@@ -465,7 +465,7 @@ airlines:
     frat5: curve_A
     load_factor_curve: lf_curve1
   - name: AL2
-    rm_system: rm_bid_price
+    rm_system: rm_test1
     frat5: curve_C
     load_factor_curve: lf_curve1
 #    ancillaries:

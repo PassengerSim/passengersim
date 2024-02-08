@@ -959,6 +959,7 @@ class Simulation:
             avg_sold = path.gt_sold / num_samples
             avg_sold_priceable = path.gt_sold_priceable / num_samples
             avg_rev = path.gt_revenue / num_samples
+
             if to_log:
                 logger.info(
                     f"{path}, avg_sold={avg_sold:6.2f}, avg_rev=${avg_rev:10,.2f}"

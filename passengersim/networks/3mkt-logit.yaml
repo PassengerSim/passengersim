@@ -4,8 +4,8 @@
 
 scenario: AW_test
 simulation_controls:
-  num_trials: 5
-  num_samples: 600
+  num_trials: 2
+  num_samples: 500
   sys_k_factor: 0.1
   mkt_k_factor: 0.15
   pax_type_k_factor: 0.2
@@ -18,9 +18,7 @@ simulation_controls:
   demand_multiplier: 1.0
   capacity_multiplier: 1.0
   manual_paths: false
-  debug_orders: false
   timeframe_demand_allocation: pods
-  capture_choice_set: true
 
 frat5_curves:
   - name: curve_A
@@ -228,23 +226,23 @@ choice_models:
 
   mnl_business:
     kind: logit
-    emult:  2.99
+    emult:  1.6
     price: -0.004
     duration: -0.006
     nonstop: 2.7
-    r1: -2.0
-    r2: -1.35
-    r3: -1.50
+    r1: -130.0
+    r2: -120.35
+    r3: -120.50
 
   mnl_leisure:
     kind: logit
-    emult: 1.9
+    emult: 1.5
     price: -0.006
     duration: -0.004
     nonstop: 2.0
-    r1: -1.30
-    r2: -0.35
-    r3: -0.35
+    r1: -30.30
+    r2: -30.35
+    r3: -30.35
 
 airlines:
   - name: AL1
@@ -761,11 +759,11 @@ snapshot_filters:
   #    sample: 35
   #    dcp: [14]
   #    flt_no: 211
-  - type: rm
-    title: RM Snapshot, EMSRb leg optimization
-    sample: [35]
-    dcp: [14]
-    flt_no: 211
+#  - type: rm
+#    title: RM Snapshot, EMSRb leg optimization
+#    sample: [35]
+#    dcp: [14]
+#    flt_no: 211
 #  - type: pro_bp
 #    title: ProBP Snapshot
 #    sample: [20, 30]

@@ -230,9 +230,9 @@ choice_models:
     price: -0.004
     duration: -0.006
     nonstop: 2.7
-    r1: -130.0
-    r2: -120.35
-    r3: -120.50
+    r1: -13.0
+    r2: -12.35
+    r3: -12.50
 
   mnl_leisure:
     kind: logit

@@ -34,7 +34,7 @@ db:
     - bucket
   fast: true
   engine: sqlite
-  filename: ":memory:"
+  filename: "adaptive-hybrid.sqlite"
 
 frat5_curves:
   - name: curve_A
@@ -597,7 +597,7 @@ choice_models:
 airlines:
   - name: AL1
     rm_system: rm_hybrid
-    frat5: curve_G
+    frat5: curve_C
     load_factor_curve: lf_curve1
 #    continuous_pricing: True
   - name: AL2

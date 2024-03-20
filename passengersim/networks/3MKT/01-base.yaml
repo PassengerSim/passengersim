@@ -201,7 +201,7 @@ legs:
     fltno: 101
     orig: BOS
     dest: ORD
-    dep_time: 08:00
+    dep_time: '08:00'
     arr_time: '10:00'
     capacity: 100
   - carrier: AL1

@@ -672,6 +672,23 @@ booking_curves:
       3: 0.98
       1: 1.0
 
+places:
+  BOS:
+    label: Boston Logan International Airport
+    lat: 42.3656
+    lon: -71.0098
+    time_zone: America/New_York
+  ORD:
+    label: Chicago O'Hare International Airport
+    lat: 41.9802
+    lon: -87.9090
+    time_zone: America/Chicago
+  LAX:
+    label: Los Angeles International Airport
+    lat: 33.9438
+    lon: -118.4091
+    time_zone: America/Los_Angeles
+
 legs:
   - carrier: AL1
     fltno: 101

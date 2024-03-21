@@ -414,6 +414,14 @@ rm_systems:
           kind: path
         - step_type: probp
           name: optimization
+      DEPARTURE:
+        - step_type: elasticity
+          name: elasticity
+          algorithm: loglog
+          kind: leg
+          min_r: 0.7
+          alpha: 0.03
+          smoothing_function: tanh
 
   rm_hybrid:
     availability_control: leg
@@ -431,11 +439,6 @@ rm_systems:
           name: optimization
           algorithm: emsrb
           kind: leg
-#      DEPARTURE:
-#        - step_type: elasticity
-#          name: elasticity
-#          algorithm: loglog
-#          kind: leg
 
   rm_adaptive_hybrid:
     availability_control: leg
@@ -570,9 +573,9 @@ choice_models:
     dwm_tod: [0.0, 0.0, 0.0, 0.0, 0.0, 0.04, 0.07, 0.10, 0.13, 0.13, 0.12, 0.10,
               0.03, 0.03, 0.04, 0.05, 0.05, 0.04, 0.02, 0.01, 0.01, 0.0, 0.0, 0.0]
     dwm_tolerance: 1.0
-#    r1: 2.0
-#    r2: 0.35
-#    r3: 0.50
+    r1: 2.0
+    r2: 0.35
+    r3: 0.50
     anc1_relevance: 0.8
     anc2_relevance: 0.5
     anc3_relevance: 0.8
@@ -586,9 +589,9 @@ choice_models:
     dwm_tod: [0.0, 0.0, 0.0, 0.0, 0.0, 0.02, 0.05, 0.08, 0.09, 0.09, 0.09, 0.06,
               0.05, 0.05, 0.07, 0.09, 0.09, 0.07, 0.05, 0.03, 0.03, 0.0, 0.0, 0.0]
     dwm_tolerance: 4.0
-#    r1: 0.70
-#    r2: 0.35
-#    r3: 0.35
+    r1: 0.70
+    r2: 0.35
+    r3: 0.35
     anc1_relevance: 0.5
     anc2_relevance: 0.8
     anc3_relevance: 0.5
@@ -596,15 +599,15 @@ choice_models:
 
 airlines:
   - name: AL1
-    rm_system: rm_hybrid
-    frat5: curve_C
+    rm_system: rm_bid_price
+    frat5: curve_B
     load_factor_curve: lf_curve1
-#    continuous_pricing: True
+    continuous_pricing: True
   - name: AL2
-    rm_system: rm_adaptive_hybrid
+    rm_system: rm_bid_price
     frat5: curve_1_5
     load_factor_curve: lf_curve1
-#    continuous_pricing: True
+    continuous_pricing: True
 #    ancillaries:
 #      ANC1: 75.0
 #      ANC2: 40.0

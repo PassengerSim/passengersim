@@ -13,6 +13,11 @@ class Demand(BaseModel, extra="forbid"):
     choice_model: str | None = None
     """The name of the choice model that is applied for this demand."""
 
+    todd_curve: str | None = None
+    """Time Of Day curve to be used in the choice model.  These
+       can vary by length of haul, day of week, E-W directionality, etc.
+       If specified here, it will override the curve in the ChoiceModel"""
+
     curve: str | None = None
     """The name of the booking curve that is applied for this demand.
 

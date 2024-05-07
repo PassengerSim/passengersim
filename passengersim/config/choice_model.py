@@ -40,6 +40,7 @@ class PodsChoiceModel(Named, extra="forbid"):
     tolerance: float | None = None
     non_stop_multiplier: float | None = None
     connection_multiplier: float | None = None
+    todd_curve: str | None = None
 
     anc1_relevance: float | None = None
     anc2_relevance: float | None = None

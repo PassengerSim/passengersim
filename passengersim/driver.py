@@ -85,6 +85,7 @@ class Simulation:
         self.choice_models = {}
         self.frat5curves = {}
         self.load_factor_curves = {}
+        self.todd_curves = {}
         self.debug = False
         self.update_frequency = None
         self.random_generator = passengersim.core.Generator(42)

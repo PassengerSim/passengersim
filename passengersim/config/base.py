@@ -38,6 +38,7 @@ from .pretty import PrettyModel, repr_dict_with_indent
 from .rm_systems import RmSystem
 from .simulation_controls import SimulationSettings
 from .snapshot_filter import SnapshotFilter
+from .todd_curves import ToddCurve
 
 if typing.TYPE_CHECKING:
     from pydantic.main import IncEx
@@ -333,6 +334,8 @@ class Config(YamlConfig, extra="forbid"):
           3: 0.95
           1: 1.0
     """
+
+    todd_curves: DictOfNamed[ToddCurve] = {}
 
     legs: list[Leg] = []
     demands: list[Demand] = []

@@ -23,6 +23,7 @@ except ImportError:
     PathClass = None
     ProBP = None
     SimulationEngine = None
+
 else:
     from passengersim_core import (
         Airline,
@@ -65,5 +66,5 @@ __all__ = [
     "Path",
     "PathClass",
     "ProBP",
-    "SimulationEngine",
+    "SimulationEngine"
 ]

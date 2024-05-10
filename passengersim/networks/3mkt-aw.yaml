@@ -489,14 +489,14 @@ rm_systems:
           name: optimization
           algorithm: emsrb
           kind: leg
-      DEPARTURE:
-        - step_type: elasticity
-          name: elasticity
-          algorithm: loglog
-          kind: leg
-          min_r: 0.5
-          alpha: 0.03
-          smoothing_function: tanh
+#      DEPARTURE:
+#        - step_type: elasticity
+#          name: elasticity
+#          algorithm: loglog
+#          kind: leg
+#          min_r: 0.5
+#          alpha: 0.03
+#          smoothing_function: tanh
 
   rm_fare_adj_leg:
     availability_control: leg
@@ -631,9 +631,9 @@ choice_models:
     basefare_mult: 2.5
     path_quality:  [38.30,  0.10]
     preferred_airline:  [-12.29,  0.17]
-    r1: 2.0
-    r2: 0.35
-    r3: 0.50
+#    r1: 2.0
+#    r2: 0.35
+#    r3: 0.50
     anc1_relevance: 0.8
     anc2_relevance: 0.5
     anc3_relevance: 0.8
@@ -655,9 +655,9 @@ choice_models:
     path_quality:  [2.02, 0.12]
     preferred_airline:  [-1.98, 0.11]
     hhi: [0.0, 0.0001]
-    r1: 0.70
-    r2: 0.35
-    r3: 0.35
+#    r1: 0.70
+#    r2: 0.35
+#    r3: 0.35
     anc1_relevance: 0.5
     anc2_relevance: 0.8
     anc3_relevance: 0.5
@@ -677,13 +677,13 @@ choice_models:
 
 airlines:
   - name: AL1
-    rm_system: rm_leg
-    frat5: curve_G_temp
+    rm_system: rm_hybrid
+    frat5: curve_C # _temp
     load_factor_curve: lf_curve1
 #    continuous_pricing: True
   - name: AL2
-    rm_system: rm_leg
-    frat5: curve_G
+    rm_system: rm_hybrid
+    frat5: curve_C
     load_factor_curve: lf_curve1
 #    continuous_pricing: True
 #    ancillaries:

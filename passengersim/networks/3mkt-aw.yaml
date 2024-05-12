@@ -17,10 +17,10 @@ simulation_controls:
   demand_multiplier: 1.0
   capacity_multiplier: 1.0
   manual_paths: false
-#  debug_orders: false
-  timeframe_demand_allocation: pods
-  capture_choice_set_file: choice-set.csv
-  capture_choice_set_obs: 10000
+  # debug_connections: true
+  # timeframe_demand_allocation: pods
+  # capture_choice_set_file: choice-set.csv
+  # capture_choice_set_obs: 10000
   # Mountain Standard Time (for me)
   controller_time_zone: -7
 
@@ -293,19 +293,19 @@ rm_systems:
       DCP:
         - step_type: untruncation
           name: untruncation
-          algorithm: naive3
-          kind: leg
+          algorithm: none
+          kind: path
         - step_type: forecast
-          name: forecast
-          algorithm: exp_smoothing
+          name: path_forecast
+          algorithm: additive_pickup
           alpha: 0.15
-          kind: leg
+          kind: path
+        - step_type: aggregation
+          name: aggregate
         - step_type: emsr
           name: leg_optimization
           algorithm: emsrb
           kind: leg
-        - step_type: useradjustment
-          name: user_adjustment
 
   rm_test_elasticity:
     availability_control: leg
@@ -457,7 +457,7 @@ rm_systems:
       DCP:
         - step_type: forecast
           name: hybrid_forecast
-          algorithm: exp_smoothing
+          algorithm: additive_pickup
           alpha: 0.15
           max_cap: 10.0
           kind: hybrid
@@ -678,11 +678,11 @@ choice_models:
 airlines:
   - name: AL1
     rm_system: rm_hybrid
-    frat5: curve_C # _temp
+    frat5: curve_A # _temp
     load_factor_curve: lf_curve1
 #    continuous_pricing: True
   - name: AL2
-    rm_system: rm_hybrid
+    rm_system: rm_leg
     frat5: curve_C
     load_factor_curve: lf_curve1
 #    continuous_pricing: True
@@ -1211,3 +1211,4 @@ snapshot_filters:
 #    sample: [20, 30]
 #    dcp: 56
 #    flt_no: 211
+

@@ -479,7 +479,7 @@ rm_systems:
       DCP:
         - step_type: forecast
           name: hybrid_forecast
-          algorithm: exp_smoothing
+          algorithm: additive_pickup
           alpha: 0.15
           max_cap: 10.0
           kind: hybrid
@@ -489,14 +489,14 @@ rm_systems:
           name: optimization
           algorithm: emsrb
           kind: leg
-#      DEPARTURE:
-#        - step_type: elasticity
-#          name: elasticity
-#          algorithm: loglog
-#          kind: leg
-#          min_r: 0.5
-#          alpha: 0.03
-#          smoothing_function: tanh
+      DEPARTURE:
+        - step_type: elasticity
+          name: elasticity
+          algorithm: loglog
+          kind: leg
+          min_r: 0.3
+          alpha: 0.1
+          smoothing_function: tanh
 
   rm_fare_adj_leg:
     availability_control: leg
@@ -677,13 +677,13 @@ choice_models:
 
 airlines:
   - name: AL1
-    rm_system: rm_hybrid
-    frat5: curve_A # _temp
+    rm_system: rm_adaptive_hybrid
+    frat5: curve_1_5
     load_factor_curve: lf_curve1
 #    continuous_pricing: True
   - name: AL2
-    rm_system: rm_leg
-    frat5: curve_C
+    rm_system: rm_hybrid
+    frat5: curve_A
     load_factor_curve: lf_curve1
 #    continuous_pricing: True
 #    ancillaries:

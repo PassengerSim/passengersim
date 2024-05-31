@@ -184,7 +184,15 @@ class Database:
             rawjson = next(
                 self.execute("SELECT configs, max(updated_at) FROM runtime_configs")
             )[0]
-        return Config.model_validate(json.loads(rawjson))
+
+        from pydantic import ValidationError
+
+        try:
+            return Config.model_validate(json.loads(rawjson))
+        except ValidationError as err:
+            logger.error(f"error loading configs: {err}")
+            logger.error("raw json: %s", json.loads(rawjson)["rm_systems"])
+            raise
 
     def save_details(self: Database, sim: SimulationEngine, dcp: int):
         """
@@ -269,7 +277,7 @@ class Database:
             idx = """
             CREATE INDEX fare_detail_idx_2
             ON fare_detail (
-                scenario, trial, sample, days_prior, carrier, booking_class
+                fare_id, scenario, trial, sample, days_prior
             );
             """
             self._connection.execute(idx)
@@ -397,9 +405,7 @@ def save_leg_bucket_multi(
         cursor = cnx.cursor()
         cnx_type = type(cnx).__name__
         if cnx_type not in leg_bucket_sql:
-            sql = leg_bucket_sql[
-                cnx_type
-            ] = f"""INSERT INTO leg_bucket_detail
+            sql = leg_bucket_sql[cnx_type] = f"""INSERT INTO leg_bucket_detail
                 (scenario, iteration, trial, sample, days_prior, flt_no,
                 bucket_number, name, auth, revenue, sold, untruncated_demand,
                 forecast_mean) VALUES ({sql_placeholders(cnx, 13)})"""

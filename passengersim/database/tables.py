@@ -88,6 +88,13 @@ def create_table_fare_defs(cnx: Database, fares: Iterable | None = None) -> None
     );
     """
     cnx.execute(sql)
+    sql2 = """
+    CREATE INDEX IF NOT EXISTS fare_defs_idx_2
+    ON fare_defs (
+        carrier, booking_class
+    );
+    """
+    cnx.execute(sql2)
     for fare in fares:
         cnx.execute(
             """

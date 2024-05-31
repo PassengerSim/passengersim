@@ -9,11 +9,13 @@ from ._version import __version__, __version_tuple__
 from .cli.info import info  # noqa: F401
 from .config import Config
 from .driver import Simulation
+from .mp_driver import MultiSimulation
 from .summary import SummaryTables
 
 __all__ = [
     "Config",
     "Simulation",
+    "MultiSimulation",
     "SummaryTables",
     "demo_network",
     "__version__",
@@ -36,7 +38,8 @@ def versions(verbose=False):
 
     if verbose:
         print(
-            f"passengersim.core {passengersim_core.__version__} (expires {passengersim_core.build_expiration()})"
+            f"passengersim.core {passengersim_core.__version__} "
+            f"(expires {passengersim_core.build_expiration()})"
         )
     else:
         print(f"passengersim.core {passengersim_core.__version__}")

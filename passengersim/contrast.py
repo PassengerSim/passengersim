@@ -421,6 +421,45 @@ def fig_carrier_yields(
 
 
 @report_figure
+def fig_carrier_total_bookings(
+    summaries,
+    raw_df=False,
+    orient: Literal["h", "v"] = "h",
+    ratio: str | bool = True,
+):
+    """
+    Generate a figure contrasting carrier total bookings for one or more runs.
+
+    Parameters
+    ----------
+    summaries : dict[str, SummaryTables]
+    raw_df : bool, default False
+    orient : {'h', 'v'}, default 'h'
+    ratio : bool or str, default True
+
+    Returns
+    -------
+    alt.Chart or pd.DataFrame
+    """
+
+    df = _assemble(summaries, "carrier_total_bookings")
+    source_order = list(summaries.keys())
+    if raw_df:
+        df.attrs["title"] = "Carrier Total Bookings"
+        return df
+    return _fig_carrier_measure(
+        df,
+        source_order,
+        load_measure="sold",
+        measure_name="Bookings",
+        measure_format=".4s",
+        orient=orient,
+        title="Carrier Total Bookings",
+        ratio=ratio,
+    )
+
+
+@report_figure
 def fig_carrier_load_factors(
     summaries: dict[str, SummaryTables],
     raw_df: bool = False,

@@ -132,6 +132,30 @@ class YamlConfig(PrettyModel):
         raw_config = cls._load_unformatted_yaml(filenames)
         return cls.model_validate(raw_config.to_dict())
 
+    tags: dict[str, Any] = {}
+    """Tags that can be used in format strings in the config."""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _parse_format_tags(cls, data: Any) -> Any:
+        """Parse format tags in the config."""
+        tags = {}
+        if "tags" in data:
+            tags.update(data["tags"])
+        if "scenario" in data:
+            tags["scenario"] = data["scenario"]
+
+        def apply_tags(x):
+            if isinstance(x, dict):
+                return {k: apply_tags(v) for k, v in x.items()}
+            if isinstance(x, list):
+                return [apply_tags(i) for i in x]
+            if isinstance(x, str):
+                return x.format(**tags)
+            return x
+
+        return apply_tags(data)
+
     def to_yaml(
         self,
         stream: os.PathLike | io.FileIO | None = None,
@@ -396,7 +420,7 @@ class Config(YamlConfig, extra="forbid"):
 
     @model_validator(mode="after")
     def _choice_model_todd_curves_exist(cls, m: Config):
-        """Check that any TODD curvves referenced in the Demand objects have been defined."""
+        """Check that any TODD curves referenced in Demand objects have been defined."""
         for name, cm in m.choice_models.items():
             if cm.todd_curve is not None and cm.todd_curve not in m.todd_curves:
                 raise ValueError(
@@ -406,11 +430,12 @@ class Config(YamlConfig, extra="forbid"):
 
     @model_validator(mode="after")
     def _demand_todd_curves_exist(cls, m: Config):
-        """Check that any TODD curves referenced in the Demand objects have been defined."""
+        """Check that any TODD curves referenced in Demand objects have been defined."""
         for dmd in m.demands:
             if dmd.todd_curve is not None and dmd.todd_curve not in m.todd_curves:
                 raise ValueError(
-                    f"Demand {dmd.orig}-{dmd.dest}:{dmd.segment} has unknown TOD Curve {dmd.todd_curve}"
+                    f"Demand {dmd.orig}-{dmd.dest}:{dmd.segment} has "
+                    f"unknown TOD Curve {dmd.todd_curve}"
                 )
         return m
 
@@ -485,6 +510,12 @@ class Config(YamlConfig, extra="forbid"):
                 raise ValueError(
                     "the `fare_class_mix` report requires recording "
                     "at least `fare_final` details in the database"
+                )
+        if "load_factor_distribution" in m.outputs.reports:
+            if not m.db.write_items & {"leg", "leg_final"}:
+                raise ValueError(
+                    "the `load_factor_distribution` report requires recording "
+                    "at least `leg_final` details in the database"
                 )
         return m
 

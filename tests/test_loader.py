@@ -122,3 +122,32 @@ def test_carriers_have_classes():
     loaded = Config.model_validate(content)
     assert loaded.airlines["AL1"].classes == ["Y0", "Y1", "Y2", "Y3"]
     assert loaded.airlines["AL2"].classes == ["F", "C", "Y"]
+
+def test_format_tags():
+    demo = """
+    scenario: party
+    tags:
+      year: 1999
+      artist: Prince
+      letter: Z
+    classes:
+      - "{letter}0"
+      - "{letter}1"
+      - "{letter}2"
+    rm_systems:
+      - name: SystemA
+        processes: {}
+    airlines:
+      AL1:
+        rm_system: SystemA
+      AL2:
+        rm_system: SystemA
+        classes:
+          - "F{year}"
+          - "{letter}zz"
+          - "{artist}"
+    """
+    content = yaml.safe_load(io.StringIO(demo))
+    loaded = Config.model_validate(content)
+    assert loaded.airlines["AL1"].classes == ["Z0", "Z1", "Z2"]
+    assert loaded.airlines["AL2"].classes == ["F1999", "Zzz", "Prince"]

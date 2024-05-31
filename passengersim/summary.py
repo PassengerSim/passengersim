@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import logging
 import os.path
 import pathlib
@@ -61,6 +62,86 @@ class SummaryTables:
         return summary
 
     @classmethod
+    def aggregate(cls, summaries: Collection[SummaryTables]):
+        """Aggregate multiple summary tables."""
+        if not summaries:
+            return None
+
+        # dataframes where trial is in the index, just concatenate
+        def concat(name):
+            frames = []
+            for s in summaries:
+                frame = getattr(s, name)
+                if frame is not None:
+                    frames.append(frame)
+            if frames:
+                return pd.concat(frames)
+            return None
+
+        carrier_history = concat("carrier_history")
+        bookings_by_timeframe = concat("bookings_by_timeframe")
+        demand_to_come = concat("demand_to_come")
+
+        # demands has some columns that are averages and some that are sums
+        demands_avg = sum(
+            s.demands.set_index(["orig", "dest", "segment"])[
+                ["sold", "revenue", "avg_fare"]
+            ]
+            for s in summaries
+        ) / len(summaries)
+        demands_sum = sum(
+            s.demands.set_index(["orig", "dest", "segment"])[
+                ["gt_demand", "gt_sold", "gt_revenue"]
+            ]
+            for s in summaries
+        )
+        demands = pd.concat([demands_avg, demands_sum], axis=1).reset_index()
+
+        carriers = sum(s.carriers.set_index("carrier") for s in summaries) / len(
+            summaries
+        )
+        legs = sum(
+            s.legs.set_index(["carrier", "flt_no", "orig", "dest"]) for s in summaries
+        ) / len(summaries)
+        paths = sum(
+            s.paths.set_index(["orig", "dest", "carrier1", "flt_no1", "carrier2"])
+            for s in summaries
+        ) / len(summaries)
+
+        def average(name):
+            frames = []
+            for s in summaries:
+                frame = getattr(s, name)
+                if frame is not None:
+                    frames.append(frame)
+            if frames:
+                return sum(frames) / len(frames)
+            return None
+
+        fare_class_mix = average("fare_class_mix")
+        leg_forecasts = average("leg_forecasts")
+        path_forecasts = average("path_forecasts")
+        bid_price_history = average("bid_price_history")
+        displacement_history = average("displacement_history")
+
+        result = cls(
+            demands=demands,
+            legs=legs,
+            paths=paths,
+            carriers=carriers,
+            fare_class_mix=fare_class_mix,
+            leg_forecasts=leg_forecasts,
+            path_forecasts=path_forecasts,
+            carrier_history=carrier_history,
+            bookings_by_timeframe=bookings_by_timeframe,
+            bid_price_history=bid_price_history,
+            displacement_history=displacement_history,
+            demand_to_come=demand_to_come,
+        )
+        result.meta_trials = summaries
+        return result
+
+    @classmethod
     def load_basic_table(self, db: database.Database, tablename: str):
         """Load a basic table"""
         logger.info("loading %s", tablename)
@@ -75,6 +156,7 @@ class SummaryTables:
             "fare_class_mix",
             "bookings_by_timeframe",
             "total_demand",
+            "load_factor_distribution",
         ),
     ) -> None:
         """
@@ -119,6 +201,8 @@ class SummaryTables:
                     additional.add("bid_price_history")
                 if "leg" in cfg.db.write_items and cfg.db.store_displacements:
                     additional.add("displacement_history")
+                if "leg" in cfg.db.write_items or "leg_final" in cfg.db.write_items:
+                    additional.add("load_factor_distribution")
             else:
                 additional = [additional]
         elif additional is None:
@@ -136,7 +220,7 @@ class SummaryTables:
                             db, orig, dest, scenario, burn_samples=burn_samples
                         )
                     )
-
+        # load additional fare class mix tables
         for i in additional:
             if isinstance(i, tuple) and i[0] == "od_fare_class_mix" and db.is_open:
                 orig, dest = i[1], i[2]
@@ -146,6 +230,24 @@ class SummaryTables:
                 self.od_fare_class_mix[(orig, dest)] = (
                     database.common_queries.od_fare_class_mix(
                         db, orig, dest, scenario, burn_samples=burn_samples
+                    )
+                )
+
+        for i in additional:
+            cutoffs = None
+            if i == "load_factor_distribution" and db.is_open:
+                cutoffs = (0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95)  # default cutoffs
+            elif (
+                isinstance(i, tuple)
+                and i[0] == "load_factor_distribution"
+                and db.is_open
+            ):
+                cutoffs = ast.literal_eval(i[1])
+            if cutoffs is not None:
+                logger.info("loading load_factor_distribution")
+                self.load_factor_distribution = (
+                    database.common_queries.load_factor_distribution(
+                        db, scenario, burn_samples=burn_samples, cutoffs=cutoffs
                     )
                 )
 
@@ -227,6 +329,7 @@ class SummaryTables:
         displacement_history: pd.DataFrame | None = None,
         local_and_flow_yields: pd.DataFrame | None = None,
         leg_carried: pd.DataFrame | None = None,
+        load_factor_distribution: pd.DataFrame | None = None,
     ):
         self.demands = demands
         self.fares = fares
@@ -247,6 +350,7 @@ class SummaryTables:
         self.displacement_history = displacement_history
         self.local_and_flow_yields = local_and_flow_yields
         self.leg_carried = leg_carried
+        self.load_factor_distribution = load_factor_distribution
 
     def to_records(self) -> dict[str, list[dict]]:
         """Convert all summary tables to a dictionary of records."""
@@ -267,6 +371,17 @@ class SummaryTables:
             for k, v in self.__dict__.items():
                 if isinstance(v, pd.DataFrame):
                     v.to_excel(writer, sheet_name=k)
+
+    def to_dataframe(self, table) -> pd.DataFrame:
+        """Convert the summary tables to a individual dataframes."""
+        sheet_count = 0
+        for k, v in self.__dict__.items():
+            if isinstance(v, pd.DataFrame):
+                sheet_count += 1
+                if sheet_count == table:
+                    return v.assign(table=k)
+
+        raise IndexError("There are fewer than", table, " DataFrames in the object")
 
     def aggregate_demand_history(self, by_segment: bool = True) -> pd.Series:
         """
@@ -433,6 +548,67 @@ class SummaryTables:
         return self._fig_fare_class_mix(
             df, label_threshold=label_threshold, title=f"Fare Class Mix ({orig}-{dest})"
         )
+
+    @report_figure
+    def fig_load_factor_distribution(self, by_carrier: bool | str = True, raw_df=False):
+        if not hasattr(self, "load_factor_distribution"):
+            raise AttributeError(
+                "load_factor_distribution data not found. Please load it first."
+            )
+
+        df_for_chart = self.load_factor_distribution
+        df_for_chart.columns.names = ["Load Factor Range"]
+        df_for_chart = df_for_chart.set_index("carrier")
+        df_for_chart = df_for_chart.stack().rename("Count").reset_index()
+
+        if not by_carrier:
+            df_for_chart = (
+                df_for_chart.groupby(["Load Factor Range"]).Count.sum().reset_index()
+            )
+        elif isinstance(by_carrier, str):
+            df_for_chart = df_for_chart[df_for_chart["carrier"] == by_carrier]
+            df_for_chart = df_for_chart.drop(columns=["carrier"])
+
+        if raw_df:
+            return df_for_chart
+
+        import altair as alt
+
+        if by_carrier is True:
+            chart = (
+                alt.Chart(df_for_chart)
+                .mark_bar()
+                .encode(
+                    x=alt.X("Load Factor Range", title="Load Factor Range"),
+                    y=alt.Y("Count:Q", title="Count"),
+                    facet=alt.Facet("carrier:N", columns=2, title="Carrier"),
+                    tooltip=[
+                        alt.Tooltip("carrier", title="Carrier"),
+                        alt.Tooltip("Count", title="Count"),
+                    ],
+                )
+                .properties(
+                    width=300, height=250, title="Leg Load Factor Frequency by Carrier"
+                )
+            )
+        else:
+            chart = (
+                alt.Chart(df_for_chart)
+                .mark_bar()
+                .encode(
+                    x=alt.X("Load Factor Range", title="Load Factor Range"),
+                    y=alt.Y("Count:Q", title="Count"),
+                )
+                .properties(
+                    width=600,
+                    height=400,
+                    title="Leg Load Factor Frequency"
+                    if not by_carrier
+                    else f"Leg Load Factor Frequency ({by_carrier})",
+                )
+            )
+
+        return chart
 
     @property
     def raw_fare_class_mix(self) -> pd.DataFrame:
@@ -795,6 +971,12 @@ class SummaryTables:
     def fig_carrier_yields(self, raw_df=False):
         return self._fig_carrier_load_factors(
             raw_df, "yield", "Average Yield", "$.4f", title="Carrier Yields"
+        )
+
+    @report_figure
+    def fig_carrier_total_bookings(self, raw_df=False):
+        return self._fig_carrier_load_factors(
+            raw_df, "sold", "Total Bookings", ".4s", title="Carrier Total Bookings"
         )
 
     def _fig_forecasts(

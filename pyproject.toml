@@ -21,7 +21,7 @@ dependencies = [
     "numpy",
     "ortools",
     "pandas",
-    "pydantic>=2.4",
+    "pydantic>=2.7",
     "pyyaml",
     "scipy",
     "typer",

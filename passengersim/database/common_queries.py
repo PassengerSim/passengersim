@@ -225,7 +225,7 @@ def total_demand(cnx: Database, scenario: str, burn_samples: int = 100) -> float
     SELECT AVG(sample_demand)
     FROM (
         SELECT
-            trial, sample, SUM(sample_demand) AS sample_demand
+            SUM(sample_demand) AS sample_demand
         FROM
             demand_detail
         WHERE

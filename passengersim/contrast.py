@@ -906,23 +906,33 @@ def fig_demand_to_come(
             s = s.groupby(s.index.names.difference(sum_on)).sum()
         return s
 
+    def get_values(s, which="mean"):
+        try:
+            result = s.demand_to_come_summary
+        except AttributeError:
+            result = dtc_seg(s.demand_to_come).groupby("segment", observed=False)
+            result = result.mean() if which == "mean" else result.std()
+            result = result.stack()
+            return result
+        else:
+            if which == "mean":
+                return result["mean_future_demand"]
+            elif which == "std":
+                return result["stdev_future_demand"]
+            else:
+                raise ValueError(f"which must be in [mean, std] not {which}")
+
     if func == "mean":
         y_title = "Mean Demand to Come"
         demand_to_come_by_segment = summaries.apply(
-            lambda s: dtc_seg(s.demand_to_come)
-            .groupby("segment", observed=False)
-            .mean()
-            .stack(),
+            lambda s: get_values(s, "mean"),
             axis=1,
         )
         df = demand_to_come_by_segment.stack().rename("dtc").reset_index()
     elif func == "std":
         y_title = "Std Dev Demand to Come"
         demand_to_come_by_segment = summaries.apply(
-            lambda s: dtc_seg(s.demand_to_come)
-            .groupby("segment", observed=False)
-            .std()
-            .stack(),
+            lambda s: get_values(s, "std"),
             axis=1,
         )
         df = demand_to_come_by_segment.stack().rename("dtc").reset_index()

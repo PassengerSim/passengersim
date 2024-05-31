@@ -4,6 +4,7 @@ import ast
 import logging
 import os.path
 import pathlib
+import warnings
 from collections.abc import Collection
 from typing import Literal
 
@@ -123,6 +124,7 @@ class SummaryTables:
         path_forecasts = average("path_forecasts")
         bid_price_history = average("bid_price_history")
         displacement_history = average("displacement_history")
+        demand_to_come_summary = average("demand_to_come_summary")
 
         result = cls(
             demands=demands,
@@ -137,8 +139,67 @@ class SummaryTables:
             bid_price_history=bid_price_history,
             displacement_history=displacement_history,
             demand_to_come=demand_to_come,
+            demand_to_come_summary=demand_to_come_summary,
         )
         result.meta_trials = summaries
+        return result
+
+    @classmethod
+    def from_sqlite_glob(
+        cls,
+        pattern: str,
+        make_indexes: bool | dict = False,
+        additional: Collection[str | tuple] | str | None = None,
+        *,
+        load_config: bool = True,
+        max_num_files: int = 9999,
+    ):
+        """
+        Load and aggregate multiple summary tables from a glob pattern.
+
+        Parameters
+        ----------
+        pattern : str
+            A glob pattern to match the files to load.
+        make_indexes
+        additional
+        load_config
+
+        Returns
+        -------
+        SummaryTables
+        """
+        import glob
+
+        cfg = None
+        raw = []
+        n = 0
+        for filename in glob.glob(pattern):
+            n += 1
+            if n > max_num_files:
+                continue
+            raw.append(
+                cls.from_sqlite(
+                    filename,
+                    make_indexes=make_indexes,
+                    additional=additional,
+                )
+            )
+            if cfg is None and load_config:
+                cfg = raw[-1].cnx.load_configs()
+        if n > max_num_files:
+            warnings.warn(
+                f"Only loaded {max_num_files} of {n} files matching pattern",
+                stacklevel=2,
+            )
+        try:
+            result = cls.aggregate(raw)
+        except Exception as e:
+            logger.error("Error aggregating summary tables: %s", e)
+            logger.exception(e)
+            return raw
+        if cfg is not None:
+            result.config = cfg
         return result
 
     @classmethod
@@ -279,6 +340,12 @@ class SummaryTables:
             logger.info("loading demand_to_come")
             self.demand_to_come = database.common_queries.demand_to_come(db, scenario)
 
+        if "demand_to_come_summary" in additional and db.is_open:
+            logger.info("loading demand_to_come_summary")
+            self.demand_to_come_summary = (
+                database.common_queries.demand_to_come_summary(db, scenario)
+            )
+
         if "carrier_history" in additional and db.is_open:
             logger.info("loading carrier_history")
             self.carrier_history = database.common_queries.carrier_history(db, scenario)
@@ -325,6 +392,7 @@ class SummaryTables:
         path_forecasts: pd.DataFrame | None = None,
         carrier_history: pd.DataFrame | None = None,
         demand_to_come: pd.DataFrame | None = None,
+        demand_to_come_summary: pd.DataFrame | None = None,
         bid_price_history: pd.DataFrame | None = None,
         displacement_history: pd.DataFrame | None = None,
         local_and_flow_yields: pd.DataFrame | None = None,
@@ -346,6 +414,7 @@ class SummaryTables:
         self.path_forecasts = path_forecasts
         self.carrier_history = carrier_history
         self.demand_to_come = demand_to_come
+        self.demand_to_come_summary = demand_to_come_summary
         self.bid_price_history = bid_price_history
         self.displacement_history = displacement_history
         self.local_and_flow_yields = local_and_flow_yields

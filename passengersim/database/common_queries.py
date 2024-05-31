@@ -38,25 +38,32 @@ def fare_class_mix(
         - `avg_price`: Average price per ticket from customers booking in this
             booking class.
     """
+    pre_qry = """
+    CREATE TABLE IF NOT EXISTS fare_summary AS
+    SELECT
+        trial, sample, scenario, carrier, booking_class,
+        SUM(sold) AS sold,
+        SUM(sold * price) AS revenue
+    FROM
+        fare_detail LEFT JOIN fare_defs USING (fare_id)
+    WHERE
+        days_prior = 0
+    GROUP BY
+        trial, sample, scenario, carrier, booking_class
+    """
+    cnx.execute(pre_qry)
+    cnx._commit_raw()
+
     qry = """
     SELECT carrier, booking_class,
            (AVG(sold)) AS avg_sold,
            (AVG(revenue)) AS avg_revenue,
            (AVG(revenue) / AVG(sold)) AS avg_price
-    FROM (
-            SELECT
-                trial, scenario, carrier, booking_class,
-                SUM(sold) AS sold,
-                SUM(sold * price) AS revenue
-            FROM
-                fare_detail LEFT JOIN fare_defs USING (fare_id)
-            WHERE
-                days_prior = 0
-                AND sample >= ?2
-                AND scenario = ?1
-            GROUP BY
-                trial, sample, carrier, booking_class
-    ) tmp
+    FROM
+        fare_summary
+    WHERE
+        sample >= ?2
+        AND scenario = ?1
     GROUP BY carrier, booking_class
     ORDER BY carrier, booking_class;
     """
@@ -485,6 +492,71 @@ def demand_to_come(
         .unstack("days_prior")
         .sort_values(by="days_prior", axis=1, ascending=False)
     )
+    return dhs
+
+
+def demand_to_come_summary(
+    cnx: Database, scenario: str, burn_samples: int = 100
+) -> pd.DataFrame:
+    """
+    Demand by market and timeframe across each sample.
+
+    This query delivers sample-by-sample timeframe demand results for the
+    various markets (origin, destination, passenger type) in the simulation.
+    It requires that the simulation was run while recording demand details
+    (i.e. with the `demand` flag set on `Config.db.write_items`).
+
+    Parameters
+    ----------
+    cnx : Database
+    scenario : str
+    burn_samples : int, default 100
+        The demand will be returned ignoring this many samples from the
+        beginning of each trial.
+
+    Returns
+    -------
+    pandas.DataFrame
+        The resulting dataframe is indexed by `iteration`, `trial`, `sample`,
+        `segment`, `orig`, and `dest`; and has columns defined by the DCPs.
+        The values stored are the total remaining demand to come at each DCP.
+    """
+    # Provides content similar to PODS *.DHS output file, but with market level detail
+    qry = """
+    CREATE TABLE IF NOT EXISTS demand_to_come_summary AS
+    WITH tmp_demand_summary AS (
+        SELECT
+            scenario, iteration, trial, sample, segment, days_prior,
+            SUM(round(sample_demand) - sold - no_go) AS future_demand
+        FROM
+            demand_detail
+        GROUP BY
+            scenario, iteration, trial, sample, segment, days_prior
+    )
+    SELECT
+        scenario, segment, days_prior,
+        AVG(future_demand) as mean_future_demand,
+        STDEV(future_demand) as stdev_future_demand
+    FROM
+        tmp_demand_summary
+    WHERE
+        sample >= ?1
+    GROUP BY
+        segment, days_prior
+    ORDER BY
+        segment, days_prior DESC
+    """
+    cnx.execute(qry, (burn_samples,))
+    cnx._commit_raw()
+
+    qry = """
+    SELECT
+        segment, days_prior, mean_future_demand, stdev_future_demand
+    FROM demand_to_come_summary
+    WHERE scenario = ?1
+    """
+    dmd = cnx.dataframe(qry, (scenario,))
+    dhs = dmd.set_index(["segment", "days_prior"])
     return dhs
 
 

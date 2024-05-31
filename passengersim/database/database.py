@@ -58,6 +58,9 @@ class Database:
         pragmas: Iterable[str] = (),
         commit_count_delay: int | None = 250,
     ):
+        if isinstance(engine, str) and engine.endswith(".sqlite") and filename is None:
+            filename = engine
+            engine = "sqlite"
         self._connection = None
         self.engine = engine
         self.filename = filename

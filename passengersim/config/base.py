@@ -144,6 +144,8 @@ class YamlConfig(PrettyModel):
             tags.update(data["tags"])
         if "scenario" in data:
             tags["scenario"] = data["scenario"]
+        tags["date_Ymd"] = time.strftime("%Y-%m-%d")
+        tags["time_HM"] = time.strftime("%H%M")
 
         def apply_tags(x):
             if isinstance(x, dict):
@@ -479,6 +481,12 @@ class Config(YamlConfig, extra="forbid"):
             if "demand" not in m.db.write_items:
                 raise ValueError(
                     "the `demand_to_come` report requires recording "
+                    "`demand` details in the database"
+                )
+        if "demand_to_come_summary" in m.outputs.reports:
+            if "demand" not in m.db.write_items:
+                raise ValueError(
+                    "the `demand_to_come_summary` report requires recording "
                     "`demand` details in the database"
                 )
         if "path_forecasts" in m.outputs.reports:

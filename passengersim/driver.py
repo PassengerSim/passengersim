@@ -375,7 +375,6 @@ class Simulation:
             tmp_fares = []
             for fare in self.sim.fares:
                 if fare.orig == dmd.orig and fare.dest == dmd.dest:
-                    # print("Joining:", dmd, fare)
                     tmp_fares.append(fare)
             tmp_fares = sorted(tmp_fares, reverse=True, key=lambda p: p.price)
             for fare in tmp_fares:
@@ -475,7 +474,6 @@ class Simulation:
         if num_paths and self.cnx.is_open:
             database.tables.create_table_path_defs(self.cnx._connection, self.sim.paths)
         logger.debug(f"Connections done, num_paths = {num_paths}")
-        self.vn_initial_mapping()
 
         # Airlines using Q-forecasting need to have pathclasses set up for all paths
         # so Q-demand can be forecasted by pathclass even in the absence of bookings
@@ -499,6 +497,7 @@ class Simulation:
                             )
                             if pthcls is not None:
                                 pthcls.add_fare(fare)
+            self.vn_initial_mapping2(carrier.name)
 
         # This will save approximately the number of choice sets requested
         if self.choice_set_file is not None and self.choice_set_obs > 0:
@@ -527,6 +526,12 @@ class Simulation:
                     index = int(bc[1])
                     pc.set_indexes(index, index)
                     path.add_path_class(pc)
+
+    def vn_initial_mapping2(self, airline_code):
+        for path in self.sim.paths:
+            if path.get_leg_carrier(0) == airline_code:
+                for i, pc in enumerate(path.pathclasses):
+                    pc.set_indexes(i, i)
 
     def end_sample(self):
         # Commit data to the database

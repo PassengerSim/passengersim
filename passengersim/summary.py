@@ -104,6 +104,7 @@ class SummaryTables:
         legs = sum(
             s.legs.set_index(["carrier", "flt_no", "orig", "dest"]) for s in summaries
         ) / len(summaries)
+        legs = legs.reset_index()
         paths = sum(
             s.paths.set_index(["orig", "dest", "carrier1", "flt_no1", "carrier2"])
             for s in summaries

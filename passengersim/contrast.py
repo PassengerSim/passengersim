@@ -907,9 +907,8 @@ def fig_demand_to_come(
         return s
 
     def get_values(s, which="mean"):
-        try:
-            result = s.demand_to_come_summary
-        except AttributeError:
+        result = getattr(s, "demand_to_come_summary", None)
+        if result is None:
             result = dtc_seg(s.demand_to_come).groupby("segment", observed=False)
             result = result.mean() if which == "mean" else result.std()
             result = result.stack()
@@ -928,6 +927,7 @@ def fig_demand_to_come(
             lambda s: get_values(s, "mean"),
             axis=1,
         )
+        demand_to_come_by_segment.index.names = ["segment", "days_prior"]
         df = demand_to_come_by_segment.stack().rename("dtc").reset_index()
     elif func == "std":
         y_title = "Std Dev Demand to Come"
@@ -935,6 +935,7 @@ def fig_demand_to_come(
             lambda s: get_values(s, "std"),
             axis=1,
         )
+        demand_to_come_by_segment.index.names = ["segment", "days_prior"]
         df = demand_to_come_by_segment.stack().rename("dtc").reset_index()
     else:
         raise ValueError(f"func must be in [mean, std] not {func}")

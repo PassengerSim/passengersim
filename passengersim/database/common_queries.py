@@ -678,8 +678,10 @@ def bid_price_history(
     """
     if weighting not in ("equal", "capacity"):
         raise ValueError(f"unknown weighting {weighting}")
-    qry = """
+    preqry = """
+    CREATE TABLE IF NOT EXISTS bid_price_general_summary AS
     SELECT
+        scenario,
         carrier,
         days_prior,
         avg(bid_price) as bid_price_mean,
@@ -691,20 +693,30 @@ def bid_price_history(
     FROM leg_detail
         LEFT JOIN leg_defs ON leg_detail.flt_no = leg_defs.flt_no
     WHERE
-        scenario == ?1
-        AND sample >= ?2
+        sample >= ?1
     GROUP BY
         carrier, days_prior
     """
+    cnx.execute(preqry, (burn_samples,))
+    cnx._commit_raw()
+    qry = """
+    SELECT
+        carrier,
+        days_prior,
+        bid_price_mean,
+        bid_price_stdev,
+        fraction_some_cap,
+        fraction_zero_cap
+    FROM bid_price_general_summary WHERE scenario == ?1
+    """
     bph = cnx.dataframe(
         qry,
-        (
-            scenario,
-            burn_samples,
-        ),
+        (scenario,),
     )
-    qry2 = """
+    preqry2 = """
+    CREATE TABLE IF NOT EXISTS bid_price_somecap_summary AS
     SELECT
+        scenario,
         carrier,
         days_prior,
         avg(bid_price) as some_cap_bid_price_mean_unweighted,
@@ -714,18 +726,24 @@ def bid_price_history(
     FROM leg_detail
         LEFT JOIN leg_defs ON leg_detail.flt_no = leg_defs.flt_no
     WHERE
-        scenario == ?1
-        AND sample >= ?2
+        sample >= ?1
         AND leg_detail.sold < leg_defs.capacity
     GROUP BY
         carrier, days_prior
     """
+    cnx.execute(preqry2, (burn_samples,))
+    cnx._commit_raw()
+    qry2 = """
+    SELECT
+        carrier, days_prior,
+        some_cap_bid_price_mean_unweighted,
+        some_cap_bid_price_stdev,
+        some_cap_bid_price_mean_capweighted
+    FROM bid_price_somecap_summary WHERE scenario == ?1
+    """
     bph_some_cap = cnx.dataframe(
         qry2,
-        (
-            scenario,
-            burn_samples,
-        ),
+        (scenario,),
     ).set_index(["carrier", "days_prior"])
     bph = bph.set_index(["carrier", "days_prior"]).join(bph_some_cap)
     bph = bph.sort_index(ascending=(True, False))
@@ -769,8 +787,10 @@ def displacement_history(
         - `displacement_stdev`: Sample standard deviation of displacement cost
             across all samples and all legs
     """
-    qry = """
+    preqry = """
+    CREATE TABLE IF NOT EXISTS displacement_summary AS
     SELECT
+        scenario,
         carrier,
         days_prior,
         avg(displacement) as displacement_mean,
@@ -778,19 +798,22 @@ def displacement_history(
     FROM leg_detail
         LEFT JOIN leg_defs ON leg_detail.flt_no = leg_defs.flt_no
     WHERE
-        scenario == ?1
-        AND sample >= ?2
+        sample >= ?1
     GROUP BY
-        carrier, days_prior
+        scenario, carrier, days_prior
     ORDER BY
         carrier, days_prior DESC
     """
+    cnx.execute(preqry, (burn_samples,))
+    cnx._commit_raw()
+    qry = """
+    SELECT carrier, days_prior, displacement_mean, displacement_stdev
+    FROM displacement_summary
+    WHERE scenario == ?1
+    """
     df = cnx.dataframe(
         qry,
-        (
-            scenario,
-            burn_samples,
-        ),
+        (scenario,),
     )
     df = df.set_index(["carrier", "days_prior"])
     return df

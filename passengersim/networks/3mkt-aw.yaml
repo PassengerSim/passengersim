@@ -653,9 +653,9 @@ choice_models:
     basefare_mult: 2.5
     path_quality:  [38.30,  0.10]
     preferred_airline:  [-12.29,  0.17]
-#    r1: 2.0
-#    r2: 0.35
-#    r3: 0.50
+    r1: 2.0
+    r2: 0.35
+    r3: 0.50
     anc1_relevance: 0.8
     anc2_relevance: 0.5
     anc3_relevance: 0.8
@@ -700,11 +700,11 @@ choice_models:
 
 airlines:
   - name: AL1
-    rm_system: rm_hybrid_mr
+    rm_system: rm_bid_price
     frat5: curve_C
     #    fare_adjustment_scale: 0.3
     #    load_factor_curve: lf_curve1
-    #    continuous_pricing: True
+    continuous_pricing: True
     classes:
       - (Y0, Y)
       - (Y1, Y)
@@ -713,11 +713,11 @@ airlines:
       - (Y4, Y)
       - (Y5, Y)
   - name: AL2
-    rm_system: rm_hybrid
+    rm_system: rm_bid_price
     frat5: curve_C
     fare_adjustment_scale: 0.5
     load_factor_curve: lf_curve1
-#    continuous_pricing: True
+    continuous_pricing: False
 #    ancillaries:
 #      ANC1: 75.0
 #      ANC2: 40.0

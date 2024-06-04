@@ -4,7 +4,7 @@
 
 scenario: AW_test
 simulation_controls:
-  num_trials: 6
+  num_trials: 16
   num_samples: 600
   sys_k_factor: 0.1
   mkt_k_factor: 0.15
@@ -661,12 +661,13 @@ choice_models:
     anc3_relevance: 0.8
     dwm_data:
       - min_distance: 0
-        max_distance: 5000
-        k_factor: 3.0
-        early_dep: [0, 20.0]
-        late_dep: [0, 30.0]
-        early_arr: [0, 15.0]
-        late_arr: [0, 40.0]
+#        max_distance: 5000
+#        k_factor: 3.0
+#        early_dep: [0, 20.0]
+#        late_dep: [0, 30.0]
+#        early_arr: [0, 15.0]
+#        late_arr: [0, 40.0]
+#        replanning: [0.0, 0.0]
         probabilities: [0.28, 0.09, 0.06, 0.04, 0.1, 0.71, 2.7, 4.76, 6.01, 6.54, 6.29, 5.88,
                         5.71, 5.77, 6.06, 6.57, 7.22, 7.75, 7.94, 7.36, 5.73, 3.67, 1.94, 0.82]
 
@@ -686,25 +687,25 @@ choice_models:
     elapsed_time: [0, 0.7]
     buffer_threshold: 25
     buffer_time: [0, 0.1]
-    replanning: [1.9, 0.1012]
     dwm_data:
       - min_distance: 0
-        max_distance: 5000
-        k_factor: 3.0
-        early_dep: [0, 10.0]
-        late_dep: [0, 15.0]
-        early_arr: [0, 10.0]
-        late_arr: [0, 20.0]
+#        max_distance: 5000
+#        k_factor: 3.0
+#        early_dep: [0, 10.0]
+#        late_dep: [0, 15.0]
+#        early_arr: [0, 10.0]
+#        late_arr: [0, 20.0]
+#        replanning: [0.0, 0.0]
         probabilities: [0.28, 0.09, 0.06, 0.04, 0.1, 0.71, 2.7, 4.76, 6.01, 6.54, 6.29, 5.88,
                         5.71, 5.77, 6.06, 6.57, 7.22, 7.75, 7.94, 7.36, 5.73, 3.67, 1.94, 0.82]
 
 airlines:
   - name: AL1
-    rm_system: rm_bid_price
+    rm_system: rm_leg
     frat5: curve_C
     #    fare_adjustment_scale: 0.3
     #    load_factor_curve: lf_curve1
-    continuous_pricing: True
+#    continuous_pricing: True
     classes:
       - (Y0, Y)
       - (Y1, Y)
@@ -713,7 +714,7 @@ airlines:
       - (Y4, Y)
       - (Y5, Y)
   - name: AL2
-    rm_system: rm_bid_price
+    rm_system: rm_leg
     frat5: curve_C
     fare_adjustment_scale: 0.5
     load_factor_curve: lf_curve1
@@ -872,7 +873,7 @@ demands:
     choice_model: business
     curve: c1
     distance: 864.0
-    todd_curve: Tues_SameTZ_LE600
+#    todd_curve: Tues_SameTZ_LE600
   - orig: BOS
     dest: ORD
     segment: leisure

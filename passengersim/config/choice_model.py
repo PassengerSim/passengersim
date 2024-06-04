@@ -16,6 +16,7 @@ class DwmData(BaseModel, extra="forbid"):
     late_dep: tuple[float, float] | None = None
     early_arr: tuple[float, float] | None = None
     late_arr: tuple[float, float] | None = None
+    replanning: tuple[float, float] | None = None
     probabilities: List[float] = []
 
 

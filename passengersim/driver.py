@@ -291,6 +291,12 @@ class Simulation(BaseSimulation):
                         late_arr_beta = (
                             dwm.late_arr[1] if dwm.late_arr is not None else 0.0
                         )
+                        replanning_alpha = (
+                            dwm.replanning[0] if dwm.replanning is not None else 0.0
+                        )
+                        replanning_beta = (
+                            dwm.replanning[1] if dwm.replanning is not None else 0.0
+                        )
                         x.add_dwm_data(
                             dwm.min_distance,
                             dwm.max_distance,
@@ -303,6 +309,8 @@ class Simulation(BaseSimulation):
                             early_arr_beta,
                             late_arr_alpha,
                             late_arr_beta,
+                            replanning_alpha,
+                            replanning_beta,
                             dwm.probabilities,
                         )
                 elif isinstance(pvalue, list | tuple):

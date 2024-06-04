@@ -18,6 +18,7 @@ class ToddCurve(Named, extra="forbid"):
     lateDepMultiplier: tuple[float, float] | None = None
     earlyArrMultiplier: tuple[float, float] | None = None
     lateArrMultiplier: tuple[float, float] | None = None
+    replanning: tuple[float, float] | None = None
 
     curve: dict[int, float]
     """Define a TODD curve.

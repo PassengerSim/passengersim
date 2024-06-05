@@ -297,6 +297,9 @@ class Simulation(BaseSimulation):
                         replanning_beta = (
                             dwm.replanning[1] if dwm.replanning is not None else 0.0
                         )
+                        # Normalize probabilities - in case someone entered percentages
+                        if abs(sum(dwm.probabilities) - 100.0) < 0.1:
+                            dwm.probabilities = [p / 100.0 for p in dwm.probabilities]
                         x.add_dwm_data(
                             dwm.min_distance,
                             dwm.max_distance,

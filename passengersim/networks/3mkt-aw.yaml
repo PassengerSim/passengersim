@@ -708,6 +708,7 @@ airlines:
     #    fare_adjustment_scale: 0.3
     #    load_factor_curve: lf_curve1
     continuous_pricing: CBC
+    cp_quantize: 5
     classes:
       - (Y0, Y)
       - (Y1, Y)

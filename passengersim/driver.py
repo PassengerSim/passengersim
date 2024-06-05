@@ -337,6 +337,7 @@ class Simulation(BaseSimulation):
             airline = passengersim.core.Airline(airline_name, availability_control)
             airline.rm_system = self.rm_systems[airline_config.rm_system]
             airline.continuous_pricing = airline_config.continuous_pricing
+            airline.cp_quantize = airline_config.cp_quantize
             if airline_config.frat5 is not None and airline_config.frat5 != "":
                 # We want a deep copy of the Frat5 curve,
                 # in case two airlines are using the same curve,

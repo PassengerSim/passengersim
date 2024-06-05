@@ -17,6 +17,10 @@ class Airline(Named, extra="forbid"):
     continuous_pricing: Optional[str] = "None"
     """Used to select continuous pricing"""
 
+    cp_quantize: Optional[int] = 0
+    """Cntrols quantization (rounding) for Continuous Pricing
+       Example: If you set it to 5, the price will be rounded to the nearest $5"""
+
     frat5: str | None = ""
     """Named FRAT5 curve.
     This is the default that will be applied if not found at a more detailed level

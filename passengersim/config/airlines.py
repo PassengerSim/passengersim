@@ -14,7 +14,7 @@ class Airline(Named, extra="forbid"):
     control: str = ""
     """Deprecated.  No effect"""
 
-    continuous_pricing: bool | None = False
+    continuous_pricing: Optional[str] = "None"
     """Used to select continuous pricing"""
 
     frat5: str | None = ""

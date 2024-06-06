@@ -5,22 +5,25 @@ from pydantic import ValidationInfo, field_validator
 
 from .named import Named
 
+from .pretty import PrettyModel
 
-class ToddCurve(Named, extra="forbid"):
+
+class ToddCurve(PrettyModel, extra="forbid"):
     """
     Customer preference data for Time Of Day
     """
 
+    name: str = "???"
     min_distance: int = 0
     max_distance: int = 25000
     k_factor: float = 3.0
-    earlyDepMultiplier: tuple[float, float] | None = None
-    lateDepMultiplier: tuple[float, float] | None = None
-    earlyArrMultiplier: tuple[float, float] | None = None
-    lateArrMultiplier: tuple[float, float] | None = None
+    early_dep: tuple[float, float] | None = None
+    late_dep: tuple[float, float] | None = None
+    early_arr: tuple[float, float] | None = None
+    late_arr: tuple[float, float] | None = None
     replanning: tuple[float, float] | None = None
 
-    curve: dict[int, float]
+    probabilities: dict[int, float] | list[float] = None
     """Define a TODD curve.
 
 

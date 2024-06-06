@@ -9,6 +9,7 @@ except ImportError:
     Bucket = None
     Cabin = None
     ChoiceModel = None
+    DecisionWindow = None
     Demand = None
     DynamicProgram = None
     Event = None
@@ -30,6 +31,7 @@ else:
         Bucket,
         Cabin,
         ChoiceModel,
+        DecisionWindow,
         Demand,
         DynamicProgram,
         Event,
@@ -52,6 +54,7 @@ __all__ = [
     "Bucket",
     "Cabin",
     "ChoiceModel",
+    "DecisionWindow",
     "Demand",
     "DynamicProgram",
     "Event",

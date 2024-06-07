@@ -689,7 +689,7 @@ choice_models:
     anc1_relevance: 0.8
     anc2_relevance: 0.5
     anc3_relevance: 0.8
-#    todd_curve: business
+    todd_curve: business
 
   leisure:
     kind: pods
@@ -707,7 +707,7 @@ choice_models:
     elapsed_time: [0, 0.7]
     buffer_threshold: 25
     buffer_time: [0, 0.1]
-#    todd_curve: leisure
+    todd_curve: leisure
 
 airlines:
   - name: AL1

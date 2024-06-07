@@ -689,7 +689,7 @@ choice_models:
     anc1_relevance: 0.8
     anc2_relevance: 0.5
     anc3_relevance: 0.8
-    todd_curve: business
+#    todd_curve: business
 
   leisure:
     kind: pods
@@ -715,7 +715,7 @@ airlines:
     frat5: curve_G
     #    fare_adjustment_scale: 0.3
     #    load_factor_curve: lf_curve1
-    continuous_pricing: CBC
+#    continuous_pricing: CBC
     cp_quantize: 5
     classes:
       - (Y0, Y)
@@ -729,7 +729,7 @@ airlines:
     frat5: curve_C
     fare_adjustment_scale: 0.5
     load_factor_curve: lf_curve1
-    continuous_pricing: BP
+#    continuous_pricing: BP
 #    ancillaries:
 #      ANC1: 75.0
 #      ANC2: 40.0

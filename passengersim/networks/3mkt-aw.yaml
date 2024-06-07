@@ -4,7 +4,7 @@
 
 scenario: AW_test
 simulation_controls:
-  num_trials: 6
+  num_trials: 5
   num_samples: 600
   sys_k_factor: 0.1
   mkt_k_factor: 0.15
@@ -707,7 +707,7 @@ choice_models:
     elapsed_time: [0, 0.7]
     buffer_threshold: 25
     buffer_time: [0, 0.1]
-    todd_curve: leisure
+#    todd_curve: leisure
 
 airlines:
   - name: AL1

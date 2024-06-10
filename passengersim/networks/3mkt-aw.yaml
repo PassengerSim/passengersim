@@ -4,7 +4,7 @@
 
 scenario: AW_test
 simulation_controls:
-  num_trials: 5
+  num_trials: 15
   num_samples: 600
   sys_k_factor: 0.1
   mkt_k_factor: 0.15
@@ -452,6 +452,29 @@ rm_systems:
         - step_type: probp
           name: optimization
 
+  rm_sub_bp:
+    availability_control: bp
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: path
+        - step_type: forecast
+          name: path_forecast
+          algorithm: additive_pickup
+          alpha: 0.15
+          kind: path
+        - step_type: subbp
+          name: optimization
+      DAILY:
+        - step_type: forecastadjustment
+          name: adjust
+          algorithm: timeframe
+          kind: path
+        - step_type: subbp
+          name: optimization
+
   rm_hybrid:
     availability_control: leg
     processes:
@@ -725,7 +748,7 @@ airlines:
       - (Y4, Y)
       - (Y5, Y)
   - name: AL2
-    rm_system: rm_bid_price
+    rm_system: rm_sub_bp
     frat5: curve_C
     fare_adjustment_scale: 0.5
     load_factor_curve: lf_curve1
@@ -884,7 +907,7 @@ demands:
     choice_model: business
     curve: c1
     distance: 864.0
-#    todd_curve: Tues_SameTZ_LE600
+    todd_curve: Tues_SameTZ_LE600
   - orig: BOS
     dest: ORD
     segment: leisure

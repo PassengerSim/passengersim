@@ -4,7 +4,7 @@
 
 scenario: AW_test
 simulation_controls:
-  num_trials: 15
+  num_trials: 5
   num_samples: 600
   sys_k_factor: 0.1
   mkt_k_factor: 0.15
@@ -473,6 +473,29 @@ rm_systems:
           algorithm: timeframe
           kind: path
         - step_type: subbp
+          name: optimization
+
+  rm_lp:
+    availability_control: bp
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: path
+        - step_type: forecast
+          name: path_forecast
+          algorithm: additive_pickup
+          alpha: 0.15
+          kind: path
+        - step_type: lp
+          name: optimization
+      DAILY:
+        - step_type: forecastadjustment
+          name: adjust
+          algorithm: timeframe
+          kind: path
+        - step_type: lp
           name: optimization
 
   rm_hybrid:

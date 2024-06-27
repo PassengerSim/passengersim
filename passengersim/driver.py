@@ -328,6 +328,7 @@ class Simulation(BaseSimulation):
             ].availability_control
             airline = passengersim.core.Airline(airline_name, availability_control)
             airline.rm_system = self.rm_systems[airline_config.rm_system]
+            airline.truncation_rule = airline_config.truncation_rule
             airline.continuous_pricing = airline_config.continuous_pricing
             if airline_config.frat5 is not None and airline_config.frat5 != "":
                 # We want a deep copy of the Frat5 curve,
@@ -409,6 +410,7 @@ class Simulation(BaseSimulation):
                 print(f"Added fare: {fare}")
             # self.fares.append(fare)
 
+        carriers = {cxr.name: cxr for cxr in self.sim.airlines}
         for path_config in config.paths:
             p = passengersim.core.Path(path_config.orig, path_config.dest, 0.0)
             p.path_quality_index = path_config.path_quality_index
@@ -427,6 +429,10 @@ class Simulation(BaseSimulation):
             assert (
                 tmp_leg.dest == path_config.dest
             ), "Path statement is corrupted, dest doesn't match"
+            path_carrier = tmp_leg.carrier
+            if path_carrier not in carriers:
+                raise ValueError(f"Carrier {path_carrier} not found")
+            p.add_airline(carriers[path_carrier])
             self.sim.add_path(p)
 
         # Go through and make sure things are linked correctly
@@ -747,74 +753,97 @@ class Simulation(BaseSimulation):
             )
 
     def run_airline_models(self, info: Any = None, departed: bool = False, debug=False):
-        event_type = info[0]
-        recording_day = info[
-            1
-        ]  # could in theory also be non-integer for fractional days
-        dcp_index = info[2]
-        if dcp_index == -1:
-            dcp_index = len(self.dcp_list) - 1
+        try:
+            event_type = info[0]
+            recording_day = info[
+                1
+            ]  # could in theory also be non-integer for fractional days
+            dcp_index = info[2]
+            if dcp_index == -1:
+                dcp_index = len(self.dcp_list) - 1
 
-        # Data capture that is normally done by RM systems
-        if event_type.lower() in {"dcp", "done"}:
-            self.sim.last_dcp = recording_day
-            self.sim.last_dcp_index = dcp_index
-            self.capture_dcp_data(dcp_index)
-            self.capture_competitor_data()  # Simulates Infare / QL2
+            what_had_happened_was = []
 
-        # Run the specified process(es) for the airlines
-        for airline in self.sim.airlines:
-            if event_type.lower() == "dcp":
-                # Regular Data Collection Points (pre-departure)
-                airline.rm_system.run(
-                    self.sim, airline.name, dcp_index, recording_day, event_type="dcp"
-                )
-            elif event_type.lower() == "daily":
-                # Daily report, every day prior to departure EXCEPT specified DCPs
-                airline.rm_system.run(
-                    self.sim, airline.name, dcp_index, recording_day, event_type="daily"
-                )
-            elif event_type.lower() == "done":
-                # Post departure processing
-                airline.rm_system.run(
-                    self.sim, airline.name, dcp_index, recording_day, event_type="dcp"
-                )
-                airline.rm_system.run(
-                    self.sim,
-                    airline.name,
-                    dcp_index,
-                    recording_day,
-                    event_type="departure",
-                )
-                if self.sim.sample % 7 == 0:
-                    # Can be used less frequently, such as ML steps on accumulated data
+            if event_type.lower() in {"dcp", "done"}:
+                self.sim.last_dcp = recording_day
+                self.sim.last_dcp_index = dcp_index
+                # self.capture_dcp_data(dcp_index)
+                # self.capture_competitor_data()  # Simulates Infare / QL2
+
+            # Run the specified process(es) for the airlines
+            for airline in self.sim.airlines:
+                if event_type.lower() == "dcp":
+                    # Regular Data Collection Points (pre-departure)
+                    what_had_happened_was.append(f"run {airline.name} DCP")
+                    airline.rm_system.run(
+                        self.sim, airline.name, dcp_index, recording_day, event_type="dcp"
+                    )
+                elif event_type.lower() == "daily":
+                    # Daily report, every day prior to departure EXCEPT specified DCPs
+                    what_had_happened_was.append(f"run {airline.name} daily")
+                    airline.rm_system.run(
+                        self.sim, airline.name, dcp_index, recording_day, event_type="daily"
+                    )
+                elif event_type.lower() == "done":
+                    # Post departure processing
+                    what_had_happened_was.append(f"run {airline.name} done")
+                    airline.rm_system.run(
+                        self.sim, airline.name, dcp_index, recording_day, event_type="dcp"
+                    )
                     airline.rm_system.run(
                         self.sim,
                         airline.name,
                         dcp_index,
                         recording_day,
-                        event_type="weekly",
+                        event_type="departure",
                     )
+                    if self.sim.sample % 7 == 0:
+                        # Can be used less frequently, such as ML steps on accumulated data
+                        airline.rm_system.run(
+                            self.sim,
+                            airline.name,
+                            dcp_index,
+                            recording_day,
+                            event_type="weekly",
+                        )
 
-        # Database capture
-        if event_type.lower() == "daily":
-            if (
-                self.cnx.is_open
-                and self.sim.save_timeframe_details
-                and recording_day > 0
-            ):
-                self.sim.write_to_sqlite(
-                    self.cnx._connection,
-                    recording_day,
-                    store_bid_prices=self.sim.config.db.store_leg_bid_prices,
-                    intermediate_day=True,
-                    store_displacements=self.sim.config.db.store_displacements,
-                )
-        elif event_type.lower() in {"dcp", "done"}:
-            if self.cnx.is_open:
-                self.cnx.save_details(self.sim, recording_day)
-            if self.file_writer is not None:
-                self.file_writer.save_details(self.sim, recording_day)
+            # Internal simulation data capture that is normally done by RM systems
+            if event_type.lower() in {"dcp", "done"}:
+                self.sim.last_dcp = recording_day
+                self.sim.last_dcp_index = dcp_index
+                self.capture_dcp_data(dcp_index)
+                # self.capture_dcp_data(dcp_index, closures_only=True)
+                what_had_happened_was.append("capture_dcp_close_data")
+                # self.capture_competitor_data()  # Simulates Infare / QL2
+
+            # Database capture
+            if event_type.lower() == "daily":
+                if (
+                    self.cnx.is_open
+                    and self.sim.save_timeframe_details
+                    and recording_day > 0
+                ):
+                    # if self.sim.sample == 101:
+                    #     print("write_to_sqlite DAILY")
+                    what_had_happened_was.append(f"write_to_sqlite daily")
+                    self.sim.write_to_sqlite(
+                        self.cnx._connection,
+                        recording_day,
+                        store_bid_prices=self.sim.config.db.store_leg_bid_prices,
+                        intermediate_day=True,
+                        store_displacements=self.sim.config.db.store_displacements,
+                    )
+            elif event_type.lower() in {"dcp", "done"}:
+                if self.cnx.is_open:
+                    self.cnx.save_details(self.sim, recording_day)
+                if self.file_writer is not None:
+                    self.file_writer.save_details(self.sim, recording_day)
+        except Exception as e:
+            print(e)
+            print("Error in run_airline_models")
+            print(f"{info=}")
+            print('what_had_happened_was=', what_had_happened_was)
+            raise
 
     def capture_competitor_data(self):
         for mkt in self.sim.markets:
@@ -822,11 +851,11 @@ class Simulation(BaseSimulation):
             for cxr, price in lowest:
                 mkt.set_competitor_price(cxr, price)
 
-    def capture_dcp_data(self, dcp_index):
+    def capture_dcp_data(self, dcp_index, closures_only=False):
         for leg in self.sim.legs:
             leg.capture_dcp(dcp_index)
         for path in self.sim.paths:
-            path.capture_dcp(dcp_index)
+            path.capture_dcp(dcp_index, closures_only=closures_only)
 
     def _accum_by_tf(self, dcp_index):
         # This is now replaced by C++ native counters ...

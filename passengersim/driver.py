@@ -20,7 +20,7 @@ import passengersim.config.rm_systems
 import passengersim.core
 from passengersim.config import Config
 from passengersim.config.snapshot_filter import SnapshotFilter
-from passengersim.core import Event, Frat5, PathClass, SimulationEngine
+from passengersim.core import DecisionWindow, Event, Frat5, PathClass, SimulationEngine
 from passengersim.summary import SummaryTables
 
 from . import database
@@ -258,6 +258,31 @@ class Simulation(BaseSimulation):
             #     )
             x.availability_control = availability_control
 
+        for todd_name, todd in config.todd_curves.items():
+            dwm = DecisionWindow(todd_name)
+            if todd.k_factor:
+                dwm.k_factor = todd.k_factor
+            if todd.min_distance:
+                dwm.min_distance = todd.min_distance
+            if todd.early_dep:
+                dwm.early_dep_alpha = todd.early_dep[0]
+                dwm.early_dep_beta = todd.early_dep[1]
+            if todd.late_dep:
+                dwm.late_dep_alpha = todd.late_dep[0]
+                dwm.late_dep_beta = todd.late_dep[1]
+            if todd.late_dep:
+                dwm.late_dep_alpha = todd.late_dep[0]
+                dwm.late_dep_beta = todd.late_dep[1]
+            if todd.late_arr:
+                dwm.late_arr_alpha = todd.late_arr[0]
+                dwm.late_arr_beta = todd.late_arr[1]
+            if todd.replanning:
+                dwm.replanning_alpha = todd.replanning[0]
+                dwm.replanning_beta = todd.replanning[1]
+            if todd.probabilities:
+                dwm.dwm_tod = list(todd.probabilities.values())
+            self.todd_curves[todd_name] = dwm
+
         for cm_name, cm in config.choice_models.items():
             x = passengersim.core.ChoiceModel(cm_name, cm.kind)
             for pname, pvalue in cm:
@@ -265,46 +290,10 @@ class Simulation(BaseSimulation):
                     continue
                 if pvalue is None:
                     continue
-                if pname == "dwm_data":
-                    for dwm in pvalue:
-                        early_dep_alpha = (
-                            dwm.early_dep[0] if dwm.early_dep is not None else 0.0
-                        )
-                        early_dep_beta = (
-                            dwm.early_dep[1] if dwm.early_dep is not None else 0.0
-                        )
-                        late_dep_alpha = (
-                            dwm.late_dep[0] if dwm.late_dep is not None else 0.0
-                        )
-                        late_dep_beta = (
-                            dwm.late_dep[1] if dwm.late_dep is not None else 0.0
-                        )
-                        early_arr_alpha = (
-                            dwm.early_arr[0] if dwm.early_arr is not None else 0.0
-                        )
-                        early_arr_beta = (
-                            dwm.early_arr[1] if dwm.early_arr is not None else 0.0
-                        )
-                        late_arr_alpha = (
-                            dwm.late_arr[0] if dwm.late_arr is not None else 0.0
-                        )
-                        late_arr_beta = (
-                            dwm.late_arr[1] if dwm.late_arr is not None else 0.0
-                        )
-                        x.add_dwm_data(
-                            dwm.min_distance,
-                            dwm.max_distance,
-                            dwm.k_factor,
-                            early_dep_alpha,
-                            early_dep_beta,
-                            late_dep_alpha,
-                            late_dep_beta,
-                            early_arr_alpha,
-                            early_arr_beta,
-                            late_arr_alpha,
-                            late_arr_beta,
-                            dwm.probabilities,
-                        )
+
+                if pname == "todd_curve":
+                    tmp_dwm = self.todd_curves[pvalue]
+                    x.add_dwm(tmp_dwm)
                 elif isinstance(pvalue, list | tuple):
                     x.add_parm(pname, *pvalue)
                 else:
@@ -330,6 +319,7 @@ class Simulation(BaseSimulation):
             airline.rm_system = self.rm_systems[airline_config.rm_system]
             airline.truncation_rule = airline_config.truncation_rule
             airline.continuous_pricing = airline_config.continuous_pricing
+            airline.cp_quantize = airline_config.cp_quantize
             if airline_config.frat5 is not None and airline_config.frat5 != "":
                 # We want a deep copy of the Frat5 curve,
                 # in case two airlines are using the same curve,
@@ -389,6 +379,8 @@ class Simulation(BaseSimulation):
                 curve_name = str(dmd_config.curve).strip()
                 curve = self.curves[curve_name]
                 dmd.add_curve(curve)
+            if dmd_config.todd_curve in self.todd_curves:
+                dmd.add_dwm(self.todd_curves[dmd_config.todd_curve])
             self.sim.add_demand(dmd)
             if self.debug:
                 print(f"Added demand: {dmd}, base_demand = {dmd.base_demand}")
@@ -440,7 +432,6 @@ class Simulation(BaseSimulation):
             tmp_fares = []
             for fare in self.sim.fares:
                 if fare.orig == dmd.orig and fare.dest == dmd.dest:
-                    # print("Joining:", dmd, fare)
                     tmp_fares.append(fare)
             tmp_fares = sorted(tmp_fares, reverse=True, key=lambda p: p.price)
             for fare in tmp_fares:
@@ -540,7 +531,6 @@ class Simulation(BaseSimulation):
         if num_paths and self.cnx.is_open:
             database.tables.create_table_path_defs(self.cnx._connection, self.sim.paths)
         logger.debug(f"Connections done, num_paths = {num_paths}")
-        self.vn_initial_mapping()
 
         # Airlines using Q-forecasting need to have pathclasses set up for all paths
         # so Q-demand can be forecasted by pathclass even in the absence of bookings
@@ -564,6 +554,7 @@ class Simulation(BaseSimulation):
                             )
                             if pthcls is not None:
                                 pthcls.add_fare(fare)
+            self.vn_initial_mapping2(carrier.name)
 
         # This will save approximately the number of choice sets requested
         if self.choice_set_file is not None and self.choice_set_obs > 0:
@@ -592,6 +583,12 @@ class Simulation(BaseSimulation):
                     index = int(bc[1])
                     pc.set_indexes(index, index)
                     path.add_path_class(pc)
+
+    def vn_initial_mapping2(self, airline_code):
+        for path in self.sim.paths:
+            if path.get_leg_carrier(0) == airline_code:
+                for i, pc in enumerate(path.pathclasses):
+                    pc.set_indexes(i, i)
 
     def end_sample(self):
         # Commit data to the database

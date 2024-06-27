@@ -4,11 +4,11 @@
 
 scenario: AW_test
 simulation_controls:
-  num_trials: 5
+  num_trials: 6
   num_samples: 600
   sys_k_factor: 0.1
   mkt_k_factor: 0.15
-#  pax_type_k_factor: 0.2
+  #  pax_type_k_factor: 0.2
   simple_k_factor: 0.2
   tf_k_factor: 0.1
   tf_z_factor: 2.0
@@ -18,7 +18,7 @@ simulation_controls:
   demand_multiplier: 1.0
   capacity_multiplier: 1.0
   manual_paths: false
-#  debug_orders: false
+  #  debug_orders: false
   timeframe_demand_allocation: pods
   capture_choice_set_file: choice-set.csv
   capture_choice_set_obs: 10000
@@ -415,10 +415,10 @@ rm_systems:
           algorithm: additive_pickup
           alpha: 0.15
           kind: path
-#        - step_type: fareadjustment
-#          name: adjust_fares
-#          algorithm: mr
-#          kind: path
+        #        - step_type: fareadjustment
+        #          name: adjust_fares
+        #          algorithm: mr
+        #          kind: path
         - step_type: probp
           name: optimization
       DAILY:
@@ -452,52 +452,6 @@ rm_systems:
         - step_type: probp
           name: optimization
 
-  rm_sub_bp:
-    availability_control: bp
-    processes:
-      DCP:
-        - step_type: untruncation
-          name: untruncation
-          algorithm: em
-          kind: path
-        - step_type: forecast
-          name: path_forecast
-          algorithm: additive_pickup
-          alpha: 0.15
-          kind: path
-        - step_type: subbp
-          name: optimization
-      DAILY:
-        - step_type: forecastadjustment
-          name: adjust
-          algorithm: timeframe
-          kind: path
-        - step_type: subbp
-          name: optimization
-
-  rm_lp:
-    availability_control: bp
-    processes:
-      DCP:
-        - step_type: untruncation
-          name: untruncation
-          algorithm: em
-          kind: path
-        - step_type: forecast
-          name: path_forecast
-          algorithm: additive_pickup
-          alpha: 0.15
-          kind: path
-        - step_type: lp
-          name: optimization
-      DAILY:
-        - step_type: forecastadjustment
-          name: adjust
-          algorithm: timeframe
-          kind: path
-        - step_type: lp
-          name: optimization
-
   rm_hybrid:
     availability_control: leg
     processes:
@@ -514,11 +468,11 @@ rm_systems:
           name: optimization
           algorithm: emsrb
           kind: leg
-#      DEPARTURE:
-#        - step_type: elasticity
-#          name: elasticity
-#          algorithm: loglog
-#          kind: leg
+  #      DEPARTURE:
+  #        - step_type: elasticity
+  #          name: elasticity
+  #          algorithm: loglog
+  #          kind: leg
 
   rm_hybrid_mr:
     availability_control: leg
@@ -666,7 +620,7 @@ rm_systems:
 
 todd_curves:
   - name: Tues_SameTZ_LE600
-    probabilities:
+    curve:
       0: 0.001
       1: 0.001
       2: 0.001
@@ -692,36 +646,6 @@ todd_curves:
       22: 0.023
       23: 0.001
 
-  - name: business
-    min_distance: 0
-    max_distance: 25000
-    k_factor: 3.0
-    early_dep: [0, 0.1]
-    late_dep: [0, 0.1]
-    early_arr: [0, 0.1]
-    late_arr: [0, 0.1]
-    replanning: [0.0, 0.0]
-    probabilities: {0: 0.28, 1: 0.09, 2: 0.06, 3: 0.04, 4: 0.1, 5: 0.71,
-                    6: 2.70, 7: 4.76, 8: 6.01, 9: 6.54, 10: 6.29, 11: 5.88,
-                    12: 5.71, 13: 5.77, 14: 6.06, 15: 6.57, 16: 7.22, 17: 7.75,
-                    18: 7.94, 19: 7.36, 20: 5.73, 21: 3.67, 22: 1.94, 23: 0.82}
-
-  - name: leisure
-    min_distance: 0
-    max_distance: 25000
-    k_factor: 0.3
-    early_dep: [0, 0.05]
-    late_dep: [0, 0.05]
-    early_arr: [0, 0.05]
-    late_arr: [0, 0.05]
-    replanning: [0.0, 0.0]
-    #        probabilities: [0.28, 0.09, 0.06, 0.04, 0.1, 0.71, 2.7, 4.76, 6.01, 6.54, 6.29, 5.88,
-    #                        5.71, 5.77, 6.06, 6.57, 7.22, 7.75, 7.94, 7.36, 5.73, 3.67, 1.94, 0.82]
-    probabilities: {0: 0.0028, 1: 0.0009, 2: 0.0006, 3: 0.0004, 4: 0.001, 5: 0.0071,
-                    6: 0.0270, 7: 0.0476, 8: 0.0601, 9: 0.0654, 10: 0.0629, 11: 0.0588,
-                    12: 0.0571, 13: 0.0577, 14: 0.0606, 15: 0.0657, 16: 0.0722, 17: 0.0775,
-                    18: 0.0794, 19: 0.0736, 20: 0.0573, 21: 0.0367, 22: 0.0194, 23: 0.0082}
-
 choice_models:
   business:
     kind: pods
@@ -735,7 +659,16 @@ choice_models:
     anc1_relevance: 0.8
     anc2_relevance: 0.5
     anc3_relevance: 0.8
-#    todd_curve: business
+    dwm_data:
+      - min_distance: 0
+        max_distance: 5000
+        k_factor: 3.0
+        early_dep: [0, 20.0]
+        late_dep: [0, 30.0]
+        early_arr: [0, 15.0]
+        late_arr: [0, 40.0]
+        probabilities: [0.28, 0.09, 0.06, 0.04, 0.1, 0.71, 2.7, 4.76, 6.01, 6.54, 6.29, 5.88,
+                        5.71, 5.77, 6.06, 6.57, 7.22, 7.75, 7.94, 7.36, 5.73, 3.67, 1.94, 0.82]
 
   leisure:
     kind: pods
@@ -753,16 +686,25 @@ choice_models:
     elapsed_time: [0, 0.7]
     buffer_threshold: 25
     buffer_time: [0, 0.1]
-#    todd_curve: leisure
+    replanning: [1.9, 0.1012]
+    dwm_data:
+      - min_distance: 0
+        max_distance: 5000
+        k_factor: 3.0
+        early_dep: [0, 10.0]
+        late_dep: [0, 15.0]
+        early_arr: [0, 10.0]
+        late_arr: [0, 20.0]
+        probabilities: [0.28, 0.09, 0.06, 0.04, 0.1, 0.71, 2.7, 4.76, 6.01, 6.54, 6.29, 5.88,
+                        5.71, 5.77, 6.06, 6.57, 7.22, 7.75, 7.94, 7.36, 5.73, 3.67, 1.94, 0.82]
 
 airlines:
   - name: AL1
-    rm_system: rm_bid_price
-    frat5: curve_G
+    rm_system: rm_davn
+    frat5: curve_C
     #    fare_adjustment_scale: 0.3
     #    load_factor_curve: lf_curve1
-#    continuous_pricing: CBC
-    cp_quantize: 5
+    #    continuous_pricing: True
     classes:
       - (Y0, Y)
       - (Y1, Y)
@@ -771,11 +713,11 @@ airlines:
       - (Y4, Y)
       - (Y5, Y)
   - name: AL2
-    rm_system: rm_sub_bp
+    rm_system: rm_leg
     frat5: curve_C
     fare_adjustment_scale: 0.5
     load_factor_curve: lf_curve1
-#    continuous_pricing: BP
+#    continuous_pricing: True
 #    ancillaries:
 #      ANC1: 75.0
 #      ANC2: 40.0
@@ -852,7 +794,7 @@ legs:
     dep_time: 08:00
     arr_time: '10:00'
     capacity: 100
-#      "": 100
+    #      "": 100
     distance: 864.0
   - carrier: AL1
     fltno: 102
@@ -1277,16 +1219,16 @@ fares:
       - R3
 
 snapshot_filters:
-#  - type: path_untruncation
-#    title: Snapshot of path untruncation
-#    sample: 35
-#    dcp: 0
-#    flt_no: 202
-#  - type: forecast
-#    title: Snapshot of forecasting
-#    sample: 35
-#    dcp: [14]
-#    flt_no: 211
+  #  - type: path_untruncation
+  #    title: Snapshot of path untruncation
+  #    sample: 35
+  #    dcp: 0
+  #    flt_no: 202
+  #  - type: forecast
+  #    title: Snapshot of forecasting
+  #    sample: 35
+  #    dcp: [14]
+  #    flt_no: 211
   - type: rm
     title: RM Snapshot, EMSRb leg optimization
     sample: [35]
@@ -1297,8 +1239,8 @@ snapshot_filters:
     sample: [35]
     dcp: [7]
     flt_no: 211
-#  - type: pro_bp
-#    title: ProBP Snapshot
-#    sample: [35]
-#    dcp: 35
-#    flt_no: 211
+  - type: pro_bp
+    title: ProBP Snapshot
+    sample: [35]
+    dcp: 35
+    flt_no: 211

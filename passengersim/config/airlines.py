@@ -14,8 +14,12 @@ class Airline(Named, extra="forbid"):
     control: str = ""
     """Deprecated.  No effect"""
 
-    continuous_pricing: bool | None = False
+    continuous_pricing: Optional[str] = "None"
     """Used to select continuous pricing"""
+
+    cp_quantize: Optional[int] = 0
+    """Cntrols quantization (rounding) for Continuous Pricing
+       Example: If you set it to 5, the price will be rounded to the nearest $5"""
 
     frat5: str | None = ""
     """Named FRAT5 curve.

@@ -1,22 +1,13 @@
 # TITLE: Choice Models
 from __future__ import annotations
 
-from typing import Annotated, Literal, List
+from typing import Annotated, Literal, List, Optional
 
 from pydantic import BaseModel, Field
 
 from .named import Named, DictOfNamed
 
-
-class DwmData(BaseModel, extra="forbid"):
-    min_distance: int = 0
-    max_distance: int = 25000
-    k_factor: float = 3.0
-    early_dep: tuple[float, float] | None = None
-    late_dep: tuple[float, float] | None = None
-    early_arr: tuple[float, float] | None = None
-    late_arr: tuple[float, float] | None = None
-    probabilities: List[float] = []
+from .todd_curves import ToddCurve
 
 
 class PodsChoiceModel(Named, extra="forbid"):
@@ -37,11 +28,10 @@ class PodsChoiceModel(Named, extra="forbid"):
     r2: float | None = None
     r3: float | None = None
     r4: float | None = None
-    dwm_data: List[DwmData] = []
     tolerance: float | None = None
     non_stop_multiplier: float | None = None
     connection_multiplier: float | None = None
-    todd_curve: str | None = None
+    todd_curve: Optional[str] = None
 
     anc1_relevance: float | None = None
     anc2_relevance: float | None = None

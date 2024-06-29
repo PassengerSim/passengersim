@@ -13,7 +13,7 @@ simulation_controls:
   timeframe_demand_allocation: pods
   max_connect_time: 240
   disable_ap: false
-  capacity_multiplier: 1.6
+  capacity_multiplier: 2.0
   demand_multiplier: 1.0
   manual_paths: false
   # debug_connections: true

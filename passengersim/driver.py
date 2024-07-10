@@ -466,9 +466,12 @@ class Simulation(BaseSimulation):
 
     def _initialize_leg_cabin_bucket(self, config: Config):
         self.legs = {}
+        carriers = {}
+        for airline in self.sim.airlines:
+            carriers[airline.name] = airline
         for leg_config in config.legs:
             leg = passengersim.core.Leg(
-                leg_config.carrier,
+                carriers[leg_config.carrier],
                 leg_config.fltno,
                 leg_config.orig,
                 leg_config.dest,
@@ -773,19 +776,31 @@ class Simulation(BaseSimulation):
                     # Regular Data Collection Points (pre-departure)
                     what_had_happened_was.append(f"run {airline.name} DCP")
                     airline.rm_system.run(
-                        self.sim, airline.name, dcp_index, recording_day, event_type="dcp"
+                        self.sim,
+                        airline.name,
+                        dcp_index,
+                        recording_day,
+                        event_type="dcp",
                     )
                 elif event_type.lower() == "daily":
                     # Daily report, every day prior to departure EXCEPT specified DCPs
                     what_had_happened_was.append(f"run {airline.name} daily")
                     airline.rm_system.run(
-                        self.sim, airline.name, dcp_index, recording_day, event_type="daily"
+                        self.sim,
+                        airline.name,
+                        dcp_index,
+                        recording_day,
+                        event_type="daily",
                     )
                 elif event_type.lower() == "done":
                     # Post departure processing
                     what_had_happened_was.append(f"run {airline.name} done")
                     airline.rm_system.run(
-                        self.sim, airline.name, dcp_index, recording_day, event_type="dcp"
+                        self.sim,
+                        airline.name,
+                        dcp_index,
+                        recording_day,
+                        event_type="dcp",
                     )
                     airline.rm_system.run(
                         self.sim,
@@ -795,7 +810,8 @@ class Simulation(BaseSimulation):
                         event_type="departure",
                     )
                     if self.sim.sample % 7 == 0:
-                        # Can be used less frequently, such as ML steps on accumulated data
+                        # Can be used less frequently,
+                        # such as ML steps on accumulated data
                         airline.rm_system.run(
                             self.sim,
                             airline.name,
@@ -822,7 +838,7 @@ class Simulation(BaseSimulation):
                 ):
                     # if self.sim.sample == 101:
                     #     print("write_to_sqlite DAILY")
-                    what_had_happened_was.append(f"write_to_sqlite daily")
+                    what_had_happened_was.append("write_to_sqlite daily")
                     self.sim.write_to_sqlite(
                         self.cnx._connection,
                         recording_day,
@@ -839,7 +855,7 @@ class Simulation(BaseSimulation):
             print(e)
             print("Error in run_airline_models")
             print(f"{info=}")
-            print('what_had_happened_was=', what_had_happened_was)
+            print("what_had_happened_was=", what_had_happened_was)
             raise
 
     def capture_competitor_data(self):

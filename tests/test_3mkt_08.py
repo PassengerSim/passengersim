@@ -180,3 +180,91 @@ def test_3mkt_08_fig_leg_forecasts(
     assert isinstance(fig, altair.TopLevelMixin)
     df = summary.fig_leg_forecasts(of=of, raw_df=True).reset_index(drop=True)
     dataframe_regression.check(df, default_tolerance=DEFAULT_TOLERANCE)
+
+
+def sim_with_truncation_rule(truncation_rule=1) -> SummaryTables:
+    input_file = demo_network("3MKT/08-untrunc-em")
+    cfg = Config.from_yaml(input_file)
+    cfg.simulation_controls.num_trials = 1
+    cfg.simulation_controls.num_samples = 500
+    cfg.outputs.reports.add(("od_fare_class_mix", "BOS", "ORD"))
+    cfg.airlines["AL1"].truncation_rule = truncation_rule
+    cfg.airlines["AL2"].truncation_rule = truncation_rule
+    sim = Simulation(cfg)
+    summary = sim.run()
+    summary.sim = sim
+    return summary
+
+
+@pytest.fixture(scope="module")
+def summary1() -> SummaryTables:
+    return sim_with_truncation_rule(1)
+
+
+@pytest.fixture(scope="module")
+def summary2() -> SummaryTables:
+    return sim_with_truncation_rule(2)
+
+
+@pytest.fixture(scope="module")
+def summary3() -> SummaryTables:
+    return sim_with_truncation_rule(3)
+
+
+def test_3mkt_08_bookings_by_timeframe_1(summary1, dataframe_regression):
+    assert isinstance(summary1, SummaryTables)
+    dataframe_regression.check(
+        summary1.bookings_by_timeframe,
+        basename="bookings_by_timeframe_1",
+        default_tolerance=DEFAULT_TOLERANCE,
+    )
+
+
+def test_3mkt_08_bookings_by_timeframe_2(summary2, dataframe_regression):
+    assert isinstance(summary2, SummaryTables)
+    dataframe_regression.check(
+        summary2.bookings_by_timeframe,
+        basename="bookings_by_timeframe_2",
+        default_tolerance=DEFAULT_TOLERANCE,
+    )
+
+
+def test_3mkt_08_bookings_by_timeframe_3(summary3, dataframe_regression):
+    assert isinstance(summary3, SummaryTables)
+    dataframe_regression.check(
+        summary3.bookings_by_timeframe,
+        basename="bookings_by_timeframe_3",
+        default_tolerance=DEFAULT_TOLERANCE,
+    )
+
+
+def test_3mkt_08_detrunc_bookings_by_timeframe(summary1, summary2, summary3):
+    assert isinstance(summary3, SummaryTables)
+    assert isinstance(summary1, SummaryTables)
+    assert isinstance(summary2, SummaryTables)
+
+    sim1 = summary1.sim
+    sim2 = summary2.sim
+    sim3 = summary3.sim
+    assert len(sim1.paths) == 12
+    for p in sim1.paths:
+        if p.carrier == "AL1":
+            assert p.truncation_rule == 1
+        elif p.carrier == "AL2":
+            assert p.truncation_rule == 1
+        else:
+            raise AssertionError(f"Unexpected carrier {p.carrier}")
+    for p in sim2.paths:
+        if p.carrier == "AL1":
+            assert p.truncation_rule == 2
+        elif p.carrier == "AL2":
+            assert p.truncation_rule == 2
+        else:
+            raise AssertionError(f"Unexpected carrier {p.carrier}")
+    for p in sim3.paths:
+        if p.carrier == "AL1":
+            assert p.truncation_rule == 3
+        elif p.carrier == "AL2":
+            assert p.truncation_rule == 3
+        else:
+            raise AssertionError(f"Unexpected carrier {p.carrier}")

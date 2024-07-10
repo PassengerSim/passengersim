@@ -51,12 +51,20 @@ class SummaryTables:
                 db.add_indexes()
 
         logger.info("loading configs")
-        config = db.load_configs()
+        config = db.load_configs(on_validation_error="ignore")
+        try:
+            scenario = config.scenario
+            burn_samples = config.simulation_controls.burn_samples
+        except AttributeError:
+            scenario = config.get("scenario", "unknown")
+            burn_samples = config.get("simulation_controls", {}).get(
+                "burn_samples", 100
+            )
 
         summary.load_additional_tables(
             db,
-            scenario=config.scenario,
-            burn_samples=config.simulation_controls.burn_samples,
+            scenario=scenario,
+            burn_samples=burn_samples,
             additional=additional,
         )
         summary.cnx = db
@@ -187,7 +195,7 @@ class SummaryTables:
                 )
             )
             if cfg is None and load_config:
-                cfg = raw[-1].cnx.load_configs()
+                cfg = raw[-1].cnx.load_configs(on_validation_error="ignore")
         if n > max_num_files:
             warnings.warn(
                 f"Only loaded {max_num_files} of {n} files matching pattern",

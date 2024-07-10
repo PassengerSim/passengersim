@@ -247,6 +247,8 @@ legs:
   arr_time: '21:00'
   capacity: 120
   distance: 1745.0
+
+
 demands:
 - orig: BOS
   dest: SFO

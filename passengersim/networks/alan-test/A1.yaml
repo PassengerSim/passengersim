@@ -1,0 +1,1735 @@
+scenario: A1 - Mucking around with Calibration
+simulation_controls:
+  # random_seed: 42
+  num_trials: 3
+  num_samples: 500
+  sys_k_factor: 0.1
+  mkt_k_factor: 0.2
+  pax_type_k_factor: 0.4
+  simple_k_factor: 0.2
+  tf_k_factor: 0.1
+  tf_z_factor: 2.0
+  prorate_revenue: true
+  timeframe_demand_allocation: pods
+  max_connect_time: 240
+  disable_ap: false
+  capacity_multiplier: 2.0
+  demand_multiplier: 1.0
+  manual_paths: false
+  # debug_connections: true
+  debug_choice: false
+
+rm_systems:
+  - name: rm_leg
+    availability_control: leg
+    processes:
+      dcp:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: leg
+        - step_type: forecast
+          name: forecast
+          algorithm: additive_pickup
+          alpha: 0.1
+          kind: leg
+        - step_type: emsr
+          name: optimization
+          algorithm: emsrb
+          kind: leg
+
+choice_models:
+  business:
+    kind: pods
+    emult: 1.6
+    basefare_mult: 2.5
+    path_quality:  [38.30,  0.10]
+#    preferred_airline:  [-12.29,  0.17]
+    r1: 2.0
+    r2: 0.35
+    r3: 0.50
+    anc1_relevance: 0.8
+    anc2_relevance: 0.5
+    anc3_relevance: 0.8
+  #    todd_curve: business
+
+  leisure:
+    kind: pods
+    emult: 1.5
+    basefare_mult: 1.0
+    path_quality:  [2.02, 0.12]
+#    preferred_airline:  [-1.98, 0.11]
+#    hhi: [0.0, 0.0001]
+    r1: 0.70
+    r2: 0.35
+    r3: 0.35
+    anc1_relevance: 0.5
+    anc2_relevance: 0.8
+    anc3_relevance: 0.5
+    elapsed_time: [0, 0.7]
+    buffer_threshold: 25
+    buffer_time: [0, 0.1]
+#    todd_curve: leisure
+
+airlines:
+  - name: AL1
+    rm_system: rm_leg
+  - name: AL2
+    rm_system: rm_leg
+classes:
+  - Y0
+  - Y1
+  - Y2
+  - Y3
+  - Y4
+  - Y5
+#  - Y6
+#  - Y7
+#  - Y8
+#  - Y9
+dcps:
+  - 63
+  - 56
+  - 49
+  - 42
+  - 35
+  - 31
+  - 28
+  - 24
+  - 21
+  - 17
+  - 14
+  - 10
+  - 7
+  - 5
+  - 3
+  - 1
+booking_curves:
+  - name: c1
+    curve:
+      63: 0.01
+      56: 0.02
+      49: 0.05
+      42: 0.13
+      35: 0.19
+      31: 0.23
+      28: 0.29
+      24: 0.35
+      21: 0.45
+      17: 0.54
+      14: 0.67
+      10: 0.79
+      7: 0.86
+      5: 0.91
+      3: 0.96
+      1: 1.0
+  - name: c2
+    curve:
+      63: 0.13
+      56: 0.22
+      49: 0.37
+      42: 0.52
+      35: 0.64
+      31: 0.7
+      28: 0.75
+      24: 0.78
+      21: 0.83
+      17: 0.87
+      14: 0.91
+      10: 0.94
+      7: 0.96
+      5: 0.98
+      3: 0.99
+      1: 1.0
+  - name: c3
+    curve:
+      63: 0.04
+      56: 0.06
+      49: 0.12
+      42: 0.26
+      35: 0.35
+      31: 0.41
+      28: 0.48
+      24: 0.54
+      21: 0.63
+      17: 0.7
+      14: 0.81
+      10: 0.88
+      7: 0.93
+      5: 0.96
+      3: 0.98
+      1: 1.0
+  - name: c4
+    curve:
+      63: 0.21
+      56: 0.35
+      49: 0.53
+      42: 0.67
+      35: 0.76
+      31: 0.8
+      28: 0.83
+      24: 0.85
+      21: 0.88
+      17: 0.91
+      14: 0.94
+      10: 0.96
+      7: 0.97
+      5: 0.98
+      3: 0.99
+      1: 1.0
+
+
+snapshot_filters:
+  - type: rm
+    title: RM Snapshot, EMSRb leg optimization
+    sample: [35]
+    dcp: [14]
+    flt_no: 9101
+  - type: rm
+    title: RM Snapshot, EMSRb leg optimization
+    sample: [35]
+    dcp: [7]
+    flt_no: 9201
+
+places:
+  BOS:
+    label: Boston Logan International Airport
+    lat: 42.3656
+    lon: -71.0098
+    time_zone: America/New_York
+
+  ORD:
+    label: Chicago O'Hare International Airport
+    lat: 41.9802
+    lon: -87.9090
+    time_zone: America/Chicago
+
+  LAX:
+    label: Los Angeles International Airport
+    lat: 33.9438
+    lon: -118.4091
+    time_zone: America/Los_Angeles
+
+  SEA:
+    label: Seattle-Tacoma International Airport
+    lat: 47.4502
+    lon: -122.3088
+    time_zone: America/Los_Angeles
+
+  PDX:
+    label: Portland International Airport
+    lat: 45.5898
+    lon: -122.5951
+    time_zone: America/Los_Angeles
+
+  SFO:
+    label: San Francisco International Airport
+    lat: 37.7749
+    lon: -122.4194
+    time_zone: America/Los_Angeles
+
+  DFW:
+    label: Dallas/Fort Worth International Airport
+    lat: 32.8998
+    lon: -97.0403
+    time_zone: America/Chicago
+
+  ATL:
+    label: Hartsfield-Jackson Atlanta International Airport
+    lat: 33.6407
+    lon: -84.4277
+    time_zone: America/New_York
+
+  MIA:
+    label: Miami International Airport
+    lat: 25.7617
+    lon: -80.1918
+    time_zone: America/New_York
+
+  JFK:
+    label: John F. Kennedy International Airport
+    lat: 40.7128
+    lon: -74.0060
+    time_zone: America/New_York
+
+
+legs:
+  # Carrier 1 network, mostly via ORD, connecting bank at 10am-11am
+  - carrier: AL1
+    fltno: 101
+    orig: SEA
+    dest: ORD
+    date: '2020-01-01'
+    dep_time: '04:00'
+    arr_time: '10:00'
+    capacity: 100
+    distance: 1733.0
+  - carrier: AL1
+    fltno: 102
+    orig: SFO
+    dest: ORD
+    date: '2020-01-01'
+    dep_time: '03:30'
+    arr_time: '10:00'
+    capacity: 100
+    distance: 1842.0
+  - carrier: AL1
+    fltno: 103
+    orig: SFO
+    dest: BOS
+    date: '2020-01-01'
+    dep_time: '08:00'
+    arr_time: '14:00'
+    capacity: 100
+    distance: 1733.0
+  - carrier: AL1
+    fltno: 104
+    orig: ORD
+    dest: BOS
+    date: '2020-01-01'
+    dep_time: '11:00'
+    arr_time: '14:30'
+    capacity: 100
+    distance: 850.0
+  - carrier: AL1
+    fltno: 105
+    orig: ORD
+    dest: JFK
+    date: '2020-01-01'
+    dep_time: '11:00'
+    arr_time: '14:25'
+    capacity: 100
+    distance: 738.0
+
+  # Carrier 2 network, mostly via DFW, connecting bank at 11am-12pm
+  - carrier: AL2
+    fltno: 201
+    orig: SEA
+    dest: DFW
+    date: '2020-01-01'
+    dep_time: '5:00'
+    arr_time: '11:00'
+    capacity: 100
+    distance: 1597.0
+  - carrier: AL2
+    fltno: 202
+    orig: SFO
+    dest: DFW
+    date: '2020-01-01'
+    dep_time: '5:30'
+    arr_time: '11:00'
+    capacity: 100
+    distance: 1461.0
+  - carrier: AL1
+    fltno: 203
+    orig: DFW
+    dest: BOS
+    date: '2020-01-01'
+    dep_time: '12:00'
+    arr_time: '16:55'
+    capacity: 100
+    distance: 1559.0
+  - carrier: AL2
+    fltno: 204
+    orig: DFW
+    dest: JFK
+    date: '2020-01-01'
+    dep_time: '12:05'
+    arr_time: '16:55'
+    capacity: 100
+    distance: 1389.0
+
+fares:
+  - carrier: AL1
+    orig: SEA
+    dest: ORD
+    booking_class: Y0
+    price: 800
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL2
+    orig: SEA
+    dest: ORD
+    booking_class: Y0
+    price: 800
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL1
+    orig: SEA
+    dest: ORD
+    booking_class: Y1
+    price: 680
+    advance_purchase: 0
+    restrictions:
+      - R1
+  - carrier: AL2
+    orig: SEA
+    dest: ORD
+    booking_class: Y1
+    price: 680
+    advance_purchase: 0
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: SEA
+    dest: ORD
+    booking_class: Y2
+    price: 560
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL2
+    orig: SEA
+    dest: ORD
+    booking_class: Y2
+    price: 560
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: SEA
+    dest: ORD
+    booking_class: Y3
+    price: 440
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL2
+    orig: SEA
+    dest: ORD
+    booking_class: Y3
+    price: 440
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL1
+    orig: SEA
+    dest: ORD
+    booking_class: Y4
+    price: 320
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL2
+    orig: SEA
+    dest: ORD
+    booking_class: Y4
+    price: 320
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL1
+    orig: SEA
+    dest: ORD
+    booking_class: Y5
+    price: 200
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL2
+    orig: SEA
+    dest: ORD
+    booking_class: Y5
+    price: 200
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL1
+    orig: SEA
+    dest: BOS
+    booking_class: Y0
+    price: 1400
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL2
+    orig: SEA
+    dest: BOS
+    booking_class: Y0
+    price: 1400
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL1
+    orig: SEA
+    dest: BOS
+    booking_class: Y1
+    price: 1190
+    advance_purchase: 0
+    restrictions:
+      - R1
+  - carrier: AL2
+    orig: SEA
+    dest: BOS
+    booking_class: Y1
+    price: 1190
+    advance_purchase: 0
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: SEA
+    dest: BOS
+    booking_class: Y2
+    price: 980
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL2
+    orig: SEA
+    dest: BOS
+    booking_class: Y2
+    price: 980
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: SEA
+    dest: BOS
+    booking_class: Y3
+    price: 770
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL2
+    orig: SEA
+    dest: BOS
+    booking_class: Y3
+    price: 770
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL1
+    orig: SEA
+    dest: BOS
+    booking_class: Y4
+    price: 560
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL2
+    orig: SEA
+    dest: BOS
+    booking_class: Y4
+    price: 560
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL1
+    orig: SEA
+    dest: BOS
+    booking_class: Y5
+    price: 350
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL2
+    orig: SEA
+    dest: BOS
+    booking_class: Y5
+    price: 350
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL1
+    orig: SEA
+    dest: JFK
+    booking_class: Y0
+    price: 1300
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL2
+    orig: SEA
+    dest: JFK
+    booking_class: Y0
+    price: 1300
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL1
+    orig: SEA
+    dest: JFK
+    booking_class: Y1
+    price: 1105
+    advance_purchase: 0
+    restrictions:
+      - R1
+  - carrier: AL2
+    orig: SEA
+    dest: JFK
+    booking_class: Y1
+    price: 1105
+    advance_purchase: 0
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: SEA
+    dest: JFK
+    booking_class: Y2
+    price: 910
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL2
+    orig: SEA
+    dest: JFK
+    booking_class: Y2
+    price: 910
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: SEA
+    dest: JFK
+    booking_class: Y3
+    price: 715
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL2
+    orig: SEA
+    dest: JFK
+    booking_class: Y3
+    price: 715
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL1
+    orig: SEA
+    dest: JFK
+    booking_class: Y4
+    price: 520
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL2
+    orig: SEA
+    dest: JFK
+    booking_class: Y4
+    price: 520
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL1
+    orig: SEA
+    dest: JFK
+    booking_class: Y5
+    price: 325
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL2
+    orig: SEA
+    dest: JFK
+    booking_class: Y5
+    price: 325
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL1
+    orig: SEA
+    dest: DFW
+    booking_class: Y0
+    price: 900
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL2
+    orig: SEA
+    dest: DFW
+    booking_class: Y0
+    price: 900
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL1
+    orig: SEA
+    dest: DFW
+    booking_class: Y1
+    price: 765
+    advance_purchase: 0
+    restrictions:
+      - R1
+  - carrier: AL2
+    orig: SEA
+    dest: DFW
+    booking_class: Y1
+    price: 765
+    advance_purchase: 0
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: SEA
+    dest: DFW
+    booking_class: Y2
+    price: 630
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL2
+    orig: SEA
+    dest: DFW
+    booking_class: Y2
+    price: 630
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: SEA
+    dest: DFW
+    booking_class: Y3
+    price: 495
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL2
+    orig: SEA
+    dest: DFW
+    booking_class: Y3
+    price: 495
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL1
+    orig: SEA
+    dest: DFW
+    booking_class: Y4
+    price: 360
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL2
+    orig: SEA
+    dest: DFW
+    booking_class: Y4
+    price: 360
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL1
+    orig: SEA
+    dest: DFW
+    booking_class: Y5
+    price: 225
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL2
+    orig: SEA
+    dest: DFW
+    booking_class: Y5
+    price: 225
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL1
+    orig: SFO
+    dest: ORD
+    booking_class: Y0
+    price: 800
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL2
+    orig: SFO
+    dest: ORD
+    booking_class: Y0
+    price: 800
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL1
+    orig: SFO
+    dest: ORD
+    booking_class: Y1
+    price: 680
+    advance_purchase: 0
+    restrictions:
+      - R1
+  - carrier: AL2
+    orig: SFO
+    dest: ORD
+    booking_class: Y1
+    price: 680
+    advance_purchase: 0
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: SFO
+    dest: ORD
+    booking_class: Y2
+    price: 560
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL2
+    orig: SFO
+    dest: ORD
+    booking_class: Y2
+    price: 560
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: SFO
+    dest: ORD
+    booking_class: Y3
+    price: 440
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL2
+    orig: SFO
+    dest: ORD
+    booking_class: Y3
+    price: 440
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL1
+    orig: SFO
+    dest: ORD
+    booking_class: Y4
+    price: 320
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL2
+    orig: SFO
+    dest: ORD
+    booking_class: Y4
+    price: 320
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL1
+    orig: SFO
+    dest: ORD
+    booking_class: Y5
+    price: 200
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL2
+    orig: SFO
+    dest: ORD
+    booking_class: Y5
+    price: 200
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL1
+    orig: SFO
+    dest: BOS
+    booking_class: Y0
+    price: 1400
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL2
+    orig: SFO
+    dest: BOS
+    booking_class: Y0
+    price: 1400
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL1
+    orig: SFO
+    dest: BOS
+    booking_class: Y1
+    price: 1190
+    advance_purchase: 0
+    restrictions:
+      - R1
+  - carrier: AL2
+    orig: SFO
+    dest: BOS
+    booking_class: Y1
+    price: 1190
+    advance_purchase: 0
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: SFO
+    dest: BOS
+    booking_class: Y2
+    price: 980
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL2
+    orig: SFO
+    dest: BOS
+    booking_class: Y2
+    price: 980
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: SFO
+    dest: BOS
+    booking_class: Y3
+    price: 770
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL2
+    orig: SFO
+    dest: BOS
+    booking_class: Y3
+    price: 770
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL1
+    orig: SFO
+    dest: BOS
+    booking_class: Y4
+    price: 560
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL2
+    orig: SFO
+    dest: BOS
+    booking_class: Y4
+    price: 560
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL1
+    orig: SFO
+    dest: BOS
+    booking_class: Y5
+    price: 350
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL2
+    orig: SFO
+    dest: BOS
+    booking_class: Y5
+    price: 350
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL1
+    orig: SFO
+    dest: JFK
+    booking_class: Y0
+    price: 1300
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL2
+    orig: SFO
+    dest: JFK
+    booking_class: Y0
+    price: 1300
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL1
+    orig: SFO
+    dest: JFK
+    booking_class: Y1
+    price: 1105
+    advance_purchase: 0
+    restrictions:
+      - R1
+  - carrier: AL2
+    orig: SFO
+    dest: JFK
+    booking_class: Y1
+    price: 1105
+    advance_purchase: 0
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: SFO
+    dest: JFK
+    booking_class: Y2
+    price: 910
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL2
+    orig: SFO
+    dest: JFK
+    booking_class: Y2
+    price: 910
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: SFO
+    dest: JFK
+    booking_class: Y3
+    price: 715
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL2
+    orig: SFO
+    dest: JFK
+    booking_class: Y3
+    price: 715
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL1
+    orig: SFO
+    dest: JFK
+    booking_class: Y4
+    price: 520
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL2
+    orig: SFO
+    dest: JFK
+    booking_class: Y4
+    price: 520
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL1
+    orig: SFO
+    dest: JFK
+    booking_class: Y5
+    price: 325
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL2
+    orig: SFO
+    dest: JFK
+    booking_class: Y5
+    price: 325
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL1
+    orig: SFO
+    dest: DFW
+    booking_class: Y0
+    price: 750
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL2
+    orig: SFO
+    dest: DFW
+    booking_class: Y0
+    price: 750
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL1
+    orig: SFO
+    dest: DFW
+    booking_class: Y1
+    price: 637.5
+    advance_purchase: 0
+    restrictions:
+      - R1
+  - carrier: AL2
+    orig: SFO
+    dest: DFW
+    booking_class: Y1
+    price: 637.5
+    advance_purchase: 0
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: SFO
+    dest: DFW
+    booking_class: Y2
+    price: 525
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL2
+    orig: SFO
+    dest: DFW
+    booking_class: Y2
+    price: 525
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: SFO
+    dest: DFW
+    booking_class: Y3
+    price: 412.5
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL2
+    orig: SFO
+    dest: DFW
+    booking_class: Y3
+    price: 412.5
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL1
+    orig: SFO
+    dest: DFW
+    booking_class: Y4
+    price: 300
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL2
+    orig: SFO
+    dest: DFW
+    booking_class: Y4
+    price: 300
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL1
+    orig: SFO
+    dest: DFW
+    booking_class: Y5
+    price: 187.5
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL2
+    orig: SFO
+    dest: DFW
+    booking_class: Y5
+    price: 187.5
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL1
+    orig: ORD
+    dest: BOS
+    booking_class: Y0
+    price: 800
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL2
+    orig: ORD
+    dest: BOS
+    booking_class: Y0
+    price: 800
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL1
+    orig: ORD
+    dest: BOS
+    booking_class: Y1
+    price: 680
+    advance_purchase: 0
+    restrictions:
+      - R1
+  - carrier: AL2
+    orig: ORD
+    dest: BOS
+    booking_class: Y1
+    price: 680
+    advance_purchase: 0
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: ORD
+    dest: BOS
+    booking_class: Y2
+    price: 560
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL2
+    orig: ORD
+    dest: BOS
+    booking_class: Y2
+    price: 560
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: ORD
+    dest: BOS
+    booking_class: Y3
+    price: 440
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL2
+    orig: ORD
+    dest: BOS
+    booking_class: Y3
+    price: 440
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL1
+    orig: ORD
+    dest: BOS
+    booking_class: Y4
+    price: 320
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL2
+    orig: ORD
+    dest: BOS
+    booking_class: Y4
+    price: 320
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL1
+    orig: ORD
+    dest: BOS
+    booking_class: Y5
+    price: 200
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL2
+    orig: ORD
+    dest: BOS
+    booking_class: Y5
+    price: 200
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL1
+    orig: ORD
+    dest: JFK
+    booking_class: Y0
+    price: 650
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL2
+    orig: ORD
+    dest: JFK
+    booking_class: Y0
+    price: 650
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL1
+    orig: ORD
+    dest: JFK
+    booking_class: Y1
+    price: 552.5
+    advance_purchase: 0
+    restrictions:
+      - R1
+  - carrier: AL2
+    orig: ORD
+    dest: JFK
+    booking_class: Y1
+    price: 552.5
+    advance_purchase: 0
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: ORD
+    dest: JFK
+    booking_class: Y2
+    price: 455
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL2
+    orig: ORD
+    dest: JFK
+    booking_class: Y2
+    price: 455
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: ORD
+    dest: JFK
+    booking_class: Y3
+    price: 357.5
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL2
+    orig: ORD
+    dest: JFK
+    booking_class: Y3
+    price: 357.5
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL1
+    orig: ORD
+    dest: JFK
+    booking_class: Y4
+    price: 260
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL2
+    orig: ORD
+    dest: JFK
+    booking_class: Y4
+    price: 260
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL1
+    orig: ORD
+    dest: JFK
+    booking_class: Y5
+    price: 162.5
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL2
+    orig: ORD
+    dest: JFK
+    booking_class: Y5
+    price: 162.5
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL1
+    orig: DFW
+    dest: BOS
+    booking_class: Y0
+    price: 800
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL2
+    orig: DFW
+    dest: BOS
+    booking_class: Y0
+    price: 800
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL1
+    orig: DFW
+    dest: BOS
+    booking_class: Y1
+    price: 680
+    advance_purchase: 0
+    restrictions:
+      - R1
+  - carrier: AL2
+    orig: DFW
+    dest: BOS
+    booking_class: Y1
+    price: 680
+    advance_purchase: 0
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: DFW
+    dest: BOS
+    booking_class: Y2
+    price: 560
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL2
+    orig: DFW
+    dest: BOS
+    booking_class: Y2
+    price: 560
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: DFW
+    dest: BOS
+    booking_class: Y3
+    price: 440
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL2
+    orig: DFW
+    dest: BOS
+    booking_class: Y3
+    price: 440
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL1
+    orig: DFW
+    dest: BOS
+    booking_class: Y4
+    price: 320
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL2
+    orig: DFW
+    dest: BOS
+    booking_class: Y4
+    price: 320
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL1
+    orig: DFW
+    dest: BOS
+    booking_class: Y5
+    price: 200
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL2
+    orig: DFW
+    dest: BOS
+    booking_class: Y5
+    price: 200
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL1
+    orig: DFW
+    dest: JFK
+    booking_class: Y0
+    price: 750
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL2
+    orig: DFW
+    dest: JFK
+    booking_class: Y0
+    price: 750
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL1
+    orig: DFW
+    dest: JFK
+    booking_class: Y1
+    price: 637.5
+    advance_purchase: 0
+    restrictions:
+      - R1
+  - carrier: AL2
+    orig: DFW
+    dest: JFK
+    booking_class: Y1
+    price: 637.5
+    advance_purchase: 0
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: DFW
+    dest: JFK
+    booking_class: Y2
+    price: 525
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL2
+    orig: DFW
+    dest: JFK
+    booking_class: Y2
+    price: 525
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: DFW
+    dest: JFK
+    booking_class: Y3
+    price: 412.5
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL2
+    orig: DFW
+    dest: JFK
+    booking_class: Y3
+    price: 412.5
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL1
+    orig: DFW
+    dest: JFK
+    booking_class: Y4
+    price: 300
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL2
+    orig: DFW
+    dest: JFK
+    booking_class: Y4
+    price: 300
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL1
+    orig: DFW
+    dest: JFK
+    booking_class: Y5
+    price: 187.5
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL2
+    orig: DFW
+    dest: JFK
+    booking_class: Y5
+    price: 187.5
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+demands:
+  - orig: SFO
+    dest: DFW
+    segment: business
+    base_demand: 80
+    reference_fare: 468.75
+    choice_model: business
+    curve: c1
+  - orig: SFO
+    dest: DFW
+    segment: leisure
+    base_demand: 150
+    reference_fare: 187.5
+    choice_model: leisure
+    curve: c2
+  - orig: SEA
+    dest: BOS
+    segment: business
+    base_demand: 80
+    reference_fare: 875
+    choice_model: business
+    curve: c1
+  - orig: SEA
+    dest: BOS
+    segment: leisure
+    base_demand: 150
+    reference_fare: 350
+    choice_model: leisure
+    curve: c2
+  - orig: SEA
+    dest: ORD
+    segment: business
+    base_demand: 80
+    reference_fare: 500
+    choice_model: business
+    curve: c1
+  - orig: SEA
+    dest: ORD
+    segment: leisure
+    base_demand: 150
+    reference_fare: 200
+    choice_model: leisure
+    curve: c2
+  - orig: DFW
+    dest: JFK
+    segment: business
+    base_demand: 80
+    reference_fare: 468.75
+    choice_model: business
+    curve: c1
+  - orig: DFW
+    dest: JFK
+    segment: leisure
+    base_demand: 150
+    reference_fare: 187.5
+    choice_model: leisure
+    curve: c2
+  - orig: SFO
+    dest: JFK
+    segment: business
+    base_demand: 80
+    reference_fare: 812.5
+    choice_model: business
+    curve: c1
+  - orig: SFO
+    dest: JFK
+    segment: leisure
+    base_demand: 150
+    reference_fare: 325
+    choice_model: leisure
+    curve: c2
+  - orig: SEA
+    dest: DFW
+    segment: business
+    base_demand: 80
+    reference_fare: 562.5
+    choice_model: business
+    curve: c1
+  - orig: SEA
+    dest: DFW
+    segment: leisure
+    base_demand: 150
+    reference_fare: 225
+    choice_model: leisure
+    curve: c2
+  - orig: DFW
+    dest: BOS
+    segment: business
+    base_demand: 80
+    reference_fare: 500
+    choice_model: business
+    curve: c1
+  - orig: DFW
+    dest: BOS
+    segment: leisure
+    base_demand: 150
+    reference_fare: 200
+    choice_model: leisure
+    curve: c2
+  - orig: ORD
+    dest: JFK
+    segment: business
+    base_demand: 80
+    reference_fare: 406.25
+    choice_model: business
+    curve: c1
+  - orig: ORD
+    dest: JFK
+    segment: leisure
+    base_demand: 150
+    reference_fare: 162.5
+    choice_model: leisure
+    curve: c2
+  - orig: SFO
+    dest: BOS
+    segment: business
+    base_demand: 80
+    reference_fare: 875
+    choice_model: business
+    curve: c1
+  - orig: SFO
+    dest: BOS
+    segment: leisure
+    base_demand: 150
+    reference_fare: 350
+    choice_model: leisure
+    curve: c2
+  - orig: SFO
+    dest: ORD
+    segment: business
+    base_demand: 80
+    reference_fare: 500
+    choice_model: business
+    curve: c1
+  - orig: SFO
+    dest: ORD
+    segment: leisure
+    base_demand: 150
+    reference_fare: 200
+    choice_model: leisure
+    curve: c2
+  - orig: ORD
+    dest: BOS
+    segment: business
+    base_demand: 80
+    reference_fare: 500
+    choice_model: business
+    curve: c1
+  - orig: ORD
+    dest: BOS
+    segment: leisure
+    base_demand: 150
+    reference_fare: 200
+    choice_model: leisure
+    curve: c2
+  - orig: SEA
+    dest: JFK
+    segment: business
+    base_demand: 80
+    reference_fare: 812.5
+    choice_model: business
+    curve: c1
+  - orig: SEA
+    dest: JFK
+    segment: leisure
+    base_demand: 150
+    reference_fare: 325
+    choice_model: leisure
+    curve: c2

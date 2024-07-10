@@ -1355,7 +1355,7 @@ class Simulation(BaseSimulation):
                     * airline_leg_lf[cxr.name]
                     / airline_leg_count[cxr.name],
                     "avg_rev": avg_rev,
-                    "avg_price": avg_rev / avg_sold,
+                    "avg_price": avg_rev / avg_sold if avg_sold > 0 else 0,
                     "asm": asm,
                     "rpm": rpm,
                     "yield": np.nan if rpm == 0 else avg_rev / rpm,

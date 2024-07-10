@@ -1,4 +1,5 @@
 import logging
+import sqlite3
 from typing import Literal
 
 import numpy as np
@@ -698,7 +699,13 @@ def bid_price_history(
         carrier, days_prior
     """
     cnx.execute(preqry, (burn_samples,))
-    cnx._commit_raw()
+    try:
+        cnx._commit_raw()
+    except sqlite3.OperationalError:
+        preqry = preqry.replace(
+            "CREATE TABLE IF NOT EXISTS", "CREATE TEMP TABLE IF NOT EXISTS"
+        )
+        cnx.execute(preqry, (burn_samples,))
     qry = """
     SELECT
         carrier,
@@ -732,7 +739,13 @@ def bid_price_history(
         carrier, days_prior
     """
     cnx.execute(preqry2, (burn_samples,))
-    cnx._commit_raw()
+    try:
+        cnx._commit_raw()
+    except sqlite3.OperationalError:
+        preqry2 = preqry2.replace(
+            "CREATE TABLE IF NOT EXISTS", "CREATE TEMP TABLE IF NOT EXISTS"
+        )
+        cnx.execute(preqry2, (burn_samples,))
     qry2 = """
     SELECT
         carrier, days_prior,
@@ -805,7 +818,13 @@ def displacement_history(
         carrier, days_prior DESC
     """
     cnx.execute(preqry, (burn_samples,))
-    cnx._commit_raw()
+    try:
+        cnx._commit_raw()
+    except sqlite3.OperationalError:
+        preqry = preqry.replace(
+            "CREATE TABLE IF NOT EXISTS", "CREATE TEMP TABLE IF NOT EXISTS"
+        )
+        cnx.execute(preqry, (burn_samples,))
     qry = """
     SELECT carrier, days_prior, displacement_mean, displacement_stdev
     FROM displacement_summary

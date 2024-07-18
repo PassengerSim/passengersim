@@ -11,7 +11,7 @@ simulation_controls:
   tf_z_factor: 2.0
   prorate_revenue: true
   timeframe_demand_allocation: pods
-  max_connect_time: 240
+  max_connect_time: 120
   disable_ap: false
   capacity_multiplier: 2.0
   demand_multiplier: 1.0
@@ -301,6 +301,53 @@ legs:
     capacity: 100
     distance: 738.0
 
+  # Carrier 1 network, mostly via ORD, connecting bank at 1pm-2pm (i.e. 3 hours after the first bank)
+  - carrier: AL1
+    fltno: 151
+    orig: SEA
+    dest: ORD
+    date: '2020-01-01'
+    dep_time: '07:00'
+    arr_time: '13:00'
+    capacity: 100
+    distance: 1733.0
+  - carrier: AL1
+    fltno: 152
+    orig: SFO
+    dest: ORD
+    date: '2020-01-01'
+    dep_time: '06:30'
+    arr_time: '13:00'
+    capacity: 100
+    distance: 1842.0
+  - carrier: AL1
+    fltno: 153
+    orig: SFO
+    dest: BOS
+    date: '2020-01-01'
+    dep_time: '11:00'
+    arr_time: '17:00'
+    capacity: 100
+    distance: 1733.0
+  - carrier: AL1
+    fltno: 154
+    orig: ORD
+    dest: BOS
+    date: '2020-01-01'
+    dep_time: '14:00'
+    arr_time: '17:30'
+    capacity: 100
+    distance: 850.0
+  - carrier: AL1
+    fltno: 155
+    orig: ORD
+    dest: JFK
+    date: '2020-01-01'
+    dep_time: '14:00'
+    arr_time: '17:25'
+    capacity: 100
+    distance: 738.0
+
   # Carrier 2 network, mostly via DFW, connecting bank at 11am-12pm
   - carrier: AL2
     fltno: 201
@@ -336,6 +383,44 @@ legs:
     date: '2020-01-01'
     dep_time: '12:05'
     arr_time: '16:55'
+    capacity: 100
+    distance: 1389.0
+
+  # Carrier 2 network, mostly via DFW, connecting bank at 2pm-3pm (i.e. 3 hours after the first bank)
+  - carrier: AL2
+    fltno: 251
+    orig: SEA
+    dest: DFW
+    date: '2020-01-01'
+    dep_time: '8:00'
+    arr_time: '14:00'
+    capacity: 100
+    distance: 1597.0
+  - carrier: AL2
+    fltno: 252
+    orig: SFO
+    dest: DFW
+    date: '2020-01-01'
+    dep_time: '8:30'
+    arr_time: '14:00'
+    capacity: 100
+    distance: 1461.0
+  - carrier: AL1
+    fltno: 253
+    orig: DFW
+    dest: BOS
+    date: '2020-01-01'
+    dep_time: '15:00'
+    arr_time: '19:55'
+    capacity: 100
+    distance: 1559.0
+  - carrier: AL2
+    fltno: 254
+    orig: DFW
+    dest: JFK
+    date: '2020-01-01'
+    dep_time: '15:05'
+    arr_time: '19:55'
     capacity: 100
     distance: 1389.0
 

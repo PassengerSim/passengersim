@@ -1,8 +1,8 @@
 scenario: A1 - Mucking around with Calibration
 simulation_controls:
   # random_seed: 42
-  num_trials: 3
-  num_samples: 500
+  num_trials: 1
+  num_samples: 400
   sys_k_factor: 0.1
   mkt_k_factor: 0.2
   pax_type_k_factor: 0.4
@@ -18,6 +18,7 @@ simulation_controls:
   manual_paths: false
   # debug_connections: true
   debug_choice: false
+  show_progress_bar: false
 
 rm_systems:
   - name: rm_leg

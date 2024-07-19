@@ -2,11 +2,37 @@
 
 from __future__ import annotations
 
-from typing import Annotated, TypeVar
+import types
+from typing import Annotated, Any, TypeVar
 
+import addicty
+from pydantic import GetCoreSchemaHandler
 from pydantic.functional_validators import BeforeValidator
+from pydantic_core import CoreSchema, core_schema
 
 from .pretty import PrettyModel
+
+
+class Dict(addicty.Dict):
+    def __repr__(self):
+        return dict.__repr__(self)
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls: Any, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        if (
+            isinstance(source_type, types.GenericAlias)
+            and source_type.__origin__ is Dict
+        ):
+            return core_schema.no_info_after_validator_function(
+                cls, handler(dict[source_type.__args__])
+            )
+        else:
+            print(source_type)
+            return core_schema.no_info_after_validator_function(
+                cls, handler(source_type)
+            )
 
 
 class Named(PrettyModel):
@@ -33,11 +59,25 @@ def enforce_name(x: dict[str, T] | list[T]) -> dict[str, T]:
             x_[k] = i
         x = x_
     for k, v in x.items():
-        if "name" not in v or not v["name"]:
-            v["name"] = k
-        if v["name"] != k:
-            raise ValueError("explict name does not match key")
+        try:
+            missing_name = "name" not in v or not v["name"]
+        except TypeError:
+            missing_name = True
+        if missing_name:
+            try:
+                v["name"] = k
+            except TypeError:
+                try:
+                    v.name = k
+                except AttributeError:
+                    raise ValueError(f"cannot assign name {k!r} to {type(v)}")
+        try:
+            if v["name"] != k:
+                raise ValueError(f"explict name {v['name']!r} does not match key {k!r}")
+        except TypeError:
+            if v.name != k:
+                raise ValueError(f"explict name {v.name!r} does not match key {k!r}")
     return x
 
 
-DictOfNamed = Annotated[dict[str, T], BeforeValidator(enforce_name)]
+DictOfNamed = Annotated[Dict[str, T], BeforeValidator(enforce_name)]

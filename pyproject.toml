@@ -60,7 +60,6 @@ target-version = "py310"
 
 [tool.ruff.lint]
 ignore = ["B905"]
-ignore-init-module-imports = true
 select = ["E", "F", "B", "UP", "TID", "I001"]
 
 [tool.ruff.lint.isort]

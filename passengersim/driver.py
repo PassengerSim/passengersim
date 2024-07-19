@@ -19,6 +19,7 @@ from scipy.stats import gamma
 import passengersim.config.rm_systems
 import passengersim.core
 from passengersim.config import Config
+from passengersim.config.manipulate import revalidate
 from passengersim.config.snapshot_filter import SnapshotFilter
 from passengersim.core import DecisionWindow, Event, Frat5, PathClass, SimulationEngine
 from passengersim.summary import SummaryTables
@@ -99,6 +100,7 @@ class Simulation(BaseSimulation):
         config: Config,
         output_dir: pathlib.Path | None = None,
     ):
+        revalidate(config)
         super().__init__(config, output_dir)
         if config.simulation_controls.write_raw_files:
             try:
@@ -131,12 +133,15 @@ class Simulation(BaseSimulation):
         self.choice_set_file = None
         self.choice_set_obs = 0
         self._initialize(config)
-        self.cnx = database.Database(
-            engine=config.db.engine,
-            filename=config.db.filename,
-            pragmas=config.db.pragmas,
-            commit_count_delay=config.db.commit_count_delay,
-        )
+        if not config.db:
+            self.cnx = database.Database()
+        else:
+            self.cnx = database.Database(
+                engine=config.db.engine,
+                filename=config.db.filename,
+                pragmas=config.db.pragmas,
+                commit_count_delay=config.db.commit_count_delay,
+            )
         if self.cnx.is_open:
             database.tables.create_table_leg_defs(self.cnx._connection, self.sim.legs)
             database.tables.create_table_fare_defs(self.cnx._connection, self.sim.fares)
@@ -1287,11 +1292,12 @@ class Simulation(BaseSimulation):
                 else:
                     raise NotImplementedError("path with other than 1 or 2 legs")
         path_class_df = pd.DataFrame(path_class_df)
-        path_class_df.sort_values(
-            by=["orig", "dest", "carrier1", "flt_no1", "booking_class"]
-        )
-        #        if to_db and to_db.is_open:
-        #            to_db.save_dataframe("path_class_summary", path_class_df)
+        if not path_class_df.empty:
+            path_class_df.sort_values(
+                by=["orig", "dest", "carrier1", "flt_no1", "booking_class"]
+            )
+            #        if to_db and to_db.is_open:
+            #            to_db.save_dataframe("path_class_summary", path_class_df)
         return path_class_df
 
     def compute_carrier_report(

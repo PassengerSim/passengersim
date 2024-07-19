@@ -254,6 +254,17 @@ class Config(YamlConfig, extra="forbid"):
     See [passengersim.config.DatabaseConfig][] for detailed documentation.
     """
 
+    @model_validator(mode="before")
+    @classmethod
+    def _db_is_none(cls, data: Any) -> Any:
+        """Setting the database to none creates a null database."""
+        if isinstance(data, dict):
+            db = data.get("db", None)
+            if db is None:
+                db = DatabaseConfig(filename=None, write_items=set())
+            data["db"] = db
+        return data
+
     outputs: OutputConfig = OutputConfig()
     """
     See [passengersim.config.OutputConfig][] for detailed documentation.

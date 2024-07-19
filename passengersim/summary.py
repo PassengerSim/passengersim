@@ -605,6 +605,8 @@ class SummaryTables:
 
     @report_figure
     def fig_fare_class_mix(self, raw_df=False, label_threshold=0.06):
+        if self.fare_class_mix is None:
+            return None
         df = self.fare_class_mix.reset_index()[["carrier", "booking_class", "avg_sold"]]
         if raw_df:
             return df

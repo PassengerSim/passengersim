@@ -11,11 +11,11 @@ class OutputConfig(PrettyModel, extra="forbid", validate_assignment=True):
     """Write excel outputs to this file after a run."""
 
     reports: set[str | tuple[str, ...]] = {
-        "fare_class_mix",
-        "load_factors",
-        "bookings_by_timeframe",
-        "total_demand",
-        "load_factor_distribution",
+        # "fare_class_mix",
+        # "load_factors",
+        # "bookings_by_timeframe",
+        # "total_demand",
+        # "load_factor_distribution",
     }
     """Reports to include."""
 

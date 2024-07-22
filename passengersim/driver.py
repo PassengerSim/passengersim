@@ -689,6 +689,7 @@ class Simulation(BaseSimulation):
                     f"Trial={self.sim.trial}, "
                     f"Sample={self.sim.sample}{airline_info}{d_info}"
                 )
+            self.sim.record_departure_statistics()
             if self.sim.trial > 0 or self.sim.sample > 0:
                 self.sim.reset_counters()
             self.generate_demands()

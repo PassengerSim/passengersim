@@ -1069,9 +1069,11 @@ class Simulation(BaseSimulation):
         load_factor_dist_df = self.compute_raw_load_factor_distribution(
             sim, to_log, to_db
         )
+        fare_class_dist_df = self.compute_raw_fare_class_mix(sim, to_log, to_db)
 
         summary = SummaryTables(
             name=sim.name,
+            config=sim.config,
             demands=dmd_df,
             fares=fare_df,
             legs=leg_df,
@@ -1079,6 +1081,7 @@ class Simulation(BaseSimulation):
             path_classes=path_classes_df,
             carriers=carrier_df,
             raw_load_factor_distribution=load_factor_dist_df,
+            raw_fare_class_mix=fare_class_dist_df,
         )
         summary.load_additional_tables(self.cnx, sim.name, sim.burn_samples, additional)
         summary.cnx = self.cnx
@@ -1378,8 +1381,8 @@ class Simulation(BaseSimulation):
             to_db.save_dataframe("carrier_summary", carrier_df)
         return carrier_df
 
+    @staticmethod
     def compute_raw_load_factor_distribution(
-        self,
         sim: SimulationEngine,
         to_log: bool = True,
         to_db: database.Database | None = None,
@@ -1410,6 +1413,48 @@ class Simulation(BaseSimulation):
             )
         if to_db and to_db.is_open:
             to_db.save_dataframe("load_factor_distribution", df)
+        return df
+
+    def compute_raw_fare_class_mix(
+        self,
+        sim: SimulationEngine,
+        to_log: bool = True,
+        to_db: database.Database | None = None,
+    ) -> pd.DataFrame:
+        """
+        Compute a fare class distribution report.
+
+        This report is a dataframe, with index values giving the fare class,
+        and column for each carrier in the simulation. The values are the
+        number of passengers for each fare class observed during the simulation
+        (excluding any burn period). This is a count of passengers not legs, so
+        a passenger on a connecting itinerary only counts once.
+        """
+        result = {}
+        for carrier in sim.airlines:
+            fc = carrier.raw_fare_class_distribution()
+            fc_sold = pd.Series(
+                {k: v["sold"] for k, v in fc.items()},
+                name="frequency",
+            )
+            fc_rev = pd.Series(
+                {k: v["revenue"] for k, v in fc.items()},
+                name="frequency",
+            )
+            result[carrier.name] = pd.concat(
+                [fc_sold, fc_rev], axis=1, keys=["sold", "revenue"]
+            )
+        if result:
+            df = pd.concat(result, axis=0, names=["carrier"])
+        else:
+            df = pd.Series(
+                {},
+                name="frequency",
+            )
+        df = df.fillna(0)
+        df["sold"] = df["sold"].astype(int)
+        if to_db and to_db.is_open:
+            to_db.save_dataframe("fare_class_distribution", df)
         return df
 
     def reseed(self, seed: int | list[int] | None = 42):

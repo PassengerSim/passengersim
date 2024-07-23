@@ -1,6 +1,6 @@
 scenario: A1 - Mucking around with Calibration
 simulation_controls:
-  # random_seed: 42
+  random_seed: 42
   num_trials: 1
   num_samples: 400
   sys_k_factor: 0.1

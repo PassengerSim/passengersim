@@ -1066,6 +1066,9 @@ class Simulation(BaseSimulation):
         path_df = self.compute_path_report(sim, to_log, to_db)
         path_classes_df = self.compute_path_class_report(sim, to_log, to_db)
         carrier_df = self.compute_carrier_report(sim, to_log, to_db)
+        load_factor_dist_df = self.compute_raw_load_factor_distribution(
+            sim, to_log, to_db
+        )
 
         summary = SummaryTables(
             name=sim.name,
@@ -1075,6 +1078,7 @@ class Simulation(BaseSimulation):
             paths=path_df,
             path_classes=path_classes_df,
             carriers=carrier_df,
+            raw_load_factor_distribution=load_factor_dist_df,
         )
         summary.load_additional_tables(self.cnx, sim.name, sim.burn_samples, additional)
         summary.cnx = self.cnx
@@ -1373,6 +1377,40 @@ class Simulation(BaseSimulation):
         if to_db and to_db.is_open:
             to_db.save_dataframe("carrier_summary", carrier_df)
         return carrier_df
+
+    def compute_raw_load_factor_distribution(
+        self,
+        sim: SimulationEngine,
+        to_log: bool = True,
+        to_db: database.Database | None = None,
+    ) -> pd.DataFrame:
+        """
+        Compute a load factor distribution report.
+
+        This report is a dataframe, with integer index values from 0 to 100,
+        and column for each carrier in the simulation. The values are the
+        frequency of each leg load factor observed during the simulation
+        (excluding any burn period).  The values for leg load factors are
+        rounded down, so that a leg load factor of 99.9% is counted as 99,
+        and only actually sold-out flights are in the 100% bin.
+        """
+        result = {}
+        for carrier in sim.airlines:
+            lf = pd.Series(
+                carrier.raw_load_factor_distribution(),
+                index=pd.RangeIndex(101, name="leg_load_factor"),
+                name="frequency",
+            )
+            result[carrier.name] = lf
+        if result:
+            df = pd.concat(result, axis=1, names=["carrier"])
+        else:
+            df = pd.DataFrame(
+                index=pd.RangeIndex(101, name="leg_load_factor"), columns=[]
+            )
+        if to_db and to_db.is_open:
+            to_db.save_dataframe("load_factor_distribution", df)
+        return df
 
     def reseed(self, seed: int | list[int] | None = 42):
         logger.debug("reseeding random_generator: %s", seed)

@@ -599,6 +599,11 @@ class Simulation(BaseSimulation):
                     pc.set_indexes(i, i)
 
     def end_sample(self):
+        """End of sample processing."""
+
+        # Record the departure statistics to carrier-level counters in the simulation
+        self.sim.record_departure_statistics()
+
         # Commit data to the database
         if self.cnx:
             try:
@@ -689,7 +694,6 @@ class Simulation(BaseSimulation):
                     f"Trial={self.sim.trial}, "
                     f"Sample={self.sim.sample}{airline_info}{d_info}"
                 )
-            self.sim.record_departure_statistics()
             if self.sim.trial > 0 or self.sim.sample > 0:
                 self.sim.reset_counters()
             self.generate_demands()
@@ -1443,13 +1447,15 @@ class Simulation(BaseSimulation):
             )
             result[carrier.name] = pd.concat(
                 [fc_sold, fc_rev], axis=1, keys=["sold", "revenue"]
-            )
+            ).rename_axis(index="booking_class")
         if result:
             df = pd.concat(result, axis=0, names=["carrier"])
         else:
-            df = pd.Series(
-                {},
-                name="frequency",
+            df = pd.DataFrame(
+                columns=["sold", "revenue"],
+                index=pd.MultiIndex(
+                    [[], []], [[], []], names=["carrier", "booking_class"]
+                ),
             )
         df = df.fillna(0)
         df["sold"] = df["sold"].astype(int)

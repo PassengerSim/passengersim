@@ -714,6 +714,9 @@ class SummaryTables:
             df_for_chart = df_for_chart.set_index("carrier")
             df_for_chart = df_for_chart.stack().rename("Count").reset_index()
 
+        else:
+            raise ValueError(f"Unknown source {source}, should be 'raw' or 'db'")
+
         if not by_carrier:
             df_for_chart = (
                 df_for_chart.groupby(["Load Factor Range"]).Count.sum().reset_index()

@@ -170,6 +170,7 @@ class SummaryTables:
             demand_to_come_summary=demand_to_come_summary,
             raw_load_factor_distribution=raw_load_factor_distribution,
             raw_fare_class_mix=raw_fare_class_mix,
+            n_total_samples=sum(s.n_total_samples for s in summaries),
         )
         result.meta_trials = summaries
         return result
@@ -432,6 +433,7 @@ class SummaryTables:
         load_factor_distribution: pd.DataFrame | None = None,
         raw_load_factor_distribution: pd.DataFrame | None = None,
         raw_fare_class_mix: pd.DataFrame | None = None,
+        n_total_samples: int = 0,
     ):
         self.config = config
         """Configuration used in the simulation that generated the summary tables."""
@@ -463,6 +465,12 @@ class SummaryTables:
 
         self.raw_fare_class_mix = raw_fare_class_mix
         """Total number of passengers by carrier by fare class."""
+
+        self.n_total_samples = n_total_samples
+        """Total number of sample departures simulated to create these summaries.
+
+        This excludes any burn samples.
+        """
 
     def to_records(self) -> dict[str, list[dict]]:
         """Convert all summary tables to a dictionary of records."""
@@ -639,9 +647,17 @@ class SummaryTables:
 
     @report_figure
     def fig_fare_class_mix(self, raw_df=False, label_threshold=0.06):
-        if self.fare_class_mix is None:
+        if self.fare_class_mix is not None:
+            df = self.fare_class_mix.reset_index()[
+                ["carrier", "booking_class", "avg_sold"]
+            ]
+        elif self.raw_fare_class_mix is not None and self.n_total_samples > 0:
+            df = self.raw_fare_class_mix / self.n_total_samples
+            df = df.rename(columns={"sold": "avg_sold"})
+            df = df.reset_index()[["carrier", "booking_class", "avg_sold"]]
+        else:
             return None
-        df = self.fare_class_mix.reset_index()[["carrier", "booking_class", "avg_sold"]]
+
         if raw_df:
             return df
         return self._fig_fare_class_mix(

@@ -1086,6 +1086,7 @@ class Simulation(BaseSimulation):
             carriers=carrier_df,
             raw_load_factor_distribution=load_factor_dist_df,
             raw_fare_class_mix=fare_class_dist_df,
+            n_total_samples=num_samples,
         )
         summary.load_additional_tables(self.cnx, sim.name, sim.burn_samples, additional)
         summary.cnx = self.cnx

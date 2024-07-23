@@ -76,6 +76,15 @@ def test_3mkt_01_fare_class_mix(summary, dataframe_regression):
     )
 
 
+def test_3mkt_01_raw_fare_class_mix(summary, dataframe_regression):
+    assert isinstance(summary, SummaryTables)
+    dataframe_regression.check(
+        summary.raw_fare_class_mix,
+        basename="raw_fare_class_mix",
+        default_tolerance=DEFAULT_TOLERANCE,
+    )
+
+
 def test_3mkt_01_demand_to_come(summary, dataframe_regression):
     assert isinstance(summary, SummaryTables)
     dataframe_regression.check(

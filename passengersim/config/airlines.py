@@ -55,3 +55,16 @@ class Airline(Named, extra="forbid"):
       - Y5
     ```
     """
+
+    truncation_rule: Literal[1, 2, 3] = 3
+    """How to handle marking truncation of demand in timeframes.
+    
+    If 1, then the demand is marked as truncated if the bucket or pathclass is closed at
+    the DCP that is the beginning of the timeframe.
+    
+    If 2, then the demand is marked as truncated if the bucket or pathclass is closed at
+    the DCP that is the end of the timeframe.
+    
+    If 3, then the demand is marked as truncated if the bucket or pathclass is closed at
+    either of the DCPs that are at the beginning or the end of the timeframe.
+    """

@@ -8,10 +8,11 @@ import logging
 import math
 import sqlite3
 import string
+import warnings
 from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import pandas as pd
 
@@ -58,6 +59,9 @@ class Database:
         pragmas: Iterable[str] = (),
         commit_count_delay: int | None = 250,
     ):
+        if isinstance(engine, str) and engine.endswith(".sqlite") and filename is None:
+            filename = engine
+            engine = "sqlite"
         self._connection = None
         self.engine = engine
         self.filename = filename
@@ -169,7 +173,7 @@ class Database:
             ),
         )
 
-    def load_configs(self, scenario=None) -> Config:
+    def load_raw_configs(self, scenario=None) -> dict | Any:
         import json
 
         if scenario:
@@ -184,15 +188,26 @@ class Database:
             rawjson = next(
                 self.execute("SELECT configs, max(updated_at) FROM runtime_configs")
             )[0]
+        result = json.loads(rawjson)
+        if not isinstance(result, dict):
+            warnings.warn("malformed configs, not a mapping", stacklevel=2)
+        return result
+
+    def load_configs(
+        self, scenario=None, on_validation_error: Literal["raise", "ignore"] = "raise"
+    ) -> Config | Any:
+        raw = self.load_raw_configs(scenario)
 
         from pydantic import ValidationError
 
         try:
-            return Config.model_validate(json.loads(rawjson))
+            return Config.model_validate(raw)
         except ValidationError as err:
             logger.error(f"error loading configs: {err}")
-            logger.error("raw json: %s", json.loads(rawjson)["rm_systems"])
-            raise
+            if on_validation_error == "raise":
+                raise
+            else:
+                return raw
 
     def save_details(self: Database, sim: SimulationEngine, dcp: int):
         """

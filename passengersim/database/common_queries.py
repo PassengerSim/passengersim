@@ -1,4 +1,5 @@
 import logging
+import sqlite3
 from typing import Literal
 
 import numpy as np
@@ -38,25 +39,32 @@ def fare_class_mix(
         - `avg_price`: Average price per ticket from customers booking in this
             booking class.
     """
+    pre_qry = """
+    CREATE TABLE IF NOT EXISTS fare_summary AS
+    SELECT
+        trial, sample, scenario, carrier, booking_class,
+        SUM(sold) AS sold,
+        SUM(sold * price) AS revenue
+    FROM
+        fare_detail LEFT JOIN fare_defs USING (fare_id)
+    WHERE
+        days_prior = 0
+    GROUP BY
+        trial, sample, scenario, carrier, booking_class
+    """
+    cnx.execute(pre_qry)
+    cnx._commit_raw()
+
     qry = """
     SELECT carrier, booking_class,
            (AVG(sold)) AS avg_sold,
            (AVG(revenue)) AS avg_revenue,
            (AVG(revenue) / AVG(sold)) AS avg_price
-    FROM (
-            SELECT
-                trial, scenario, carrier, booking_class,
-                SUM(sold) AS sold,
-                SUM(sold * price) AS revenue
-            FROM
-                fare_detail LEFT JOIN fare_defs USING (fare_id)
-            WHERE
-                days_prior = 0
-                AND sample >= ?2
-                AND scenario = ?1
-            GROUP BY
-                trial, sample, carrier, booking_class
-    ) tmp
+    FROM
+        fare_summary
+    WHERE
+        sample >= ?2
+        AND scenario = ?1
     GROUP BY carrier, booking_class
     ORDER BY carrier, booking_class;
     """
@@ -218,7 +226,7 @@ def total_demand(cnx: Database, scenario: str, burn_samples: int = 100) -> float
     SELECT AVG(sample_demand)
     FROM (
         SELECT
-            trial, sample, SUM(sample_demand) AS sample_demand
+            SUM(sample_demand) AS sample_demand
         FROM
             demand_detail
         WHERE
@@ -488,6 +496,71 @@ def demand_to_come(
     return dhs
 
 
+def demand_to_come_summary(
+    cnx: Database, scenario: str, burn_samples: int = 100
+) -> pd.DataFrame:
+    """
+    Demand by market and timeframe across each sample.
+
+    This query delivers sample-by-sample timeframe demand results for the
+    various markets (origin, destination, passenger type) in the simulation.
+    It requires that the simulation was run while recording demand details
+    (i.e. with the `demand` flag set on `Config.db.write_items`).
+
+    Parameters
+    ----------
+    cnx : Database
+    scenario : str
+    burn_samples : int, default 100
+        The demand will be returned ignoring this many samples from the
+        beginning of each trial.
+
+    Returns
+    -------
+    pandas.DataFrame
+        The resulting dataframe is indexed by `iteration`, `trial`, `sample`,
+        `segment`, `orig`, and `dest`; and has columns defined by the DCPs.
+        The values stored are the total remaining demand to come at each DCP.
+    """
+    # Provides content similar to PODS *.DHS output file, but with market level detail
+    qry = """
+    CREATE TABLE IF NOT EXISTS demand_to_come_summary AS
+    WITH tmp_demand_summary AS (
+        SELECT
+            scenario, iteration, trial, sample, segment, days_prior,
+            SUM(round(sample_demand) - sold - no_go) AS future_demand
+        FROM
+            demand_detail
+        GROUP BY
+            scenario, iteration, trial, sample, segment, days_prior
+    )
+    SELECT
+        scenario, segment, days_prior,
+        AVG(future_demand) as mean_future_demand,
+        STDEV(future_demand) as stdev_future_demand
+    FROM
+        tmp_demand_summary
+    WHERE
+        sample >= ?1
+    GROUP BY
+        segment, days_prior
+    ORDER BY
+        segment, days_prior DESC
+    """
+    cnx.execute(qry, (burn_samples,))
+    cnx._commit_raw()
+
+    qry = """
+    SELECT
+        segment, days_prior, mean_future_demand, stdev_future_demand
+    FROM demand_to_come_summary
+    WHERE scenario = ?1
+    """
+    dmd = cnx.dataframe(qry, (scenario,))
+    dhs = dmd.set_index(["segment", "days_prior"])
+    return dhs
+
+
 def carrier_history(
     cnx: Database, scenario: str, burn_samples: int = 100
 ) -> pd.DataFrame:
@@ -606,8 +679,10 @@ def bid_price_history(
     """
     if weighting not in ("equal", "capacity"):
         raise ValueError(f"unknown weighting {weighting}")
-    qry = """
+    preqry = """
+    CREATE TABLE IF NOT EXISTS bid_price_general_summary AS
     SELECT
+        scenario,
         carrier,
         days_prior,
         avg(bid_price) as bid_price_mean,
@@ -619,20 +694,36 @@ def bid_price_history(
     FROM leg_detail
         LEFT JOIN leg_defs ON leg_detail.flt_no = leg_defs.flt_no
     WHERE
-        scenario == ?1
-        AND sample >= ?2
+        sample >= ?1
     GROUP BY
         carrier, days_prior
     """
+    cnx.execute(preqry, (burn_samples,))
+    try:
+        cnx._commit_raw()
+    except sqlite3.OperationalError:
+        preqry = preqry.replace(
+            "CREATE TABLE IF NOT EXISTS", "CREATE TEMP TABLE IF NOT EXISTS"
+        )
+        cnx.execute(preqry, (burn_samples,))
+    qry = """
+    SELECT
+        carrier,
+        days_prior,
+        bid_price_mean,
+        bid_price_stdev,
+        fraction_some_cap,
+        fraction_zero_cap
+    FROM bid_price_general_summary WHERE scenario == ?1
+    """
     bph = cnx.dataframe(
         qry,
-        (
-            scenario,
-            burn_samples,
-        ),
+        (scenario,),
     )
-    qry2 = """
+    preqry2 = """
+    CREATE TABLE IF NOT EXISTS bid_price_somecap_summary AS
     SELECT
+        scenario,
         carrier,
         days_prior,
         avg(bid_price) as some_cap_bid_price_mean_unweighted,
@@ -642,18 +733,30 @@ def bid_price_history(
     FROM leg_detail
         LEFT JOIN leg_defs ON leg_detail.flt_no = leg_defs.flt_no
     WHERE
-        scenario == ?1
-        AND sample >= ?2
+        sample >= ?1
         AND leg_detail.sold < leg_defs.capacity
     GROUP BY
         carrier, days_prior
     """
+    cnx.execute(preqry2, (burn_samples,))
+    try:
+        cnx._commit_raw()
+    except sqlite3.OperationalError:
+        preqry2 = preqry2.replace(
+            "CREATE TABLE IF NOT EXISTS", "CREATE TEMP TABLE IF NOT EXISTS"
+        )
+        cnx.execute(preqry2, (burn_samples,))
+    qry2 = """
+    SELECT
+        carrier, days_prior,
+        some_cap_bid_price_mean_unweighted,
+        some_cap_bid_price_stdev,
+        some_cap_bid_price_mean_capweighted
+    FROM bid_price_somecap_summary WHERE scenario == ?1
+    """
     bph_some_cap = cnx.dataframe(
         qry2,
-        (
-            scenario,
-            burn_samples,
-        ),
+        (scenario,),
     ).set_index(["carrier", "days_prior"])
     bph = bph.set_index(["carrier", "days_prior"]).join(bph_some_cap)
     bph = bph.sort_index(ascending=(True, False))
@@ -697,8 +800,10 @@ def displacement_history(
         - `displacement_stdev`: Sample standard deviation of displacement cost
             across all samples and all legs
     """
-    qry = """
+    preqry = """
+    CREATE TABLE IF NOT EXISTS displacement_summary AS
     SELECT
+        scenario,
         carrier,
         days_prior,
         avg(displacement) as displacement_mean,
@@ -706,19 +811,28 @@ def displacement_history(
     FROM leg_detail
         LEFT JOIN leg_defs ON leg_detail.flt_no = leg_defs.flt_no
     WHERE
-        scenario == ?1
-        AND sample >= ?2
+        sample >= ?1
     GROUP BY
-        carrier, days_prior
+        scenario, carrier, days_prior
     ORDER BY
         carrier, days_prior DESC
     """
+    cnx.execute(preqry, (burn_samples,))
+    try:
+        cnx._commit_raw()
+    except sqlite3.OperationalError:
+        preqry = preqry.replace(
+            "CREATE TABLE IF NOT EXISTS", "CREATE TEMP TABLE IF NOT EXISTS"
+        )
+        cnx.execute(preqry, (burn_samples,))
+    qry = """
+    SELECT carrier, days_prior, displacement_mean, displacement_stdev
+    FROM displacement_summary
+    WHERE scenario == ?1
+    """
     df = cnx.dataframe(
         qry,
-        (
-            scenario,
-            burn_samples,
-        ),
+        (scenario,),
     )
     df = df.set_index(["carrier", "days_prior"])
     return df

@@ -861,6 +861,10 @@ class Simulation(BaseSimulation):
                     self.cnx.save_details(self.sim, recording_day)
                 if self.file_writer is not None:
                     self.file_writer.save_details(self.sim, recording_day)
+
+            # simulation statistics record
+            self.sim.record_daily_statistics(recording_day)
+
         except Exception as e:
             print(e)
             print("Error in run_airline_models")
@@ -1074,6 +1078,7 @@ class Simulation(BaseSimulation):
             sim, to_log, to_db
         )
         fare_class_dist_df = self.compute_raw_fare_class_mix(sim, to_log, to_db)
+        bid_price_history_df = self.compute_bid_price_history(sim, to_log, to_db)
 
         summary = SummaryTables(
             name=sim.name,
@@ -1084,6 +1089,7 @@ class Simulation(BaseSimulation):
             paths=path_df,
             path_classes=path_classes_df,
             carriers=carrier_df,
+            bid_price_history=bid_price_history_df,
             raw_load_factor_distribution=load_factor_dist_df,
             raw_fare_class_mix=fare_class_dist_df,
             n_total_samples=num_samples,
@@ -1462,6 +1468,42 @@ class Simulation(BaseSimulation):
         df["sold"] = df["sold"].astype(int)
         if to_db and to_db.is_open:
             to_db.save_dataframe("fare_class_distribution", df)
+        return df
+
+    @staticmethod
+    def compute_bid_price_history(
+        sim: SimulationEngine,
+        to_log: bool = True,
+        to_db: database.Database | None = None,
+    ) -> pd.DataFrame:
+        """Compute the bid price history for each leg."""
+        result = {}
+        for carrier in sim.airlines:
+            bp = carrier.raw_bid_price_trace()
+            result[carrier.name] = (
+                pd.DataFrame.from_dict(bp, orient="index")
+                .sort_index(ascending=False)
+                .rename_axis(index="days_prior")
+            )
+        if result:
+            df = pd.concat(result, axis=0, names=["carrier"])
+        else:
+            df = pd.DataFrame(
+                columns=[
+                    "bid_price_mean",
+                    "bid_price_stdev",
+                    "some_cap_bid_price_mean",
+                    "some_cap_bid_price_stdev",
+                    "fraction_some_cap",
+                    "fraction_zero_cap",
+                ],
+                index=pd.MultiIndex(
+                    [[], []], [[], []], names=["carrier", "days_prior"]
+                ),
+            )
+        df = df.fillna(0)
+        if to_db and to_db.is_open:
+            to_db.save_dataframe("bid_price_history", df)
         return df
 
     def reseed(self, seed: int | list[int] | None = 42):

@@ -155,10 +155,12 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     """
     Scale all demand by this value.
 
-    Setting to a value other than 1.0 will increase or decrease all demand inputs
-    uniformly by the same multiplicative amount. This is helpful when exploring how
-    simulation results vary when you have "low demand" scenarios (e.g,
-    demand_multiplier = 0.8), or "high demand" scenarios (e.g., demand multiplier = 1.1).
+    Setting to a value other than 1.0 will increase or decrease
+    all demand inputs uniformly by the same multiplicative amount.
+    This is helpful when exploring how simulation results vary
+    when you have "low demand" scenarios
+    (e.g, demand_multiplier = 0.8), or "high demand" scenarios
+    (e.g., demand multiplier = 1.1).
     """
 
     capacity_multiplier: confloat(gt=0) = 1.0
@@ -232,9 +234,9 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
 
     capture_choice_set_obs: int = 0
     """
-    If this is set, PassengerSim will randomly sample the ChoiceSet data and output 
-    APPROXIMATELY this many choice sets (each will have multiple items and all items for the choice
-    set will be saved and output)
+    If this is set, PassengerSim will randomly sample the ChoiceSet data and output
+    APPROXIMATELY this many choice sets (each will have multiple items and all items
+    for the choice set will be saved and output)
     """
 
     show_progress_bar: bool = True

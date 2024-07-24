@@ -38,7 +38,5 @@ def save_demand_to_database(cnx: Database, sim: SimulationEngine, dcp: int):
         sample_demand,  -- 9
         sold,           -- 10
         revenue         -- 11
-    ) VALUES """ + cnx.sql_placeholders(
-        11
-    )
+    ) VALUES """ + cnx.sql_placeholders(11)
     cursor.executemany(sql, data_list)

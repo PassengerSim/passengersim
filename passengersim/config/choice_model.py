@@ -1,13 +1,11 @@
 # TITLE: Choice Models
 from __future__ import annotations
 
-from typing import Annotated, Literal, List, Optional
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
-from .named import Named, DictOfNamed
-
-from .todd_curves import ToddCurve
+from .named import Named
 
 
 class PodsChoiceModel(Named, extra="forbid"):
@@ -31,7 +29,7 @@ class PodsChoiceModel(Named, extra="forbid"):
     tolerance: float | None = None
     non_stop_multiplier: float | None = None
     connection_multiplier: float | None = None
-    todd_curve: Optional[str] = None
+    todd_curve: str | None = None
 
     anc1_relevance: float | None = None
     anc2_relevance: float | None = None

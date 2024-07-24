@@ -14,7 +14,11 @@ def _subprocess_run_trial(
     trial_id: int, cfg_json: str, output_dir: pathlib.Path | None = None
 ):
     cfg = Config.model_validate(json.loads(cfg_json))
-    if str(cfg.db.filename) != ":memory:":
+    if (
+        cfg.db is not None
+        and cfg.db.filename is not None
+        and str(cfg.db.filename) != ":memory:"
+    ):
         cfg.db.filename = cfg.db.filename.with_suffix(
             f".trial{trial_id:02}" + cfg.db.filename.suffix
         )

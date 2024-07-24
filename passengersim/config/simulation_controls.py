@@ -2,7 +2,7 @@
 # DOC-NAME: 01-simulation-controls
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import ValidationInfo, confloat, conint, field_validator
 
@@ -244,6 +244,15 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     The progress display requires `rich` is installed.
     """
 
+    # A bunch of debug flags, these are only used for development !!!
+    debug_availability: Optional[bool] = False
+    debug_choice: Optional[bool] = False
+    debug_connections: Optional[bool] = False
+    debug_events: Optional[bool] = False
+    debug_fares: Optional[bool] = False
+    debug_offers: Optional[bool] = False
+    debug_orders: Optional[bool] = False
+
     @field_validator("controller_time_zone", mode="before")
     def _time_zone_convert_hours_to_seconds(cls, v):
         if -12 <= v <= 12:
@@ -258,3 +267,8 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     """
     Which algorithm to use for time frame demand allocation.
     """
+
+
+
+
+

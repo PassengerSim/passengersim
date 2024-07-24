@@ -170,7 +170,7 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     Business class and/or first class can be quickly simulated with this option
     """
 
-    manual_paths: bool = True
+    manual_paths: bool = False
     """
     The user has provided explicit paths and connections.
 

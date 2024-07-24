@@ -411,6 +411,16 @@ class Config(YamlConfig, extra="forbid"):
             return load_pem_x509_certificate(self.raw_license_certificate)
 
     @model_validator(mode="after")
+    def _manual_paths(cls, m: Config):
+        """If manual_paths is true, there must be Path items
+           if it's set to false, then there shouldn't be any path items"""
+        if m.simulation_controls.manual_paths and len(m.paths) == 0:
+            raise ValueError(f"manual_paths is set to true, but no paths found in the input config")
+        if not m.simulation_controls.manual_paths and len(m.paths) > 0:
+            raise ValueError(f"manual_paths is set to false, but paths were specified in the input config")
+        return m
+
+    @model_validator(mode="after")
     def _airlines_have_rm_systems(cls, m: Config):
         """Check that all airlines have RM systems that have been defined."""
         for airline in m.airlines.values():

@@ -683,7 +683,7 @@ class SummaryTables:
     def fig_load_factor_distribution(
         self,
         by_carrier: bool | str = True,
-        breakpoints=(50, 60, 70, 80, 85, 90, 95),
+        breakpoints=(50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100),
         source: Literal["raw", "db"] = "raw",
         raw_df=False,
     ):
@@ -696,10 +696,12 @@ class SummaryTables:
             If True, show the distribution by carrier.  If a string, show the
             distribution for that carrier. If False, show the distribution
             aggregated over all carriers.
-        breakpoints : tuple[int], default (50, 60, 70, 80, 85, 90, 95)
-            The breakpoints for the load factor ranges. The first and last
-            breakpoints are always bounded to 0 and 100, respectively. These
-            can be given in this argument or omitted.
+        breakpoints : tuple[int], default (50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100)
+            The breakpoints for the load factor ranges, which represent the lowest
+            load factor value in each bin. The first and last breakpoints are always
+            bounded to 0 and 101, respectively; these bounds can be included explicitly
+            or omitted to be included implicitly. Setting the top value to 101 ensures
+            that the highest load factor value (100) is included in the last bin.
         source : {"raw", "db"}, default "raw"
             The source of the data.  "raw" uses the raw load factor distribution
             output from the simulation, which is faster and preferred if available.
@@ -734,15 +736,23 @@ class SummaryTables:
                 breakpoints = (-1,) + breakpoints[1:]
             else:
                 breakpoints = (-1,) + breakpoints
-            if breakpoints[-1] >= 100:
-                breakpoints = breakpoints[:-1] + (100,)
+            if breakpoints[-1] >= 101:
+                breakpoints = breakpoints[:-1] + (101,)
             else:
-                breakpoints = breakpoints + (100,)
-            labels = [f"0-{breakpoints[1]}"]
-            for i in range(1, len(breakpoints) - 1):
-                labels += [f"{breakpoints[i]}-{breakpoints[i + 1]}"]
+                breakpoints = breakpoints + (101,)
+            # Create labels for categories
+            labels = [f"0-{breakpoints[1]-1}"]
+            for i in range(1, len(breakpoints) - 2):
+                labels += [f"{breakpoints[i]}-{breakpoints[i + 1]-1}"]
+            if breakpoints[-2] < 100:
+                labels += [f"{breakpoints[-2]}-100"]
+            else:
+                labels += ["100"]
             breaker = pd.cut(
-                df_for_chart.leg_load_factor, bins=breakpoints, labels=labels
+                df_for_chart.leg_load_factor,
+                bins=breakpoints,
+                right=False,
+                labels=labels,
             ).rename("Load Factor Range")
             df_for_chart = (
                 df_for_chart.groupby(["carrier", breaker], observed=False)

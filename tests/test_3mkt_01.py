@@ -1,5 +1,6 @@
 import datetime
 import zoneinfo
+from typing import Literal
 
 import altair
 import pytest
@@ -216,7 +217,7 @@ def test_3mkt_01_fig_leg_forecasts(summary, dataframe_regression):
 @pytest.mark.parametrize("by_carrier", [False, True, "AL1"])
 @pytest.mark.parametrize("source", ["raw", "db"])
 def test_3mkt_01_fig_load_factor_grouped(
-    summary, dataframe_regression, by_carrier, source
+    summary, dataframe_regression, by_carrier, source: Literal["raw", "db"]
 ):
     assert isinstance(summary, SummaryTables)
     fig = summary.fig_load_factor_distribution(by_carrier=by_carrier, source=source)

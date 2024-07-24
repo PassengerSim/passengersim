@@ -772,7 +772,7 @@ airlines:
       - (Y4, Y)
       - (Y5, Y)
   - name: AL2
-    rm_system: rm_sub_bp
+    rm_system: rm_davn
     frat5: curve_C
     fare_adjustment_scale: 0.5
     load_factor_curve: lf_curve1

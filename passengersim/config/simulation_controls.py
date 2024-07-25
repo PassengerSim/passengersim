@@ -177,6 +177,12 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     If set to False, the automatic path generation algorithm is applied.
     """
 
+    use_3seg: Optional[bool] = False
+    """
+    Use the new A* search to build connections, it can create 3seg connects
+
+    """
+
     write_raw_files: bool = False
 
     random_seed: int | None = None

@@ -683,7 +683,7 @@ class SummaryTables:
     def fig_load_factor_distribution(
         self,
         by_carrier: bool | str = True,
-        breakpoints=(50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100),
+        breakpoints: tuple[int, ...] = (50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100),
         source: Literal["raw", "db"] = "raw",
         raw_df=False,
     ):
@@ -732,6 +732,8 @@ class SummaryTables:
                 .rename("Count")
                 .reset_index()
             )
+            if isinstance(breakpoints, list):
+                breakpoints = tuple(breakpoints)
             if breakpoints[0] <= 0:
                 breakpoints = (-1,) + breakpoints[1:]
             else:
@@ -740,12 +742,19 @@ class SummaryTables:
                 breakpoints = breakpoints[:-1] + (101,)
             else:
                 breakpoints = breakpoints + (101,)
+
             # Create labels for categories
-            labels = [f"0-{breakpoints[1]-1}"]
+            def make_label(i, j):
+                if i == j - 1:
+                    return f"{i}"
+                else:
+                    return f"{i}-{j-1}"
+
+            labels = [make_label(0, breakpoints[1])]
             for i in range(1, len(breakpoints) - 2):
-                labels += [f"{breakpoints[i]}-{breakpoints[i + 1]-1}"]
+                labels += [make_label(breakpoints[i], breakpoints[i + 1])]
             if breakpoints[-2] < 100:
-                labels += [f"{breakpoints[-2]}-100"]
+                labels += [make_label(breakpoints[-2], 101)]
             else:
                 labels += ["100"]
             breaker = pd.cut(

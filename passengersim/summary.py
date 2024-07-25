@@ -683,7 +683,19 @@ class SummaryTables:
     def fig_load_factor_distribution(
         self,
         by_carrier: bool | str = True,
-        breakpoints: tuple[int, ...] = (50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100),
+        breakpoints: Collection[int, ...] = (
+            50,
+            55,
+            60,
+            65,
+            70,
+            75,
+            80,
+            85,
+            90,
+            95,
+            100,
+        ),
         source: Literal["raw", "db"] = "raw",
         raw_df=False,
     ):
@@ -696,7 +708,7 @@ class SummaryTables:
             If True, show the distribution by carrier.  If a string, show the
             distribution for that carrier. If False, show the distribution
             aggregated over all carriers.
-        breakpoints : tuple[int], default (50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100)
+        breakpoints : Collection[int, ...], default (50, 55, 60, 65, ..., 90, 95, 100)
             The breakpoints for the load factor ranges, which represent the lowest
             load factor value in each bin. The first and last breakpoints are always
             bounded to 0 and 101, respectively; these bounds can be included explicitly
@@ -732,7 +744,7 @@ class SummaryTables:
                 .rename("Count")
                 .reset_index()
             )
-            if isinstance(breakpoints, list):
+            if not isinstance(breakpoints, tuple):
                 breakpoints = tuple(breakpoints)
             if breakpoints[0] <= 0:
                 breakpoints = (-1,) + breakpoints[1:]

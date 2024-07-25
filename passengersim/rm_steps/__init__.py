@@ -4,7 +4,8 @@
 #  - This is the abstract base class, each component will inherit from this
 #  - It defines the means to link the processing steps and check they fit together
 #
-# Alan W, Mathstream LLC, January 2023
+# Alan W, January 2023
+# (c) PassengerSim LLC
 #
 
 from abc import ABC, abstractmethod

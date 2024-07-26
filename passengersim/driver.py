@@ -589,14 +589,14 @@ class Simulation(BaseSimulation):
                 for bc in self.classes:
                     pc = PathClass(bc)
                     index = int(bc[1])
-                    pc.set_indexes(index, index)
+                    pc.set_index(0, index)
                     path.add_path_class(pc)
 
     def vn_initial_mapping2(self, airline_code):
         for path in self.sim.paths:
             if path.get_leg_carrier(0) == airline_code:
                 for i, pc in enumerate(path.pathclasses):
-                    pc.set_indexes(i, i)
+                    pc.set_index(0, i)
 
     def end_sample(self):
         """End of sample processing."""

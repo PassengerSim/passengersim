@@ -13,7 +13,7 @@ simulation_controls:
   max_connect_time: 120
   disable_ap: false
   demand_multiplier: 1.0
-  manual_paths: true
+  manual_paths: false
 rm_systems:
 - name: rm_test1
   availability_control: leg
@@ -1325,49 +1325,50 @@ fares:
   - R1
   - R2
   - R3
-paths:
-- orig: BOS
-  dest: SFO
-  path_quality_index: 1.0
-  legs:
-  - 1
-- orig: BOS
-  dest: SFO
-  path_quality_index: 1.0
-  legs:
-  - 2
-- orig: BOS
-  dest: ORD
-  path_quality_index: 1.0
-  legs:
-  - 3
-- orig: BOS
-  dest: ORD
-  path_quality_index: 1.0
-  legs:
-  - 4
-- orig: BOS
-  dest: ORD
-  path_quality_index: 1.0
-  legs:
-  - 5
-- orig: BOS
-  dest: DFW
-  path_quality_index: 1.0
-  legs:
-  - 6
-- orig: BOS
-  dest: DFW
-  path_quality_index: 1.0
-  legs:
-  - 7
-- orig: BOS
-  dest: DFW
-  path_quality_index: 1.0
-  legs:
-  - 8
-- orig: BOS
-  dest: DFW
-  path_quality_index: 1.0
-  legs:
-  - 9
+    
+# paths:
+# - orig: BOS
+#   dest: SFO
+#   path_quality_index: 1.0
+#   legs:
+#   - 1
+# - orig: BOS
+#   dest: SFO
+#   path_quality_index: 1.0
+#   legs:
+#   - 2
+# - orig: BOS
+#   dest: ORD
+#   path_quality_index: 1.0
+#   legs:
+#   - 3
+# - orig: BOS
+#   dest: ORD
+#   path_quality_index: 1.0
+#   legs:
+#   - 4
+# - orig: BOS
+#   dest: ORD
+#   path_quality_index: 1.0
+#   legs:
+#   - 5
+# - orig: BOS
+#   dest: DFW
+#   path_quality_index: 1.0
+#   legs:
+#   - 6
+# - orig: BOS
+#   dest: DFW
+#   path_quality_index: 1.0
+#   legs:
+#   - 7
+# - orig: BOS
+#   dest: DFW
+#   path_quality_index: 1.0
+#   legs:
+#   - 8
+# - orig: BOS
+#   dest: DFW
+#   path_quality_index: 1.0
+#   legs:
+#   - 9

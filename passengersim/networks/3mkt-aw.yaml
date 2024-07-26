@@ -6,6 +6,7 @@ scenario: AW_test
 simulation_controls:
   num_trials: 5
   num_samples: 600
+  random_seed: 42
   sys_k_factor: 0.1
   mkt_k_factor: 0.15
 #  pax_type_k_factor: 0.2
@@ -24,6 +25,8 @@ simulation_controls:
 #  capture_choice_set_obs: 10000
   # Mountain Standard Time (for me)
   controller_time_zone: -7
+  generate_3seg: true
+  debug_connections: false
 
 #db:
 #  write_items:

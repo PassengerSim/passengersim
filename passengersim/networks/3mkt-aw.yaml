@@ -297,7 +297,7 @@ rm_systems:
       DCP:
         - step_type: untruncation
           name: untruncation
-          algorithm: naive3
+          algorithm: em
           kind: leg
         - step_type: forecast
           name: forecast
@@ -774,7 +774,7 @@ airlines:
       - (Y4, Y)
       - (Y5, Y)
   - name: AL2
-    rm_system: rm_leg
+    rm_system: rm_test1
     frat5: curve_C
     fare_adjustment_scale: 0.5
     load_factor_curve: lf_curve1

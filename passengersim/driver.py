@@ -827,7 +827,7 @@ class Simulation(BaseSimulation):
                 self.capture_dcp_data(dcp_index)
                 # self.capture_dcp_data(dcp_index, closures_only=True)
                 what_had_happened_was.append("capture_dcp_close_data")
-                # self.capture_competitor_data()  # Simulates Infare / QL2
+                self.capture_competitor_data()  # Simulates Infare / QL2
 
             # Database capture
             if event_type.lower() == "daily":

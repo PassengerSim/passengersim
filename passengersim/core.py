@@ -5,6 +5,7 @@ try:
 except ImportError:
     warnings.warn("passengersim.core is not available", stacklevel=2)
     Airline = None
+    Airport = None
     BookingCurve = None
     Bucket = None
     Cabin = None
@@ -27,6 +28,7 @@ except ImportError:
 else:
     from passengersim_core import (
         Airline,
+        Airport,
         BookingCurve,
         Bucket,
         Cabin,
@@ -50,6 +52,7 @@ else:
 
 __all__ = [
     "Airline",
+    "Airport",
     "BookingCurve",
     "Bucket",
     "Cabin",

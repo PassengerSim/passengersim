@@ -20,7 +20,7 @@ import passengersim.config.rm_systems
 import passengersim.core
 from passengersim.config import Config
 from passengersim.config.snapshot_filter import SnapshotFilter
-from passengersim.core import DecisionWindow, Event, Frat5, PathClass, SimulationEngine
+from passengersim.core import Airport, DecisionWindow, Event, Frat5, PathClass, SimulationEngine
 from passengersim.summary import SummaryTables
 
 from . import database
@@ -348,6 +348,15 @@ class Simulation(BaseSimulation):
         self.classes = config.classes
         self.init_rm = {}  # TODO
         self.dcps = config.dcps
+
+        # Load the places into Airport objects.  We use lat/lon to get
+        # great circle distance, and this also has the MCT data
+        for code, p in config.places.items():
+            a = Airport(code, p.label)
+            a.latitude, a.longitude = p.lat, p.lon
+            if p.mct is not None:
+                a.set_mct(p.mct[0], p.mct[1], p.mct[2], p.mct[3])
+            self.sim.add_airport(a)
 
         self.curves = {}
         for curve_name, curve_config in config.booking_curves.items():

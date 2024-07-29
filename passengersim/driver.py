@@ -316,11 +316,13 @@ class Simulation(BaseSimulation):
         for lf_name, lf_curve in config.load_factor_curves.items():
             self.load_factor_curves[lf_name] = lf_curve
 
+        carriers = {}
         for airline_name, airline_config in config.airlines.items():
             availability_control = self.rm_systems[
                 airline_config.rm_system
             ].availability_control
             airline = passengersim.core.Airline(airline_name, availability_control)
+            carriers[airline_name] = airline
             airline.rm_system = self.rm_systems[airline_config.rm_system]
             airline.truncation_rule = airline_config.truncation_rule
             airline.continuous_pricing = airline_config.continuous_pricing
@@ -393,7 +395,7 @@ class Simulation(BaseSimulation):
         # self.fares = []
         for fare_config in config.fares:
             fare = passengersim.core.Fare(
-                fare_config.carrier,
+                carriers[fare_config.carrier],
                 fare_config.orig,
                 fare_config.dest,
                 fare_config.booking_class,

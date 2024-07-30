@@ -448,7 +448,7 @@ class Simulation(BaseSimulation):
             for cxr in self.sim.airlines:
                 prev_fare = None
                 for fare in dmd.fares:
-                    if fare.carrier != cxr.name:
+                    if fare.carrier_name != cxr.name:
                         continue
                     if prev_fare is not None:
                         diff = prev_fare.price - fare.price
@@ -462,7 +462,7 @@ class Simulation(BaseSimulation):
         for leg in self.sim.legs:
             for fare in self.sim.fares:
                 if (
-                    fare.carrier == leg.carrier
+                    fare.carrier_name == leg.carrier
                     and fare.orig == leg.orig
                     and fare.dest == leg.dest
                 ):
@@ -555,7 +555,7 @@ class Simulation(BaseSimulation):
                         continue
                     for fare in self.sim.fares:
                         if (
-                            fare.carrier == pth.carrier
+                            fare.carrier_name == pth.carrier
                             and fare.orig == pth.orig
                             and fare.dest == pth.dest
                         ):
@@ -898,11 +898,11 @@ class Simulation(BaseSimulation):
                 self.fare_sales_by_dcp[("business", prev_dcp)] = inc_business
                 self.fare_sales_by_dcp[("leisure", prev_dcp)] = inc_leisure
 
-                key2 = (f.carrier, prev_dcp)
+                key2 = (f.carrier_name, prev_dcp)
                 curr_airline = self.fare_sales_by_airline_dcp[key2]
                 self.fare_sales_by_airline_dcp[key2] = curr_airline + f.sold
 
-                key3 = (f.carrier, f.booking_class, prev_dcp)
+                key3 = (f.carrier_name, f.booking_class, prev_dcp)
                 self.fare_details_sold[key3] += f.sold
                 self.fare_details_sold_business[key3] += f.sold_business
                 self.fare_details_revenue[key3] += f.price * f.sold

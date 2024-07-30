@@ -6,13 +6,16 @@ import os.path
 import pathlib
 import warnings
 from collections.abc import Collection
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 import pandas as pd
 
 from . import database
 from .reporting import report_figure
+
+if TYPE_CHECKING:
+    from .config import Config
 
 logger = logging.getLogger("passengersim.summary")
 
@@ -106,6 +109,8 @@ class SummaryTables:
         )
         demands = pd.concat([demands_avg, demands_sum], axis=1).reset_index()
 
+        # these are averages, but need to have the index values excluded
+        # TODO: the index values should be set properly on the original dataframes
         carriers = sum(s.carriers.set_index("carrier") for s in summaries) / len(
             summaries
         )
@@ -135,6 +140,20 @@ class SummaryTables:
         displacement_history = average("displacement_history")
         demand_to_come_summary = average("demand_to_come_summary")
 
+        # dataframes with count data that need to be summed
+        def sum_count(name):
+            frames = []
+            for s in summaries:
+                frame = getattr(s, name)
+                if frame is not None:
+                    frames.append(frame)
+            if frames:
+                return sum(frames)
+            return None
+
+        raw_load_factor_distribution = sum_count("raw_load_factor_distribution")
+        raw_fare_class_mix = sum_count("raw_fare_class_mix")
+
         result = cls(
             demands=demands,
             legs=legs,
@@ -149,6 +168,9 @@ class SummaryTables:
             displacement_history=displacement_history,
             demand_to_come=demand_to_come,
             demand_to_come_summary=demand_to_come_summary,
+            raw_load_factor_distribution=raw_load_factor_distribution,
+            raw_fare_class_mix=raw_fare_class_mix,
+            n_total_samples=sum(s.n_total_samples for s in summaries),
         )
         result.meta_trials = summaries
         return result
@@ -385,7 +407,9 @@ class SummaryTables:
 
     def __init__(
         self,
+        *,
         name: str | None = "name?",
+        config: Config | None = None,
         demands: pd.DataFrame | None = None,
         fares: pd.DataFrame | None = None,
         legs: pd.DataFrame | None = None,
@@ -407,7 +431,13 @@ class SummaryTables:
         local_and_flow_yields: pd.DataFrame | None = None,
         leg_carried: pd.DataFrame | None = None,
         load_factor_distribution: pd.DataFrame | None = None,
+        raw_load_factor_distribution: pd.DataFrame | None = None,
+        raw_fare_class_mix: pd.DataFrame | None = None,
+        n_total_samples: int = 0,
     ):
+        self.config = config
+        """Configuration used in the simulation that generated the summary tables."""
+
         self.demands = demands
         self.fares = fares
         self.legs = legs
@@ -429,6 +459,18 @@ class SummaryTables:
         self.local_and_flow_yields = local_and_flow_yields
         self.leg_carried = leg_carried
         self.load_factor_distribution = load_factor_distribution
+
+        self.raw_load_factor_distribution = raw_load_factor_distribution
+        """Total number of leg departures by carrier by load factor (integers 0-100)."""
+
+        self.raw_fare_class_mix = raw_fare_class_mix
+        """Total number of passengers by carrier by fare class."""
+
+        self.n_total_samples = n_total_samples
+        """Total number of sample departures simulated to create these summaries.
+
+        This excludes any burn samples.
+        """
 
     def to_records(self) -> dict[str, list[dict]]:
         """Convert all summary tables to a dictionary of records."""
@@ -605,7 +647,17 @@ class SummaryTables:
 
     @report_figure
     def fig_fare_class_mix(self, raw_df=False, label_threshold=0.06):
-        df = self.fare_class_mix.reset_index()[["carrier", "booking_class", "avg_sold"]]
+        if self.fare_class_mix is not None:
+            df = self.fare_class_mix.reset_index()[
+                ["carrier", "booking_class", "avg_sold"]
+            ]
+        elif self.raw_fare_class_mix is not None and self.n_total_samples > 0:
+            df = self.raw_fare_class_mix / self.n_total_samples
+            df = df.rename(columns={"sold": "avg_sold"})
+            df = df.reset_index()[["carrier", "booking_class", "avg_sold"]]
+        else:
+            return None
+
         if raw_df:
             return df
         return self._fig_fare_class_mix(
@@ -628,16 +680,121 @@ class SummaryTables:
         )
 
     @report_figure
-    def fig_load_factor_distribution(self, by_carrier: bool | str = True, raw_df=False):
-        if not hasattr(self, "load_factor_distribution"):
-            raise AttributeError(
-                "load_factor_distribution data not found. Please load it first."
+    def fig_load_factor_distribution(
+        self,
+        by_carrier: bool | str = True,
+        breakpoints: Collection[int, ...] = (
+            50,
+            55,
+            60,
+            65,
+            70,
+            75,
+            80,
+            85,
+            90,
+            95,
+            100,
+        ),
+        source: Literal["raw", "db"] = "raw",
+        raw_df=False,
+    ):
+        """
+        Figure showing the distribution of leg load factors.
+
+        Parameters
+        ----------
+        by_carrier : bool or str, default True
+            If True, show the distribution by carrier.  If a string, show the
+            distribution for that carrier. If False, show the distribution
+            aggregated over all carriers.
+        breakpoints : Collection[int, ...], default (50, 55, 60, 65, ..., 90, 95, 100)
+            The breakpoints for the load factor ranges, which represent the lowest
+            load factor value in each bin. The first and last breakpoints are always
+            bounded to 0 and 101, respectively; these bounds can be included explicitly
+            or omitted to be included implicitly. Setting the top value to 101 ensures
+            that the highest load factor value (100) is included in the last bin.
+        source : {"raw", "db"}, default "raw"
+            The source of the data.  "raw" uses the raw load factor distribution
+            output from the simulation, which is faster and preferred if available.
+            "db" uses the older load factor distribution table, which is extracted
+            as a query from the database.  This requires leg level departure (final)
+            details to have been recorded in the database, but potentially allows
+            arbitrary custom filters or transformations to be applied.
+        raw_df : bool, default False
+            Return the raw data for this figure as a pandas DataFrame, instead
+            of generating the figure itself.
+
+        Returns
+        -------
+        altair.Chart or pd.DataFrame
+        """
+        if source == "raw":
+            # Load using faster raw load factor data generated by the simulation
+            # This is faster than loading from the database and now preferred
+            if self.raw_load_factor_distribution is None:
+                raise AttributeError(
+                    "raw_load_factor_distribution not found, "
+                    "it is required for using raw source data."
+                )
+
+            df_for_chart = (
+                self.raw_load_factor_distribution.rename_axis(columns="carrier")
+                .stack()
+                .rename("Count")
+                .reset_index()
+            )
+            if not isinstance(breakpoints, tuple):
+                breakpoints = tuple(breakpoints)
+            if breakpoints[0] <= 0:
+                breakpoints = (-1,) + breakpoints[1:]
+            else:
+                breakpoints = (-1,) + breakpoints
+            if breakpoints[-1] >= 101:
+                breakpoints = breakpoints[:-1] + (101,)
+            else:
+                breakpoints = breakpoints + (101,)
+
+            # Create labels for categories
+            def make_label(i, j):
+                if i == j - 1:
+                    return f"{i}"
+                else:
+                    return f"{i}-{j-1}"
+
+            labels = [make_label(0, breakpoints[1])]
+            for i in range(1, len(breakpoints) - 2):
+                labels += [make_label(breakpoints[i], breakpoints[i + 1])]
+            if breakpoints[-2] < 100:
+                labels += [make_label(breakpoints[-2], 101)]
+            else:
+                labels += ["100"]
+            breaker = pd.cut(
+                df_for_chart.leg_load_factor,
+                bins=breakpoints,
+                right=False,
+                labels=labels,
+            ).rename("Load Factor Range")
+            df_for_chart = (
+                df_for_chart.groupby(["carrier", breaker], observed=False)
+                .Count.sum()
+                .reset_index()
             )
 
-        df_for_chart = self.load_factor_distribution
-        df_for_chart.columns.names = ["Load Factor Range"]
-        df_for_chart = df_for_chart.set_index("carrier")
-        df_for_chart = df_for_chart.stack().rename("Count").reset_index()
+        elif source == "db":
+            # Older load factor distribution table, taken from database
+            if not hasattr(self, "load_factor_distribution"):
+                raise AttributeError(
+                    "load_factor_distribution data not found. Please load it first."
+                )
+
+            df_for_chart = self.load_factor_distribution
+            df_for_chart.columns.names = ["Load Factor Range"]
+            df_for_chart = df_for_chart.set_index("carrier")
+            df_for_chart = df_for_chart.stack().rename("Count").reset_index()
+
+        else:
+            raise ValueError(f"Unknown source {source}, should be 'raw' or 'db'")
 
         if not by_carrier:
             df_for_chart = (
@@ -687,18 +844,6 @@ class SummaryTables:
             )
 
         return chart
-
-    @property
-    def raw_fare_class_mix(self) -> pd.DataFrame:
-        """Raw data giving the fare class mix.
-
-        This tidy dataframe contains these columns:
-
-        - carrier (str)
-        - booking_class (str)
-        - avg_sold (float)
-        """
-        return self.fig_fare_class_mix(raw_df=True)
 
     @report_figure
     def fig_bookings_by_timeframe(

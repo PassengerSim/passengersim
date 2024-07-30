@@ -123,6 +123,7 @@ def test_carriers_have_classes():
     assert loaded.airlines["AL1"].classes == ["Y0", "Y1", "Y2", "Y3"]
     assert loaded.airlines["AL2"].classes == ["F", "C", "Y"]
 
+
 def test_format_tags():
     demo = """
     scenario: party

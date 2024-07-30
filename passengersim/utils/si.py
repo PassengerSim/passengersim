@@ -1,29 +1,31 @@
-import numpy as np
 import re
 
+import numpy as np
+
 tiers = [
-    'y', # yocto
-    'z', # zepto
-    'a', # atto
-    'f', # femto
-    'p', # pico
-    'n', # nano
-    'µ', # micro
-    'm', # milli
-    '',  #
-    'K', # Kilo
-    'M', # Mega
-    'G', # Giga
-    'T', # Tera
-    'P', # Peta
-    'E', # Exa
-    'Z', # Zeta
-    'Y', # Yotta
+    "y",  # yocto
+    "z",  # zepto
+    "a",  # atto
+    "f",  # femto
+    "p",  # pico
+    "n",  # nano
+    "µ",  # micro
+    "m",  # milli
+    "",  #
+    "K",  # Kilo
+    "M",  # Mega
+    "G",  # Giga
+    "T",  # Tera
+    "P",  # Peta
+    "E",  # Exa
+    "Z",  # Zeta
+    "Y",  # Yotta
 ]
 
-def si_units(x, kind='', f="{:.3g}{}{}"):
+
+def si_units(x, kind="", f="{:.3g}{}{}"):
     tier = 8
-    shift = 1024 if kind=='B' else 1000
+    shift = 1024 if kind == "B" else 1000
     while np.absolute(x) > shift and tier < len(tiers):
         x /= shift
         tier += 1
@@ -31,13 +33,15 @@ def si_units(x, kind='', f="{:.3g}{}{}"):
         x *= shift
         tier -= 1
     # Convert modest fractions back to simple decimals
-    if tiers[tier] == 'm' and x > 10:
+    if tiers[tier] == "m" and x > 10:
         x /= shift
         tier += 1
-    return f.format(x,tiers[tier],kind)
+    return f.format(x, tiers[tier], kind)
+
 
 _si_float = re.compile(r"^\s*([0-9]+\.?[0-9]*)\s?([yzafpnµmKMGTPEZY])\s*$")
 _si_int = re.compile(r"^\s*([0-9]+)\s?([yzafpnµmKMGTPEZY])\s*$")
+
 
 def get_float(x):
     try:
@@ -48,8 +52,9 @@ def get_float(x):
             raise
         else:
             y = float(match.group(1))
-            power = (tiers.index(match.group(2))-8)*3
+            power = (tiers.index(match.group(2)) - 8) * 3
             return y * 10**power
+
 
 def get_int(x):
     try:
@@ -60,5 +65,5 @@ def get_int(x):
             raise
         else:
             y = int(match.group(1))
-            power = (tiers.index(match.group(2))-8)*3
+            power = (tiers.index(match.group(2)) - 8) * 3
             return y * 10**power

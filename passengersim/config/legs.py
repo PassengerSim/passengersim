@@ -4,7 +4,6 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ValidationInfo, field_validator
-from typing import List
 
 
 def create_timestamp(base_date, offset, hh, mm) -> int:

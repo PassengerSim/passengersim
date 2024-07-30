@@ -19,6 +19,7 @@ from scipy.stats import gamma
 import passengersim.config.rm_systems
 import passengersim.core
 from passengersim.config import Config
+from passengersim.config.manipulate import revalidate
 from passengersim.config.snapshot_filter import SnapshotFilter
 from passengersim.core import Airport, DecisionWindow, Event, Frat5, PathClass, SimulationEngine
 from passengersim.summary import SummaryTables
@@ -99,6 +100,7 @@ class Simulation(BaseSimulation):
         config: Config,
         output_dir: pathlib.Path | None = None,
     ):
+        revalidate(config)
         super().__init__(config, output_dir)
         if config.simulation_controls.write_raw_files:
             try:
@@ -131,12 +133,15 @@ class Simulation(BaseSimulation):
         self.choice_set_file = None
         self.choice_set_obs = 0
         self._initialize(config)
-        self.cnx = database.Database(
-            engine=config.db.engine,
-            filename=config.db.filename,
-            pragmas=config.db.pragmas,
-            commit_count_delay=config.db.commit_count_delay,
-        )
+        if not config.db:
+            self.cnx = database.Database()
+        else:
+            self.cnx = database.Database(
+                engine=config.db.engine,
+                filename=config.db.filename,
+                pragmas=config.db.pragmas,
+                commit_count_delay=config.db.commit_count_delay,
+            )
         if self.cnx.is_open:
             database.tables.create_table_leg_defs(self.cnx._connection, self.sim.legs)
             database.tables.create_table_fare_defs(self.cnx._connection, self.sim.fares)
@@ -311,11 +316,13 @@ class Simulation(BaseSimulation):
         for lf_name, lf_curve in config.load_factor_curves.items():
             self.load_factor_curves[lf_name] = lf_curve
 
+        carriers = {}
         for airline_name, airline_config in config.airlines.items():
             availability_control = self.rm_systems[
                 airline_config.rm_system
             ].availability_control
             airline = passengersim.core.Airline(airline_name, availability_control)
+            carriers[airline_name] = airline
             airline.rm_system = self.rm_systems[airline_config.rm_system]
             airline.truncation_rule = airline_config.truncation_rule
             airline.continuous_pricing = airline_config.continuous_pricing
@@ -397,7 +404,7 @@ class Simulation(BaseSimulation):
         # self.fares = []
         for fare_config in config.fares:
             fare = passengersim.core.Fare(
-                fare_config.carrier,
+                carriers[fare_config.carrier],
                 fare_config.orig,
                 fare_config.dest,
                 fare_config.booking_class,
@@ -450,7 +457,7 @@ class Simulation(BaseSimulation):
             for cxr in self.sim.airlines:
                 prev_fare = None
                 for fare in dmd.fares:
-                    if fare.carrier != cxr.name:
+                    if fare.carrier_name != cxr.name:
                         continue
                     if prev_fare is not None:
                         diff = prev_fare.price - fare.price
@@ -464,7 +471,7 @@ class Simulation(BaseSimulation):
         for leg in self.sim.legs:
             for fare in self.sim.fares:
                 if (
-                    fare.carrier == leg.carrier
+                    fare.carrier_name == leg.carrier
                     and fare.orig == leg.orig
                     and fare.dest == leg.dest
                 ):
@@ -557,7 +564,7 @@ class Simulation(BaseSimulation):
                         continue
                     for fare in self.sim.fares:
                         if (
-                            fare.carrier == pth.carrier
+                            fare.carrier_name == pth.carrier
                             and fare.orig == pth.orig
                             and fare.dest == pth.dest
                         ):
@@ -603,6 +610,11 @@ class Simulation(BaseSimulation):
                     pc.set_index(0, i)
 
     def end_sample(self):
+        """End of sample processing."""
+
+        # Record the departure statistics to carrier-level counters in the simulation
+        self.sim.record_departure_statistics()
+
         # Commit data to the database
         if self.cnx:
             try:
@@ -860,6 +872,10 @@ class Simulation(BaseSimulation):
                     self.cnx.save_details(self.sim, recording_day)
                 if self.file_writer is not None:
                     self.file_writer.save_details(self.sim, recording_day)
+
+            # simulation statistics record
+            self.sim.record_daily_statistics(recording_day)
+
         except Exception as e:
             print(e)
             print("Error in run_airline_models")
@@ -891,11 +907,11 @@ class Simulation(BaseSimulation):
                 self.fare_sales_by_dcp[("business", prev_dcp)] = inc_business
                 self.fare_sales_by_dcp[("leisure", prev_dcp)] = inc_leisure
 
-                key2 = (f.carrier, prev_dcp)
+                key2 = (f.carrier_name, prev_dcp)
                 curr_airline = self.fare_sales_by_airline_dcp[key2]
                 self.fare_sales_by_airline_dcp[key2] = curr_airline + f.sold
 
-                key3 = (f.carrier, f.booking_class, prev_dcp)
+                key3 = (f.carrier_name, f.booking_class, prev_dcp)
                 self.fare_details_sold[key3] += f.sold
                 self.fare_details_sold_business[key3] += f.sold_business
                 self.fare_details_revenue[key3] += f.price * f.sold
@@ -1069,15 +1085,25 @@ class Simulation(BaseSimulation):
         path_df = self.compute_path_report(sim, to_log, to_db)
         path_classes_df = self.compute_path_class_report(sim, to_log, to_db)
         carrier_df = self.compute_carrier_report(sim, to_log, to_db)
+        load_factor_dist_df = self.compute_raw_load_factor_distribution(
+            sim, to_log, to_db
+        )
+        fare_class_dist_df = self.compute_raw_fare_class_mix(sim, to_log, to_db)
+        bid_price_history_df = self.compute_bid_price_history(sim, to_log, to_db)
 
         summary = SummaryTables(
             name=sim.name,
+            config=sim.config,
             demands=dmd_df,
             fares=fare_df,
             legs=leg_df,
             paths=path_df,
             path_classes=path_classes_df,
             carriers=carrier_df,
+            bid_price_history=bid_price_history_df,
+            raw_load_factor_distribution=load_factor_dist_df,
+            raw_fare_class_mix=fare_class_dist_df,
+            n_total_samples=num_samples,
         )
         summary.load_additional_tables(self.cnx, sim.name, sim.burn_samples, additional)
         summary.cnx = self.cnx
@@ -1296,11 +1322,12 @@ class Simulation(BaseSimulation):
                 else:
                     raise NotImplementedError("path with other than 1 or 2 legs")
         path_class_df = pd.DataFrame(path_class_df)
-        path_class_df.sort_values(
-            by=["orig", "dest", "carrier1", "flt_no1", "booking_class"]
-        )
-        #        if to_db and to_db.is_open:
-        #            to_db.save_dataframe("path_class_summary", path_class_df)
+        if not path_class_df.empty:
+            path_class_df.sort_values(
+                by=["orig", "dest", "carrier1", "flt_no1", "booking_class"]
+            )
+            #        if to_db and to_db.is_open:
+            #            to_db.save_dataframe("path_class_summary", path_class_df)
         return path_class_df
 
     def compute_carrier_report(
@@ -1375,6 +1402,120 @@ class Simulation(BaseSimulation):
         if to_db and to_db.is_open:
             to_db.save_dataframe("carrier_summary", carrier_df)
         return carrier_df
+
+    @staticmethod
+    def compute_raw_load_factor_distribution(
+        sim: SimulationEngine,
+        to_log: bool = True,
+        to_db: database.Database | None = None,
+    ) -> pd.DataFrame:
+        """
+        Compute a load factor distribution report.
+
+        This report is a dataframe, with integer index values from 0 to 100,
+        and column for each carrier in the simulation. The values are the
+        frequency of each leg load factor observed during the simulation
+        (excluding any burn period).  The values for leg load factors are
+        rounded down, so that a leg load factor of 99.9% is counted as 99,
+        and only actually sold-out flights are in the 100% bin.
+        """
+        result = {}
+        for carrier in sim.airlines:
+            lf = pd.Series(
+                carrier.raw_load_factor_distribution(),
+                index=pd.RangeIndex(101, name="leg_load_factor"),
+                name="frequency",
+            )
+            result[carrier.name] = lf
+        if result:
+            df = pd.concat(result, axis=1, names=["carrier"])
+        else:
+            df = pd.DataFrame(
+                index=pd.RangeIndex(101, name="leg_load_factor"), columns=[]
+            )
+        if to_db and to_db.is_open:
+            to_db.save_dataframe("load_factor_distribution", df)
+        return df
+
+    def compute_raw_fare_class_mix(
+        self,
+        sim: SimulationEngine,
+        to_log: bool = True,
+        to_db: database.Database | None = None,
+    ) -> pd.DataFrame:
+        """
+        Compute a fare class distribution report.
+
+        This report is a dataframe, with index values giving the fare class,
+        and column for each carrier in the simulation. The values are the
+        number of passengers for each fare class observed during the simulation
+        (excluding any burn period). This is a count of passengers not legs, so
+        a passenger on a connecting itinerary only counts once.
+        """
+        result = {}
+        for carrier in sim.airlines:
+            fc = carrier.raw_fare_class_distribution()
+            fc_sold = pd.Series(
+                {k: v["sold"] for k, v in fc.items()},
+                name="frequency",
+            )
+            fc_rev = pd.Series(
+                {k: v["revenue"] for k, v in fc.items()},
+                name="frequency",
+            )
+            result[carrier.name] = pd.concat(
+                [fc_sold, fc_rev], axis=1, keys=["sold", "revenue"]
+            ).rename_axis(index="booking_class")
+        if result:
+            df = pd.concat(result, axis=0, names=["carrier"])
+        else:
+            df = pd.DataFrame(
+                columns=["sold", "revenue"],
+                index=pd.MultiIndex(
+                    [[], []], [[], []], names=["carrier", "booking_class"]
+                ),
+            )
+        df = df.fillna(0)
+        df["sold"] = df["sold"].astype(int)
+        if to_db and to_db.is_open:
+            to_db.save_dataframe("fare_class_distribution", df)
+        return df
+
+    @staticmethod
+    def compute_bid_price_history(
+        sim: SimulationEngine,
+        to_log: bool = True,
+        to_db: database.Database | None = None,
+    ) -> pd.DataFrame:
+        """Compute the bid price history for each leg."""
+        result = {}
+        for carrier in sim.airlines:
+            bp = carrier.raw_bid_price_trace()
+            result[carrier.name] = (
+                pd.DataFrame.from_dict(bp, orient="index")
+                .sort_index(ascending=False)
+                .rename_axis(index="days_prior")
+            )
+        if result:
+            df = pd.concat(result, axis=0, names=["carrier"])
+        else:
+            df = pd.DataFrame(
+                columns=[
+                    "bid_price_mean",
+                    "bid_price_stdev",
+                    "some_cap_bid_price_mean",
+                    "some_cap_bid_price_stdev",
+                    "fraction_some_cap",
+                    "fraction_zero_cap",
+                ],
+                index=pd.MultiIndex(
+                    [[], []], [[], []], names=["carrier", "days_prior"]
+                ),
+            )
+        df = df.fillna(0)
+        if to_db and to_db.is_open:
+            to_db.save_dataframe("bid_price_history", df)
+        return df
 
     def reseed(self, seed: int | list[int] | None = 42):
         logger.debug("reseeding random_generator: %s", seed)

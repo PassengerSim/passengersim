@@ -113,7 +113,7 @@ def create_table_fare_defs(cnx: Database, fares: Iterable | None = None) -> None
             """,
             (
                 fare.fare_id,
-                fare.carrier,
+                fare.carrier_name,
                 fare.orig,
                 fare.dest,
                 fare.booking_class,

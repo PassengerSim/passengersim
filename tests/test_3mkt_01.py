@@ -1,5 +1,6 @@
 import datetime
 import zoneinfo
+from typing import Literal
 
 import altair
 import pytest
@@ -72,6 +73,15 @@ def test_3mkt_01_fare_class_mix(summary, dataframe_regression):
     dataframe_regression.check(
         summary.fare_class_mix,
         basename="fare_class_mix",
+        default_tolerance=DEFAULT_TOLERANCE,
+    )
+
+
+def test_3mkt_01_raw_fare_class_mix(summary, dataframe_regression):
+    assert isinstance(summary, SummaryTables)
+    dataframe_regression.check(
+        summary.raw_fare_class_mix,
+        basename="raw_fare_class_mix",
         default_tolerance=DEFAULT_TOLERANCE,
     )
 
@@ -205,11 +215,14 @@ def test_3mkt_01_fig_leg_forecasts(summary, dataframe_regression):
 
 
 @pytest.mark.parametrize("by_carrier", [False, True, "AL1"])
-def test_3mkt_01_fig_load_factor_grouped(summary, dataframe_regression, by_carrier):
+@pytest.mark.parametrize("source", ["raw", "db"])
+def test_3mkt_01_fig_load_factor_grouped(
+    summary, dataframe_regression, by_carrier, source: Literal["raw", "db"]
+):
     assert isinstance(summary, SummaryTables)
-    fig = summary.fig_load_factor_distribution(by_carrier=by_carrier)
+    fig = summary.fig_load_factor_distribution(by_carrier=by_carrier, source=source)
     assert isinstance(fig, altair.TopLevelMixin)
     df = summary.fig_load_factor_distribution(
-        by_carrier=by_carrier, raw_df=True
+        by_carrier=by_carrier, raw_df=True, source=source
     ).reset_index(drop=True)
     dataframe_regression.check(df, default_tolerance=DEFAULT_TOLERANCE)

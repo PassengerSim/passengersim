@@ -16,7 +16,7 @@ class BookingCurve(Named, extra="forbid"):
 
     For a given customer type, the booking curve gives the cumulative fraction
     of those customers who are expected to have already "arrived" at any given
-    data collection point (DCP / days_prior to departure).  
+    data collection point (DCP / days_prior to departure).
     An "arriving" customer is one who is interested
     in booking, but may or may not actually purchase a travel product from one
     of the carriers, depending on the availability of products at the time of their

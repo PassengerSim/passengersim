@@ -1,7 +1,3 @@
-
-from typing import Literal
-
-import altair
 import pytest
 
 from passengersim import Simulation, demo_network
@@ -27,16 +23,26 @@ def test_default_path_truncation_rules(default_config):
     for p in sim0.paths:
         assert p.truncation_rule == 3
 
+
 def test_carrier_defined_path_truncation_rules(default_config):
-    default_config.airlines['AL1'].truncation_rule = 1
-    default_config.airlines['AL2'].truncation_rule = 2
+    default_config.airlines["AL1"].truncation_rule = 1
+    default_config.airlines["AL2"].truncation_rule = 2
     sim1 = Simulation(default_config)
     sim1.setup_scenario()
     assert len(sim1.paths) == 12
     for p in sim1.paths:
-        if p.carrier == 'AL1':
+        if p.carrier == "AL1":
             assert p.truncation_rule == 1
-        elif p.carrier == 'AL2':
+        elif p.carrier == "AL2":
             assert p.truncation_rule == 2
         else:
             raise AssertionError(f"Unexpected carrier {p.carrier}")
+
+
+def test_empty_sim_no_database():
+    c = Config()
+    c.db = None
+    s = Simulation(c)
+    summary = s.run()
+    assert isinstance(summary, SummaryTables)
+    assert not summary.cnx.is_open

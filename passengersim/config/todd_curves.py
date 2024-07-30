@@ -1,10 +1,6 @@
 # TITLE: Booking Curves
 from __future__ import annotations
 
-from pydantic import ValidationInfo, field_validator
-
-from .named import Named
-
 from .pretty import PrettyModel
 
 

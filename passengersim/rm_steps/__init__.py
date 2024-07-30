@@ -58,7 +58,12 @@ class RmStep(RmStepBase, ABC):
 
     @abstractmethod
     def run(
-        self, sim: SimulationEngine, airline: str, dcp_index: int, dcp: int, debug: bool = False
+        self,
+        sim: SimulationEngine,
+        airline: str,
+        dcp_index: int,
+        dcp: int,
+        debug: bool = False,
     ):
         """This is where the magic happens.
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal, Optional, Any
+from typing import Any, Literal
 
 from .named import Named
 
@@ -14,10 +14,10 @@ class Airline(Named, extra="forbid"):
     control: str = ""
     """Deprecated.  No effect"""
 
-    continuous_pricing: Optional[str] = "None"
+    continuous_pricing: str | None = "None"
     """Used to select continuous pricing"""
 
-    cp_quantize: Optional[int] = 0
+    cp_quantize: int | None = 0
     """Cntrols quantization (rounding) for Continuous Pricing
        Example: If you set it to 5, the price will be rounded to the nearest $5"""
 
@@ -26,7 +26,7 @@ class Airline(Named, extra="forbid"):
     This is the default that will be applied if not found at a more detailed level
     """
 
-    fare_adjustment_scale: Optional[float] = 1.0
+    fare_adjustment_scale: float | None = 1.0
 
     load_factor_curve: Any | None = None
     """Named Load Factor curve.
@@ -38,6 +38,9 @@ class Airline(Named, extra="forbid"):
 
     classes: list[str] | list[tuple[str, str]] = []
     """A list of fare classes.
+
+    This list can be a simple list of fare classes, or a list of 2-tuples where
+    the first element is the fare class and the second element is the cabin.
 
     One convention is to use Y0, Y1, ... to label fare classes from the highest
     fare (Y0) to the lowest fare (Yn).  You can also use Y, B, M, H,... etc.
@@ -54,17 +57,32 @@ class Airline(Named, extra="forbid"):
       - Y4
       - Y5
     ```
+
+    If using cabins, it is reasonable to name the classes in consistent manner,
+    but this is optional, and arbitrary class names are still allowed. All class
+    names should still be unique, and cabin identifiers should be replicated
+    identically for classes that share a cabin.  Thus the list might look like this:
+
+    ```{yaml}
+    classes:
+      - (F0, F)
+      - (F1, F)
+      - (Y0, Y)
+      - (Y1, Y)
+      - (Y2, Y)
+      - (Y3, Y)
+    ```
     """
 
     truncation_rule: Literal[1, 2, 3] = 3
     """How to handle marking truncation of demand in timeframes.
-    
+
     If 1, then the demand is marked as truncated if the bucket or pathclass is closed at
     the DCP that is the beginning of the timeframe.
-    
+
     If 2, then the demand is marked as truncated if the bucket or pathclass is closed at
     the DCP that is the end of the timeframe.
-    
+
     If 3, then the demand is marked as truncated if the bucket or pathclass is closed at
     either of the DCPs that are at the beginning or the end of the timeframe.
     """

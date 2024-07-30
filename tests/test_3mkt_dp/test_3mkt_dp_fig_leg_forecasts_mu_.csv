@@ -1,4 +1,4 @@
-,carrier,flt_no,booking_class,days_prior,forecast_mean
+,carrier,leg_id,booking_class,days_prior,forecast_mean
 0,AL1,101,Y0,0,0
 1,AL1,101,Y0,1,0.8823892153914068
 2,AL1,101,Y0,3,3.6286424966583986

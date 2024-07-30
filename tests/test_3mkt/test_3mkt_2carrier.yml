@@ -109,72 +109,72 @@ paths:
 - carrier1: AL1
   carrier2: AL1
   dest: LAX
-  flt_no1: 101
-  flt_no2: 111.0
+  leg_id1: 101
+  leg_id2: 111.0
   orig: BOS
 - carrier1: AL1
   carrier2: AL1
   dest: LAX
-  flt_no1: 102
-  flt_no2: 112.0
+  leg_id1: 102
+  leg_id2: 112.0
   orig: BOS
 - carrier1: AL2
   carrier2: AL2
   dest: LAX
-  flt_no1: 201
-  flt_no2: 211.0
+  leg_id1: 201
+  leg_id2: 211.0
   orig: BOS
 - carrier1: AL2
   carrier2: AL2
   dest: LAX
-  flt_no1: 202
-  flt_no2: 212.0
+  leg_id1: 202
+  leg_id2: 212.0
   orig: BOS
 - carrier1: AL1
   carrier2: null
   dest: ORD
-  flt_no1: 101
-  flt_no2: .nan
+  leg_id1: 101
+  leg_id2: .nan
   orig: BOS
 - carrier1: AL1
   carrier2: null
   dest: ORD
-  flt_no1: 102
-  flt_no2: .nan
+  leg_id1: 102
+  leg_id2: .nan
   orig: BOS
 - carrier1: AL2
   carrier2: null
   dest: ORD
-  flt_no1: 201
-  flt_no2: .nan
+  leg_id1: 201
+  leg_id2: .nan
   orig: BOS
 - carrier1: AL2
   carrier2: null
   dest: ORD
-  flt_no1: 202
-  flt_no2: .nan
+  leg_id1: 202
+  leg_id2: .nan
   orig: BOS
 - carrier1: AL1
   carrier2: null
   dest: LAX
-  flt_no1: 111
-  flt_no2: .nan
+  leg_id1: 111
+  leg_id2: .nan
   orig: ORD
 - carrier1: AL1
   carrier2: null
   dest: LAX
-  flt_no1: 112
-  flt_no2: .nan
+  leg_id1: 112
+  leg_id2: .nan
   orig: ORD
 - carrier1: AL2
   carrier2: null
   dest: LAX
-  flt_no1: 211
-  flt_no2: .nan
+  leg_id1: 211
+  leg_id2: .nan
   orig: ORD
 - carrier1: AL2
   carrier2: null
   dest: LAX
-  flt_no1: 212
-  flt_no2: .nan
+  leg_id1: 212
+  leg_id2: .nan
   orig: ORD

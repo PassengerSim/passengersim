@@ -592,7 +592,7 @@ def _fig_forecasts(
 def fig_leg_forecasts(
     summaries,
     raw_df=False,
-    by_flt_no=None,
+    by_leg_id=None,
     by_class: bool | str = True,
     of: Literal["mu", "sigma"] | list[Literal["mu", "sigma"]] = "mu",
     agg_booking_classes: bool = False,
@@ -602,7 +602,7 @@ def fig_leg_forecasts(
             raise NotImplementedError
         fig = fig_leg_forecasts(
             summaries,
-            by_flt_no=by_flt_no,
+            by_leg_id=by_leg_id,
             by_class=by_class,
             of=of[0],
             agg_booking_classes=agg_booking_classes,
@@ -610,14 +610,14 @@ def fig_leg_forecasts(
         for of_ in of[1:]:
             fig |= fig_leg_forecasts(
                 summaries,
-                by_flt_no=by_flt_no,
+                by_leg_id=by_leg_id,
                 by_class=by_class,
                 of=of_,
                 agg_booking_classes=agg_booking_classes,
             )
         return fig
     df = _assemble(
-        summaries, "leg_forecasts", by_flt_no=by_flt_no, by_class=by_class, of=of
+        summaries, "leg_forecasts", by_leg_id=by_leg_id, by_class=by_class, of=of
     )
     color = "booking_class:N"
     if isinstance(by_class, str):
@@ -645,7 +645,7 @@ def fig_leg_forecasts(
         return df
     return _fig_forecasts(
         df,
-        facet_on="flt_no" if not isinstance(by_flt_no, int) else None,
+        facet_on="flt_no" if not isinstance(by_leg_id, int) else None,
         y="forecast_mean" if of == "mu" else "forecast_stdev",
         y_title="Mean Demand Forecast" if of == "mu" else "Std Dev Demand Forecast",
         color=color,

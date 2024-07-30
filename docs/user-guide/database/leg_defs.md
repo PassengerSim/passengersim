@@ -13,7 +13,8 @@ step, so it should be available and populated for every simulation run.
 
 | Column    | Data Type           | Description                                        |
 |:----------|:--------------------|:---------------------------------------------------|
-| flt_no    | INTEGER PRIMARY KEY | Unique identifier for a given leg [^1]             |
+| leg_id    | INTEGER PRIMARY KEY | Unique identifier for a given leg [^1]             |
+| flt_no    | INTEGER             | Flight number label for this leg                   |
 | carrier   | TEXT                | Name of carrier for this leg                       |
 | orig      | TEXT                | Origin (typically an airport code or similar)      |
 | dest      | TEXT                | Destination (typically an airport code or similar) |
@@ -29,5 +30,6 @@ step, so it should be available and populated for every simulation run.
     multiple segments sharing the same flight number, and multiple carriers will
     have completely unrelated flights with the same flight number.  To simplify
     data processing, PassengerSim uses a unique id for every travel segment. Networks
-    in PassengerSim that are derived from realistic sources will require some
-    modest preprocessing to create unique flight numbers for every leg.
+    in PassengerSim that are derived from realistic sources can still store flight
+    numbers as a nominal label for every leg, but they are not used for anything
+    except certain post-simulation reporting features.

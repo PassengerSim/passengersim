@@ -115,11 +115,11 @@ class SummaryTables:
             summaries
         )
         legs = sum(
-            s.legs.set_index(["carrier", "flt_no", "orig", "dest"]) for s in summaries
+            s.legs.set_index(["carrier", "leg_id", "orig", "dest"]) for s in summaries
         ) / len(summaries)
         legs = legs.reset_index()
         paths = sum(
-            s.paths.set_index(["orig", "dest", "carrier1", "flt_no1", "carrier2"])
+            s.paths.set_index(["orig", "dest", "carrier1", "leg_id1", "carrier2"])
             for s in summaries
         ) / len(summaries)
 
@@ -1236,7 +1236,7 @@ class SummaryTables:
     @report_figure
     def fig_leg_forecasts(
         self,
-        by_flt_no: bool | int = True,
+        by_leg_id: bool | int = True,
         by_class: bool | str = True,
         of: Literal["mu", "sigma"] | list[Literal["mu", "sigma"]] = "mu",
         raw_df=False,
@@ -1245,13 +1245,13 @@ class SummaryTables:
             if raw_df:
                 raise NotImplementedError
             fig = self.fig_leg_forecasts(
-                by_flt_no=by_flt_no,
+                by_leg_id=by_leg_id,
                 by_class=by_class,
                 of=of[0],
             )
             for of_ in of[1:]:
                 fig |= self.fig_leg_forecasts(
-                    by_flt_no=by_flt_no,
+                    by_leg_id=by_leg_id,
                     by_class=by_class,
                     of=of_,
                 )
@@ -1259,7 +1259,7 @@ class SummaryTables:
         y = "forecast_mean" if of == "mu" else "forecast_stdev"
         columns = [
             "carrier",
-            "flt_no",
+            "leg_id",
             "booking_class",
             "days_prior",
             y,
@@ -1268,8 +1268,8 @@ class SummaryTables:
             raise ValueError("the leg_forecasts summary table is not available")
         df = self.leg_forecasts.reset_index()[columns]
         color = "booking_class:N"
-        if isinstance(by_flt_no, int) and by_flt_no is not True:
-            df = df[df.flt_no == by_flt_no]
+        if isinstance(by_leg_id, int) and by_leg_id is not True:
+            df = df[df.leg_id == by_leg_id]
         if isinstance(by_class, str):
             df = df[df.booking_class == by_class]
             color = None

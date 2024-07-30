@@ -152,7 +152,7 @@ def load_factors(cnx: Database, scenario: str, burn_samples: int = 100) -> pd.Da
                  SUM(capacity * distance) AS asm,
                  SUM(revenue) AS revenue
           FROM leg_detail
-                   JOIN leg_defs USING (flt_no)
+                   JOIN leg_defs USING (leg_id)
           WHERE days_prior = 0
             AND sample >= ?2
             AND scenario = ?1
@@ -192,7 +192,7 @@ def load_factor_distribution(
     FROM (
         SELECT carrier, sold, capacity, (1.0*sold)/capacity AS lf
         FROM leg_detail
-                   JOIN leg_defs USING (flt_no)
+                   JOIN leg_defs USING (leg_id)
           WHERE days_prior = 0  -- only after all sales are recorded
             AND sample >= ?2    -- only after burn period
             AND scenario = ?1   -- only for this scenario
@@ -352,7 +352,7 @@ def leg_forecasts(
     Returns
     -------
     pandas.DataFrame
-        The resulting dataframe is indexed by `carrier`, `flt_no`,
+        The resulting dataframe is indexed by `carrier`, `leg_id`,
         `bucket_number`, `booking_class` and `days_prior`, and has these columns:
 
         - `forecast_mean`: Average forecast mean (mu).
@@ -365,7 +365,7 @@ def leg_forecasts(
     qry = """
     SELECT
         carrier,
-        flt_no,
+        leg_id,
         bucket_number,
         name as booking_class,
         days_prior,
@@ -374,12 +374,12 @@ def leg_forecasts(
         AVG(forecast_closed_in_tf) as forecast_closed_in_tf,
         AVG(forecast_closed_in_future) as forecast_closed_in_future
     FROM
-        leg_bucket_detail LEFT JOIN leg_defs USING (flt_no)
+        leg_bucket_detail LEFT JOIN leg_defs USING (leg_id)
     WHERE
         scenario = ?1
         AND sample >= ?2
     GROUP BY
-        carrier, flt_no, bucket_number, name, days_prior
+        carrier, leg_id, bucket_number, name, days_prior
     """
     return cnx.dataframe(
         qry,
@@ -387,7 +387,7 @@ def leg_forecasts(
             scenario,
             burn_samples,
         ),
-    ).set_index(["carrier", "flt_no", "bucket_number", "booking_class", "days_prior"])
+    ).set_index(["carrier", "leg_id", "bucket_number", "booking_class", "days_prior"])
 
 
 def path_forecasts(
@@ -611,7 +611,7 @@ def carrier_history(
             iteration, trial, sample, carrier,
             sum(forecast_mean) as forecast_mean,
             sqrt(sum(forecast_stdev*forecast_stdev)) as forecast_stdev
-        FROM leg_bucket_detail LEFT JOIN leg_defs USING (flt_no)
+        FROM leg_bucket_detail LEFT JOIN leg_defs USING (leg_id)
         WHERE days_prior == ?2 AND scenario == ?1 AND sample >= ?3
         GROUP BY iteration, trial, sample, carrier
         """,
@@ -623,7 +623,7 @@ def carrier_history(
             iteration, trial, sample, carrier,
             sum(sold) as sold,
             sum(revenue) as revenue
-        FROM leg_bucket_detail LEFT JOIN leg_defs USING (flt_no)
+        FROM leg_bucket_detail LEFT JOIN leg_defs USING (leg_id)
         WHERE days_prior == 0 AND scenario == ?1 AND sample >= ?2
         GROUP BY iteration, trial, sample, carrier
         """,
@@ -692,7 +692,7 @@ def bid_price_history(
         avg(CASE WHEN leg_detail.sold < leg_defs.capacity THEN 0.0 ELSE 1.0 END)
             as fraction_zero_cap
     FROM leg_detail
-        LEFT JOIN leg_defs ON leg_detail.flt_no = leg_defs.flt_no
+        LEFT JOIN leg_defs ON leg_detail.leg_id = leg_defs.leg_id
     WHERE
         sample >= ?1
     GROUP BY
@@ -731,7 +731,7 @@ def bid_price_history(
         (SUM(bid_price * leg_defs.capacity) / SUM(leg_defs.capacity))
             as some_cap_bid_price_mean_capweighted
     FROM leg_detail
-        LEFT JOIN leg_defs ON leg_detail.flt_no = leg_defs.flt_no
+        LEFT JOIN leg_defs ON leg_detail.leg_id = leg_defs.leg_id
     WHERE
         sample >= ?1
         AND leg_detail.sold < leg_defs.capacity
@@ -809,7 +809,7 @@ def displacement_history(
         avg(displacement) as displacement_mean,
         stdev(displacement) as displacement_stdev
     FROM leg_detail
-        LEFT JOIN leg_defs ON leg_detail.flt_no = leg_defs.flt_no
+        LEFT JOIN leg_defs ON leg_detail.leg_id = leg_defs.leg_id
     WHERE
         sample >= ?1
     GROUP BY
@@ -880,7 +880,7 @@ def local_and_flow_yields(
             path_id
     )
     SELECT
-        flt_no, carrier, orig, dest, capacity, leg_defs.distance,
+        leg_id, carrier, orig, dest, capacity, leg_defs.distance,
         yield AS local_yield,
         CAST(total_sold AS REAL) /
             (total_sold + IFNULL(f1.flow_sold, 0) + IFNULL(f2.flow_sold, 0))
@@ -891,7 +891,7 @@ def local_and_flow_yields(
     FROM
         leg_defs
         LEFT JOIN path_yields locals
-        ON locals.leg1 == flt_no AND locals.leg2 IS NULL
+        ON locals.leg1 == leg_id AND locals.leg2 IS NULL
         LEFT JOIN (
             SELECT
                 leg1,
@@ -903,7 +903,7 @@ def local_and_flow_yields(
             WHERE
                 leg2 IS NOT NULL
             GROUP BY leg1
-        ) f1 ON f1.leg1 == leg_defs.flt_no
+        ) f1 ON f1.leg1 == leg_defs.leg_id
         LEFT JOIN (
             SELECT
                 leg2,
@@ -913,7 +913,7 @@ def local_and_flow_yields(
             FROM
                 path_yields
             GROUP BY leg2
-        ) f2 ON f2.leg2 == leg_defs.flt_no
+        ) f2 ON f2.leg2 == leg_defs.leg_id
     """
     df = cnx.dataframe(
         qry,
@@ -960,7 +960,7 @@ def leg_local_and_flow_by_class(
     logger.info("running leg_local_and_flow_by_class query")
     qry = """
     SELECT
-        flt_no,
+        leg_id,
         leg_defs.carrier,
         leg_defs.orig,
         leg_defs.dest,
@@ -969,9 +969,9 @@ def leg_local_and_flow_by_class(
         IFNULL(AVG(pthcls.sold), 0) AS carried_loc
     FROM
         leg_bucket_detail
-        LEFT JOIN leg_defs USING (flt_no)
+        LEFT JOIN leg_defs USING (leg_id)
         LEFT JOIN pthcls ON
-            flt_no == pthcls.leg1
+            leg_id == pthcls.leg1
             AND leg_bucket_detail.name == pthcls.booking_class
             AND leg_bucket_detail.iteration == pthcls.iteration
             AND leg_bucket_detail.trial == pthcls.trial
@@ -981,7 +981,7 @@ def leg_local_and_flow_by_class(
         AND leg_bucket_detail.sample >= ?2
         AND days_prior == 0
     GROUP BY
-        flt_no,
+        leg_id,
         leg_defs.carrier,
         leg_defs.orig,
         leg_defs.dest,

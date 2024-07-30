@@ -128,108 +128,108 @@ paths:
 - carrier1: AL1
   carrier2: null
   dest: SFO
-  flt_no1: 1
-  flt_no2: null
+  leg_id1: 1
+  leg_id2: null
   orig: BOS
 - carrier1: AL2
   carrier2: null
   dest: SFO
-  flt_no1: 2
-  flt_no2: null
+  leg_id1: 2
+  leg_id2: null
   orig: BOS
 - carrier1: AL1
   carrier2: null
   dest: ORD
-  flt_no1: 3
-  flt_no2: null
+  leg_id1: 3
+  leg_id2: null
   orig: BOS
 - carrier1: AL2
   carrier2: null
   dest: ORD
-  flt_no1: 4
-  flt_no2: null
+  leg_id1: 4
+  leg_id2: null
   orig: BOS
 - carrier1: AL3
   carrier2: null
   dest: ORD
-  flt_no1: 5
-  flt_no2: null
+  leg_id1: 5
+  leg_id2: null
   orig: BOS
 - carrier1: AL1
   carrier2: null
   dest: DFW
-  flt_no1: 6
-  flt_no2: null
+  leg_id1: 6
+  leg_id2: null
   orig: BOS
 - carrier1: AL1
   carrier2: null
   dest: DFW
-  flt_no1: 7
-  flt_no2: null
+  leg_id1: 7
+  leg_id2: null
   orig: BOS
 - carrier1: AL2
   carrier2: null
   dest: DFW
-  flt_no1: 8
-  flt_no2: null
+  leg_id1: 8
+  leg_id2: null
   orig: BOS
 - carrier1: AL4
   carrier2: null
   dest: DFW
-  flt_no1: 9
-  flt_no2: null
+  leg_id1: 9
+  leg_id2: null
   orig: BOS
 - carrier1: AL1
   carrier2: null
   dest: DFW
-  flt_no1: 6
-  flt_no2: null
+  leg_id1: 6
+  leg_id2: null
   orig: BOS
 - carrier1: AL1
   carrier2: null
   dest: DFW
-  flt_no1: 7
-  flt_no2: null
+  leg_id1: 7
+  leg_id2: null
   orig: BOS
 - carrier1: AL2
   carrier2: null
   dest: DFW
-  flt_no1: 8
-  flt_no2: null
+  leg_id1: 8
+  leg_id2: null
   orig: BOS
 - carrier1: AL4
   carrier2: null
   dest: DFW
-  flt_no1: 9
-  flt_no2: null
+  leg_id1: 9
+  leg_id2: null
   orig: BOS
 - carrier1: AL1
   carrier2: null
   dest: ORD
-  flt_no1: 3
-  flt_no2: null
+  leg_id1: 3
+  leg_id2: null
   orig: BOS
 - carrier1: AL2
   carrier2: null
   dest: ORD
-  flt_no1: 4
-  flt_no2: null
+  leg_id1: 4
+  leg_id2: null
   orig: BOS
 - carrier1: AL3
   carrier2: null
   dest: ORD
-  flt_no1: 5
-  flt_no2: null
+  leg_id1: 5
+  leg_id2: null
   orig: BOS
 - carrier1: AL1
   carrier2: null
   dest: SFO
-  flt_no1: 1
-  flt_no2: null
+  leg_id1: 1
+  leg_id2: null
   orig: BOS
 - carrier1: AL2
   carrier2: null
   dest: SFO
-  flt_no1: 2
-  flt_no2: null
+  leg_id1: 2
+  leg_id2: null
   orig: BOS

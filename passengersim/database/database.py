@@ -304,7 +304,7 @@ class Database:
             logger.info("adding index on leg_detail")
             idx = """
             CREATE INDEX leg_detail_idx_2
-            ON leg_detail (scenario, trial, sample, days_prior, flt_no);
+            ON leg_detail (scenario, trial, sample, days_prior, leg_id);
             """
             self._connection.execute(idx)
             self._connection.commit()
@@ -389,7 +389,7 @@ def save_leg(cnx, sim, leg, dcp) -> string:
     try:
         cursor = cnx.cursor()
         sql = f"""INSERT INTO leg_detail
-                (scenario, iteration, trial, sample, days_prior, flt_no, sold, revenue)
+                (scenario, iteration, trial, sample, days_prior, leg_id, sold, revenue)
                 VALUES ({sql_placeholders(cnx, 8)})"""
         cursor.execute(
             sql,
@@ -399,7 +399,7 @@ def save_leg(cnx, sim, leg, dcp) -> string:
                 sim.trial,
                 sim.sample,
                 dcp,
-                leg.flt_no,
+                leg.leg_id,
                 leg.sold,
                 leg.revenue,
             ),
@@ -421,7 +421,7 @@ def save_leg_bucket_multi(
         cnx_type = type(cnx).__name__
         if cnx_type not in leg_bucket_sql:
             sql = leg_bucket_sql[cnx_type] = f"""INSERT INTO leg_bucket_detail
-                (scenario, iteration, trial, sample, days_prior, flt_no,
+                (scenario, iteration, trial, sample, days_prior, leg_id,
                 bucket_number, name, auth, revenue, sold, untruncated_demand,
                 forecast_mean) VALUES ({sql_placeholders(cnx, 13)})"""
         else:
@@ -434,7 +434,7 @@ def save_leg_bucket_multi(
                 sim.trial,
                 sim.sample,
                 dcp,
-                leg.flt_no,
+                leg.leg_id,
                 n,
                 bkt.name,
                 bkt.alloc,

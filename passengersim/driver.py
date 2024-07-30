@@ -476,8 +476,22 @@ class Simulation(BaseSimulation):
         carriers = {}
         for airline in self.sim.airlines:
             carriers[airline.name] = airline
+        next_leg_id = 1
         for leg_config in config.legs:
+            # if no leg_id is provided, we'll use the fltno if it's not already in use
+            if (
+                leg_config.leg_id is None
+                and leg_config.fltno is not None
+                and not self.sim.leg_id_exists(leg_config.fltno)
+            ):
+                leg_config.leg_id = leg_config.fltno
+            # if still no leg_id, we'll use the next available
+            if leg_config.leg_id is None:
+                while self.sim.leg_id_exists(next_leg_id):
+                    next_leg_id += 1
+                leg_config.leg_id = next_leg_id
             leg = passengersim.core.Leg(
+                leg_config.leg_id,
                 carriers[leg_config.carrier],
                 leg_config.fltno,
                 leg_config.orig,
@@ -509,7 +523,7 @@ class Simulation(BaseSimulation):
                 self.set_classes(leg, cabin)
             if self.debug:
                 print(f"Added leg: {leg}, dist = {leg.distance}")
-            self.legs[leg.flt_no] = leg
+            self.legs[leg.leg_id] = leg
 
     def set_classes(self, _leg, _cabin, debug=False):
         if len(self.classes) == 0:
@@ -1236,9 +1250,9 @@ class Simulation(BaseSimulation):
                         orig=path.orig,
                         dest=path.dest,
                         carrier1=path.get_leg_carrier(0),
-                        flt_no1=path.get_leg_fltno(0),
+                        leg_id1=path.get_leg_id(0),
                         carrier2=None,
-                        flt_no2=None,
+                        leg_id2=None,
                         avg_sold=avg_sold,
                         avg_sold_priceable=avg_sold_priceable,
                         avg_rev=avg_rev,
@@ -1250,9 +1264,9 @@ class Simulation(BaseSimulation):
                         orig=path.orig,
                         dest=path.dest,
                         carrier1=path.get_leg_carrier(0),
-                        flt_no1=path.get_leg_fltno(0),
+                        leg_id1=path.get_leg_id(0),
                         carrier2=path.get_leg_carrier(1),
-                        flt_no2=path.get_leg_fltno(1),
+                        leg_id2=path.get_leg_id(1),
                         avg_sold=avg_sold,
                         avg_sold_priceable=avg_sold_priceable,
                         avg_rev=avg_rev,
@@ -1286,9 +1300,9 @@ class Simulation(BaseSimulation):
                             orig=path.orig,
                             dest=path.dest,
                             carrier1=path.get_leg_carrier(0),
-                            flt_no1=path.get_leg_fltno(0),
+                            leg_id1=path.get_leg_id(0),
                             carrier2=None,
-                            flt_no2=None,
+                            leg_id2=None,
                             booking_class=pc.booking_class,
                             avg_sold=avg_sold,
                             avg_sold_priceable=avg_sold_priceable,
@@ -1301,9 +1315,9 @@ class Simulation(BaseSimulation):
                             orig=path.orig,
                             dest=path.dest,
                             carrier1=path.get_leg_carrier(0),
-                            flt_no1=path.get_leg_fltno(0),
+                            leg_id1=path.get_leg_id(0),
                             carrier2=path.get_leg_carrier(1),
-                            flt_no2=path.get_leg_fltno(1),
+                            leg_id2=path.get_leg_id(1),
                             booking_class=pc.booking_class,
                             avg_sold=avg_sold,
                             avg_sold_priceable=avg_sold_priceable,
@@ -1315,7 +1329,7 @@ class Simulation(BaseSimulation):
         path_class_df = pd.DataFrame(path_class_df)
         if not path_class_df.empty:
             path_class_df.sort_values(
-                by=["orig", "dest", "carrier1", "flt_no1", "booking_class"]
+                by=["orig", "dest", "carrier1", "leg_id1", "booking_class"]
             )
             #        if to_db and to_db.is_open:
             #            to_db.save_dataframe("path_class_summary", path_class_df)

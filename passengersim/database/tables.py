@@ -21,7 +21,8 @@ def create_table_leg_defs(cnx: Database, legs: Iterable | None = None):
     sql = """
     CREATE TABLE IF NOT EXISTS leg_defs
     (
-        flt_no INTEGER PRIMARY KEY,
+        leg_id INTEGER PRIMARY KEY,
+        flt_no INTEGER,
         carrier TEXT,
         orig TEXT,
         dest TEXT,
@@ -36,6 +37,7 @@ def create_table_leg_defs(cnx: Database, legs: Iterable | None = None):
         cnx.execute(
             """
             INSERT OR REPLACE INTO leg_defs(
+                leg_id,
                 flt_no,
                 carrier,
                 orig,
@@ -45,10 +47,11 @@ def create_table_leg_defs(cnx: Database, legs: Iterable | None = None):
                 capacity,
                 distance
             ) VALUES (
-                ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8
+                ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9
             )
             """,
             (
+                leg.leg_id,
                 leg.flt_no,
                 leg.carrier,
                 leg.orig,
@@ -167,8 +170,8 @@ def create_table_path_defs(cnx: Database, paths: Iterable | None = None):
                 pth.orig,
                 pth.get_leg_dest(0) if connects else None,
                 pth.dest,
-                pth.get_leg_fltno(0),
-                pth.get_leg_fltno(1) if connects else None,
+                pth.get_leg_id(0),
+                pth.get_leg_id(1) if connects else None,
                 pth.get_total_distance(),
             ),
         )
@@ -191,7 +194,7 @@ def create_table_leg_detail(cnx: Database, primary_key: bool = False) -> None:
         trial	        	INT NOT NULL,
         sample  	    	INT NOT NULL,
         days_prior       	INT NOT NULL,
-        flt_no		    	INT NOT NULL,
+        leg_id		    	INT NOT NULL,
         updated_at	    	DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         sold	    		INT,
         revenue             FLOAT,
@@ -222,7 +225,7 @@ def create_table_leg_bucket_detail(cnx: Database, primary_key: bool = False):
         trial	    	INT NOT NULL,
         sample  		INT NOT NULL,
         days_prior   	INT NOT NULL,
-        flt_no			INT NOT NULL,
+        leg_id          INT NOT NULL,
         bucket_number   INT NOT NULL,
         name            VARCHAR(10) NOT NULL,
         auth    		INT,

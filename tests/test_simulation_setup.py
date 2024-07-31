@@ -46,3 +46,44 @@ def test_empty_sim_no_database():
     summary = s.run()
     assert isinstance(summary, SummaryTables)
     assert not summary.cnx.is_open
+
+
+def test_automatic_leg_ids():
+    from passengersim.config import Config
+
+    carrier1 = dict(name="X1", control="none", rm_system="fcfs")
+    carrier2 = dict(name="X2", control="none", rm_system="fcfs")
+    leg1 = dict(
+        orig="A",
+        dest="B",
+        carrier="X1",
+        fltno=123,
+        dep_time="08:00",
+        arr_time="10:00",
+        capacity=100,
+    )
+    # leg2 has different carrier but the same fltno as leg1,
+    # so it should get a new leg_id (1)
+    leg2 = dict(
+        orig="A",
+        dest="B",
+        carrier="X2",
+        fltno=123,
+        dep_time="08:00",
+        arr_time="10:00",
+        capacity=100,
+    )
+    fcfs = dict(availability_control="leg", processes={})
+    raw = {
+        "legs": [leg1, leg2],
+        "carriers": [carrier1, carrier2],
+        "rm_systems": {"fcfs": fcfs},
+    }
+    cfg = Config.model_validate(raw)
+    sim = Simulation(cfg)
+    assert len(sim.legs) == 2
+    assert list(sim.legs.keys()) == [123, 1]
+    for leg, leg_id in zip(sim.legs, [123, 1]):
+        assert leg == leg_id
+    assert sim.sim.legs[0].leg_id == 123
+    assert sim.sim.legs[1].leg_id == 1

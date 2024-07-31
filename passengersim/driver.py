@@ -21,7 +21,14 @@ import passengersim.core
 from passengersim.config import Config
 from passengersim.config.manipulate import revalidate
 from passengersim.config.snapshot_filter import SnapshotFilter
-from passengersim.core import DecisionWindow, Event, Frat5, PathClass, SimulationEngine
+from passengersim.core import (
+    Airport,
+    DecisionWindow,
+    Event,
+    Frat5,
+    PathClass,
+    SimulationEngine,
+)
 from passengersim.summary import SummaryTables
 
 from . import database
@@ -355,6 +362,15 @@ class Simulation(BaseSimulation):
         self.classes = config.classes
         self.init_rm = {}  # TODO
         self.dcps = config.dcps
+
+        # Load the places into Airport objects.  We use lat/lon to get
+        # great circle distance, and this also has the MCT data
+        for code, p in config.places.items():
+            a = Airport(code, p.label)
+            a.latitude, a.longitude = p.lat, p.lon
+            if p.mct is not None:
+                a.set_mct(p.mct[0], p.mct[1], p.mct[2], p.mct[3])
+            self.sim.add_airport(a)
 
         self.curves = {}
         for curve_name, curve_config in config.booking_curves.items():
@@ -853,7 +869,7 @@ class Simulation(BaseSimulation):
                 self.capture_dcp_data(dcp_index)
                 # self.capture_dcp_data(dcp_index, closures_only=True)
                 what_had_happened_was.append("capture_dcp_close_data")
-                # self.capture_competitor_data()  # Simulates Infare / QL2
+                self.capture_competitor_data()  # Simulates Infare / QL2
 
             # Database capture
             if event_type.lower() == "daily":

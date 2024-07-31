@@ -1,6 +1,6 @@
 import math
 from zoneinfo import ZoneInfo
-
+from typing import List
 from pydantic import BaseModel, field_validator
 
 
@@ -24,12 +24,29 @@ class Place(BaseModel, extra="forbid", validate_assignment=True):
     The time zone for this location.
     """
 
+    mct: List[int] | None = None
+    """
+    Default Minimum Connect Time (MCT) for this location (Airport)
+    Specified as a list of 4 integers, [DD, DI, ID, II], with time in minutes
+    Domestic->Domestic, Domestic->International, etc.
+    Future version of PassengerSim will also allow specific exceptions by airline / route / etc.
+    """
+
     @field_validator("time_zone")
     def _valid_time_zone(cls, v: str):
         """Check for valid time zones."""
         if isinstance(v, str):
             ZoneInfo(v)
         return v
+
+    @field_validator("mct")
+    def _valid_mct(cls, m: str):
+        if m is None:
+            return True
+        elif not isinstance(m, list):
+            return False
+        elif len(m) != 4:
+            raise ValueError("When specified, MCT should be a list of 4 integer values, [DD, DI, ID, II], in minutes")
 
     @property
     def time_zone_info(self):

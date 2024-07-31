@@ -4,10 +4,11 @@ try:
     import passengersim_core  # noqa: F401
 except ImportError:
     warnings.warn("passengersim.core is not available", stacklevel=2)
-    Carrier = None
+    Airport = None
     BookingCurve = None
     Bucket = None
     Cabin = None
+    Carrier = None
     ChoiceModel = None
     DecisionWindow = None
     Demand = None
@@ -26,6 +27,7 @@ except ImportError:
     SimulationEngine = None
 else:
     from passengersim_core import (
+        Airport,
         BookingCurve,
         Bucket,
         Cabin,
@@ -49,10 +51,11 @@ else:
     )
 
 __all__ = [
-    "Carrier",
+    "Airport",
     "BookingCurve",
     "Bucket",
     "Cabin",
+    "Carrier",
     "ChoiceModel",
     "DecisionWindow",
     "Demand",

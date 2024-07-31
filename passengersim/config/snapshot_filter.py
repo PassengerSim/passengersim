@@ -81,7 +81,7 @@ class SnapshotFilter(BaseModel, validate_assignment=True):
         None,
     ] = None
     title: str = ""
-    airline: str = ""
+    carrier: str = ""
     trial: list[int] = []
     sample: list[int] = []
     dcp: list[int] = []
@@ -142,7 +142,7 @@ class SnapshotFilter(BaseModel, validate_assignment=True):
         info += f"  dcp={sim.last_dcp}"
 
         if leg is not None:
-            if self.airline and leg.carrier != self.airline:
+            if self.carrier and leg.carrier != self.carrier:
                 return SnapshotInstruction(False, why=f"cause {leg.carrier=}")
             info += f"  carrier={leg.carrier}"
 
@@ -172,7 +172,7 @@ class SnapshotFilter(BaseModel, validate_assignment=True):
             info += f"  flt_no={path.get_leg_fltno(0)}"
 
         if carrier is not None:
-            if self.airline and carrier != self.airline:
+            if self.carrier and carrier != self.carrier:
                 return SnapshotInstruction(False, why=f"cause {carrier=}")
             info += f"  carrier={carrier}"
 
@@ -182,7 +182,7 @@ class SnapshotFilter(BaseModel, validate_assignment=True):
             info += f"  orig={orig}"
 
         if dest is not None:
-            if self.airline and dest not in self.dest:
+            if self.carrier and dest not in self.dest:
                 return SnapshotInstruction(False, why=f"cause {dest=}")
             info += f"  dest={dest}"
 

@@ -25,7 +25,7 @@ rm_systems:
         algorithm: emsrb
         kind: leg
 
-airlines:
+carriers:
   - name: AL1
     rm_system: rm_test1
   - name: AL2

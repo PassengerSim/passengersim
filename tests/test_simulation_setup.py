@@ -25,8 +25,8 @@ def test_default_path_truncation_rules(default_config):
 
 
 def test_carrier_defined_path_truncation_rules(default_config):
-    default_config.airlines["AL1"].truncation_rule = 1
-    default_config.airlines["AL2"].truncation_rule = 2
+    default_config.carriers["AL1"].truncation_rule = 1
+    default_config.carriers["AL2"].truncation_rule = 2
     sim1 = Simulation(default_config)
     sim1.setup_scenario()
     assert len(sim1.paths) == 12

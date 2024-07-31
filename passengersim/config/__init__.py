@@ -2,9 +2,9 @@
 # DOC-NAME: 00-configs
 from __future__ import annotations
 
-from .airlines import Airline
 from .base import Config
 from .booking_curves import BookingCurve
+from .carriers import Carrier
 from .choice_model import ChoiceModel
 from .database import DatabaseConfig
 from .demands import Demand

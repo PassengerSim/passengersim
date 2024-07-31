@@ -1,4 +1,4 @@
-airlines:
+carriers:
 - asm: 432000000.0
   avg_rev: 87199.89
   avg_sold: 301

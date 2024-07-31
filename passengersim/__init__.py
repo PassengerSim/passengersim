@@ -1,7 +1,7 @@
 try:
     # before loading any other subpackages, first try to
     # load declarations of all the usual RmStep classes
-    from passengersim_core import airline as rm  # noqa: F401
+    from passengersim_core import carrier as rm  # noqa: F401
 except ImportError:
     raise
 

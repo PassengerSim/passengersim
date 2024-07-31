@@ -5,11 +5,11 @@ from typing import Any, Literal
 from .named import Named
 
 
-class Airline(Named, extra="forbid"):
-    """Configuration for passengersim.Airline object."""
+class Carrier(Named, extra="forbid"):
+    """Configuration for passengersim.Carrier object."""
 
     rm_system: str
-    """Name of the revenue management system used by this airline."""
+    """Name of the revenue management system used by this carrier."""
 
     control: str = ""
     """Deprecated.  No effect"""
@@ -34,7 +34,7 @@ class Airline(Named, extra="forbid"):
     """
 
     ancillaries: dict[str, float] | None = {}
-    """Specifies ancillaries offered by the airline, codes are ANC1 .. ANC4"""
+    """Specifies ancillaries offered by the carrier, codes are ANC1 .. ANC4"""
 
     classes: list[str] | list[tuple[str, str]] = []
     """A list of fare classes.

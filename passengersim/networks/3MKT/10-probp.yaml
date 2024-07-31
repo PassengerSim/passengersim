@@ -36,7 +36,7 @@ rm_systems:
       - step_type: aggregation  # not needed for algorithm, but gives leg forecast data for output
         name: aggregate
 
-airlines:
+carriers:
   - name: AL1
     rm_system: rm_probp
   - name: AL2

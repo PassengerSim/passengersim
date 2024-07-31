@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 import yaml
-from passengersim_core.airline import ForecastStep, UntruncationStep
+from passengersim_core.carrier import ForecastStep, UntruncationStep
 from pydantic import ValidationError
 
 from passengersim import Config
@@ -78,8 +78,8 @@ def test_u10_loader():
     with gzip.open(u10_network) as f:
         content.update(yaml.safe_load(f))
     u10 = Config.model_validate(content)
-    assert len(u10.airlines) == 4
-    assert u10.airlines["AL2"].name == "AL2"
+    assert len(u10.carriers) == 4
+    assert u10.carriers["AL2"].name == "AL2"
 
 
 # def test_u10_transcoder():
@@ -98,7 +98,7 @@ def test_u10_loader():
 
 def test_carriers_have_classes():
     demo = """
-    airlines:
+    carriers:
       AL1:
         rm_system: SystemA
         frat5: curve_G
@@ -120,8 +120,8 @@ def test_carriers_have_classes():
     """
     content = yaml.safe_load(io.StringIO(demo))
     loaded = Config.model_validate(content)
-    assert loaded.airlines["AL1"].classes == ["Y0", "Y1", "Y2", "Y3"]
-    assert loaded.airlines["AL2"].classes == ["F", "C", "Y"]
+    assert loaded.carriers["AL1"].classes == ["Y0", "Y1", "Y2", "Y3"]
+    assert loaded.carriers["AL2"].classes == ["F", "C", "Y"]
 
 
 def test_format_tags():
@@ -138,7 +138,7 @@ def test_format_tags():
     rm_systems:
       - name: SystemA
         processes: {}
-    airlines:
+    carriers:
       AL1:
         rm_system: SystemA
       AL2:
@@ -150,5 +150,5 @@ def test_format_tags():
     """
     content = yaml.safe_load(io.StringIO(demo))
     loaded = Config.model_validate(content)
-    assert loaded.airlines["AL1"].classes == ["Z0", "Z1", "Z2"]
-    assert loaded.airlines["AL2"].classes == ["F1999", "Zzz", "Prince"]
+    assert loaded.carriers["AL1"].classes == ["Z0", "Z1", "Z2"]
+    assert loaded.carriers["AL2"].classes == ["F1999", "Zzz", "Prince"]

@@ -22,8 +22,8 @@ from pydantic import Field, field_validator, model_validator
 
 from passengersim.pseudonym import random_label
 
-from .airlines import Airline
 from .booking_curves import BookingCurve
+from .carriers import Carrier
 from .choice_model import ChoiceModel
 from .database import DatabaseConfig
 from .demands import Demand
@@ -297,10 +297,10 @@ class Config(YamlConfig, extra="forbid"):
 
     Need to explaining more here"""
 
-    airlines: DictOfNamed[Airline] = {}
-    """A list of airlines.
+    carriers: DictOfNamed[Carrier] = {}
+    """A list of carriers.
 
-    One convention is to use Airline1, Airline2, ... to list the airlines in the
+    One convention is to use Airline1, Airline2, ... to list the carriers in the
     network.  Another convention is to use IATA industry-standard two-letter airline
     codes.  See the
     [IATA code search](https://www.iata.org/en/publications/directories/code-search/)
@@ -334,7 +334,7 @@ class Config(YamlConfig, extra="forbid"):
     def _classes_are_for_carriers(cls, data: Any) -> Any:
         """Any carrier that doesn't have its own classes gets the global ones."""
         if isinstance(data, dict):
-            carriers = data.get("airlines", {})
+            carriers = data.get("carriers", {})
             if isinstance(carriers, list):
                 for carrier in carriers:
                     if isinstance(carrier, dict) and "classes" not in carrier:
@@ -343,7 +343,7 @@ class Config(YamlConfig, extra="forbid"):
                 for carrier in carriers.values():
                     if isinstance(carrier, dict) and "classes" not in carrier:
                         carrier["classes"] = data.get("classes", [])
-            data["airlines"] = carriers
+            data["carriers"] = carriers
         return data
 
     dcps: list[int] = []
@@ -424,20 +424,25 @@ class Config(YamlConfig, extra="forbid"):
     @model_validator(mode="after")
     def _manual_paths(cls, m: Config):
         """If manual_paths is true, there must be Path items
-           if it's set to false, then there shouldn't be any path items"""
+        if it's set to false, then there shouldn't be any path items"""
         if m.simulation_controls.manual_paths and len(m.paths) == 0:
-            raise ValueError(f"manual_paths is set to true, but no paths found in the input config")
+            raise ValueError(
+                "manual_paths is set to true, but no paths found in the input config"
+            )
         if not m.simulation_controls.manual_paths and len(m.paths) > 0:
-            raise ValueError(f"manual_paths is set to false, but paths were specified in the input config")
+            raise ValueError(
+                "manual_paths is set to false, "
+                "but paths were specified in the input config"
+            )
         return m
 
     @model_validator(mode="after")
-    def _airlines_have_rm_systems(cls, m: Config):
-        """Check that all airlines have RM systems that have been defined."""
-        for airline in m.airlines.values():
-            if airline.rm_system not in m.rm_systems:
+    def _carriers_have_rm_systems(cls, m: Config):
+        """Check that all carriers have RM systems that have been defined."""
+        for carrier in m.carriers.values():
+            if carrier.rm_system not in m.rm_systems:
                 raise ValueError(
-                    f"Airline {airline.name} has unknown RM system {airline.rm_system}"
+                    f"Carrier {carrier.name} has unknown RM system {carrier.rm_system}"
                 )
         return m
 

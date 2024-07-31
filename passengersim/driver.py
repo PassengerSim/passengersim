@@ -87,10 +87,10 @@ class BaseSimulation(ABC):
         for path in self._sim.paths:
             yield from path.pathclasses
 
-    def pathclasses_for_airline(self, airline: str):
-        """Generator of all path classes for a given airline."""
+    def pathclasses_for_carrier(self, carrier: str):
+        """Generator of all path classes for a given carrier."""
         for path in self._sim.paths:
-            if path.carrier == airline:
+            if path.carrier == carrier:
                 yield from path.pathclasses
 
 
@@ -115,7 +115,7 @@ class Simulation(BaseSimulation):
         self.dcp_list = [63, 56, 49, 42, 35, 31, 28, 24, 21, 17, 14, 10, 7, 5, 3, 1, 0]
         self.classes = []
         self.fare_sales_by_dcp = defaultdict(int)
-        self.fare_sales_by_airline_dcp = defaultdict(int)
+        self.fare_sales_by_carrier_dcp = defaultdict(int)
         self.fare_details_sold = defaultdict(int)
         self.fare_details_sold_business = defaultdict(int)
         self.fare_details_revenue = defaultdict(float)
@@ -232,7 +232,7 @@ class Simulation(BaseSimulation):
                 self.dcps.append(days_prior)
 
         self.rm_systems = {}
-        from passengersim_core.airline.rm_system import Rm_System
+        from passengersim_core.carrier.rm_system import Rm_System
 
         for rm_name, rm_system in config.rm_systems.items():
             x = self.rm_systems[rm_name] = Rm_System(rm_name)
@@ -317,40 +317,40 @@ class Simulation(BaseSimulation):
             self.load_factor_curves[lf_name] = lf_curve
 
         carriers = {}
-        for airline_name, airline_config in config.airlines.items():
+        for carrier_name, carrier_config in config.carriers.items():
             availability_control = self.rm_systems[
-                airline_config.rm_system
+                carrier_config.rm_system
             ].availability_control
-            airline = passengersim.core.Airline(airline_name, availability_control)
-            carriers[airline_name] = airline
-            airline.rm_system = self.rm_systems[airline_config.rm_system]
-            airline.truncation_rule = airline_config.truncation_rule
-            airline.continuous_pricing = airline_config.continuous_pricing
-            airline.cp_quantize = airline_config.cp_quantize
-            if airline_config.frat5 is not None and airline_config.frat5 != "":
+            carrier = passengersim.core.Carrier(carrier_name, availability_control)
+            carriers[carrier_name] = carrier
+            carrier.rm_system = self.rm_systems[carrier_config.rm_system]
+            carrier.truncation_rule = carrier_config.truncation_rule
+            carrier.continuous_pricing = carrier_config.continuous_pricing
+            carrier.cp_quantize = carrier_config.cp_quantize
+            if carrier_config.frat5 is not None and carrier_config.frat5 != "":
                 # We want a deep copy of the Frat5 curve,
-                # in case two airlines are using the same curve,
+                # in case two carriers are using the same curve,
                 # and we want to adjust one of them using ML
-                f5_data = config.frat5_curves[airline_config.frat5]
+                f5_data = config.frat5_curves[carrier_config.frat5]
                 f5 = Frat5(f5_name)
                 for _dcp, val in f5_data.curve.items():
                     f5.add_vals(val)
-                # f5 = self.frat5curves[airline_config.frat5]
-                if airline_config.fare_adjustment_scale is not None:
-                    f5.fare_adjustment_scale = airline_config.fare_adjustment_scale
-                airline.frat5 = f5
+                # f5 = self.frat5curves[carrier_config.frat5]
+                if carrier_config.fare_adjustment_scale is not None:
+                    f5.fare_adjustment_scale = carrier_config.fare_adjustment_scale
+                carrier.frat5 = f5
             if (
-                airline_config.load_factor_curve is not None
-                and airline_config.load_factor_curve != ""
+                carrier_config.load_factor_curve is not None
+                and carrier_config.load_factor_curve != ""
             ):
-                lfc = self.load_factor_curves[airline_config.load_factor_curve]
-                airline.load_factor_curve = lfc
+                lfc = self.load_factor_curves[carrier_config.load_factor_curve]
+                carrier.load_factor_curve = lfc
 
-            for anc_code, anc_price in airline_config.ancillaries.items():
+            for anc_code, anc_price in carrier_config.ancillaries.items():
                 anc = Ancillary(anc_code, anc_price, 0)
-                airline.add_ancillary(anc)
+                carrier.add_ancillary(anc)
 
-            self.sim.add_airline(airline)
+            self.sim.add_carrier(carrier)
 
         self.classes = config.classes
         self.init_rm = {}  # TODO
@@ -409,7 +409,7 @@ class Simulation(BaseSimulation):
                 print(f"Added fare: {fare}")
             # self.fares.append(fare)
 
-        carriers = {cxr.name: cxr for cxr in self.sim.airlines}
+        carriers = {cxr.name: cxr for cxr in self.sim.carriers}
         for path_config in config.paths:
             p = passengersim.core.Path(path_config.orig, path_config.dest, 0.0)
             p.path_quality_index = path_config.path_quality_index
@@ -431,7 +431,7 @@ class Simulation(BaseSimulation):
             path_carrier = tmp_leg.carrier
             if path_carrier not in carriers:
                 raise ValueError(f"Carrier {path_carrier} not found")
-            p.add_airline(carriers[path_carrier])
+            p.add_carrier(carriers[path_carrier])
             self.sim.add_path(p)
 
         # Go through and make sure things are linked correctly
@@ -445,7 +445,7 @@ class Simulation(BaseSimulation):
                 dmd.add_fare(fare)
 
             # Now set upper and lower bounds, these are used in continuous pricing
-            for cxr in self.sim.airlines:
+            for cxr in self.sim.carriers:
                 prev_fare = None
                 for fare in dmd.fares:
                     if fare.carrier_name != cxr.name:
@@ -474,8 +474,8 @@ class Simulation(BaseSimulation):
     def _initialize_leg_cabin_bucket(self, config: Config):
         self.legs = {}
         carriers = {}
-        for airline in self.sim.airlines:
-            carriers[airline.name] = airline
+        for carrier in self.sim.carriers:
+            carriers[carrier.name] = carrier
         next_leg_id = 1
         for leg_config in config.legs:
             # if no leg_id is provided, we'll use the fltno if it's not already in use
@@ -558,7 +558,7 @@ class Simulation(BaseSimulation):
 
         # Airlines using Q-forecasting need to have pathclasses set up for all paths
         # so Q-demand can be forecasted by pathclass even in the absence of bookings
-        for carrier in self.sim.airlines:
+        for carrier in self.sim.carriers:
             if carrier.frat5:
                 logger.info(
                     f"Setting up path classes for carrier {carrier.name}, "
@@ -596,21 +596,21 @@ class Simulation(BaseSimulation):
             self.sim.choice_set_sampling_probability = prob
 
     def vn_initial_mapping(self):
-        vn_airlines = []
-        for airline in self.sim.airlines:
-            if airline.control == "vn":
-                vn_airlines.append(airline.name)
+        vn_carriers = []
+        for carrier in self.sim.carriers:
+            if carrier.control == "vn":
+                vn_carriers.append(carrier.name)
         for path in self.sim.paths:
-            if path.get_leg_carrier(0) in vn_airlines:
+            if path.get_leg_carrier(0) in vn_carriers:
                 for bc in self.classes:
                     pc = PathClass(bc)
                     index = int(bc[1])
                     pc.set_index(0, index)
                     path.add_path_class(pc)
 
-    def vn_initial_mapping2(self, airline_code):
+    def vn_initial_mapping2(self, carrier_code):
         for path in self.sim.paths:
-            if path.get_leg_carrier(0) == airline_code:
+            if path.get_leg_carrier(0) == carrier_code:
                 for i, pc in enumerate(path.pathclasses):
                     pc.set_index(0, i)
 
@@ -641,18 +641,18 @@ class Simulation(BaseSimulation):
         alpha = 0.15
         for m in self.sim.markets:
             sold = float(m.sold)
-            for a in self.sim.airlines:
+            for a in self.sim.carriers:
                 try:
-                    airline_sold = m.get_airline_sold(a.name)
+                    carrier_sold = m.get_carrier_sold(a.name)
                 except Exception as e:
                     print(e)
-                share = airline_sold / sold if sold > 0 else 0
+                share = carrier_sold / sold if sold > 0 else 0
                 if self.sim.sample > 1:
-                    old_share = m.get_airline_share(a.name)
+                    old_share = m.get_carrier_share(a.name)
                     new_share = alpha * share + (1.0 - alpha) * old_share
-                    m.set_airline_share(a.name, new_share)
+                    m.set_carrier_share(a.name, new_share)
                 else:
-                    m.set_airline_share(a.name, share)
+                    m.set_carrier_share(a.name, share)
 
     def _run_single_trial(
         self,
@@ -692,11 +692,11 @@ class Simulation(BaseSimulation):
                 )
             if update_freq is not None and self.sim.sample % update_freq == 0:
                 total_rev, n = 0.0, 0
-                airline_info = ""
-                for cxr in self.sim.airlines:
+                carrier_info = ""
+                for cxr in self.sim.carriers:
                     total_rev += cxr.revenue
                     n += 1
-                    airline_info += (
+                    carrier_info += (
                         f"{', ' if n > 0 else ''}{cxr.name}=${cxr.revenue:8.0f}"
                     )
                 dmd_b, dmd_l = 0, 0
@@ -708,7 +708,7 @@ class Simulation(BaseSimulation):
                 d_info = f", {int(dmd_b)}, {int(dmd_l)}"
                 logger.info(
                     f"Trial={self.sim.trial}, "
-                    f"Sample={self.sim.sample}{airline_info}{d_info}"
+                    f"Sample={self.sim.sample}{carrier_info}{d_info}"
                 )
             if self.sim.trial > 0 or self.sim.sample > 0:
                 self.sim.reset_counters()
@@ -718,7 +718,7 @@ class Simulation(BaseSimulation):
             # Loop on passengers
             while True:
                 event = self.sim.go()
-                self.run_airline_models(event)
+                self.run_carrier_models(event)
                 if event is None or str(event) == "Done" or (event[0] == "Done"):
                     assert (
                         self.sim.num_events() == 0
@@ -778,7 +778,7 @@ class Simulation(BaseSimulation):
                 update_freq,
             )
 
-    def run_airline_models(self, info: Any = None, departed: bool = False, debug=False):
+    def run_carrier_models(self, info: Any = None, departed: bool = False, debug=False):
         try:
             event_type = info[0]
             recording_day = info[
@@ -796,41 +796,41 @@ class Simulation(BaseSimulation):
                 # self.capture_dcp_data(dcp_index)
                 # self.capture_competitor_data()  # Simulates Infare / QL2
 
-            # Run the specified process(es) for the airlines
-            for airline in self.sim.airlines:
+            # Run the specified process(es) for the carriers
+            for carrier in self.sim.carriers:
                 if event_type.lower() == "dcp":
                     # Regular Data Collection Points (pre-departure)
-                    what_had_happened_was.append(f"run {airline.name} DCP")
-                    airline.rm_system.run(
+                    what_had_happened_was.append(f"run {carrier.name} DCP")
+                    carrier.rm_system.run(
                         self.sim,
-                        airline.name,
+                        carrier.name,
                         dcp_index,
                         recording_day,
                         event_type="dcp",
                     )
                 elif event_type.lower() == "daily":
                     # Daily report, every day prior to departure EXCEPT specified DCPs
-                    what_had_happened_was.append(f"run {airline.name} daily")
-                    airline.rm_system.run(
+                    what_had_happened_was.append(f"run {carrier.name} daily")
+                    carrier.rm_system.run(
                         self.sim,
-                        airline.name,
+                        carrier.name,
                         dcp_index,
                         recording_day,
                         event_type="daily",
                     )
                 elif event_type.lower() == "done":
                     # Post departure processing
-                    what_had_happened_was.append(f"run {airline.name} done")
-                    airline.rm_system.run(
+                    what_had_happened_was.append(f"run {carrier.name} done")
+                    carrier.rm_system.run(
                         self.sim,
-                        airline.name,
+                        carrier.name,
                         dcp_index,
                         recording_day,
                         event_type="dcp",
                     )
-                    airline.rm_system.run(
+                    carrier.rm_system.run(
                         self.sim,
-                        airline.name,
+                        carrier.name,
                         dcp_index,
                         recording_day,
                         event_type="departure",
@@ -838,9 +838,9 @@ class Simulation(BaseSimulation):
                     if self.sim.sample % 7 == 0:
                         # Can be used less frequently,
                         # such as ML steps on accumulated data
-                        airline.rm_system.run(
+                        carrier.rm_system.run(
                             self.sim,
-                            airline.name,
+                            carrier.name,
                             dcp_index,
                             recording_day,
                             event_type="weekly",
@@ -883,7 +883,7 @@ class Simulation(BaseSimulation):
 
         except Exception as e:
             print(e)
-            print("Error in run_airline_models")
+            print("Error in run_carrier_models")
             print(f"{info=}")
             print("what_had_happened_was=", what_had_happened_was)
             raise
@@ -913,8 +913,8 @@ class Simulation(BaseSimulation):
                 self.fare_sales_by_dcp[("leisure", prev_dcp)] = inc_leisure
 
                 key2 = (f.carrier_name, prev_dcp)
-                curr_airline = self.fare_sales_by_airline_dcp[key2]
-                self.fare_sales_by_airline_dcp[key2] = curr_airline + f.sold
+                curr_carrier = self.fare_sales_by_carrier_dcp[key2]
+                self.fare_sales_by_carrier_dcp[key2] = curr_carrier + f.sold
 
                 key3 = (f.carrier_name, f.booking_class, prev_dcp)
                 self.fare_details_sold[key3] += f.sold
@@ -1357,27 +1357,27 @@ class Simulation(BaseSimulation):
         num_samples = sim.num_trials_completed * (sim.num_samples - sim.burn_samples)
         carrier_df = []
 
-        airline_asm = defaultdict(float)
-        airline_rpm = defaultdict(float)
-        airline_leg_lf = defaultdict(float)
-        airline_leg_count = defaultdict(float)
+        carrier_asm = defaultdict(float)
+        carrier_rpm = defaultdict(float)
+        carrier_leg_lf = defaultdict(float)
+        carrier_leg_count = defaultdict(float)
         for leg in sim.legs:
-            airline_asm[leg.carrier] += leg.distance * leg.capacity * num_samples
-            airline_rpm[leg.carrier] += leg.distance * leg.gt_sold
-            airline_leg_lf[leg.carrier] += leg.gt_sold / (leg.capacity * num_samples)
-            airline_leg_count[leg.carrier] += 1
+            carrier_asm[leg.carrier] += leg.distance * leg.capacity * num_samples
+            carrier_rpm[leg.carrier] += leg.distance * leg.gt_sold
+            carrier_leg_lf[leg.carrier] += leg.gt_sold / (leg.capacity * num_samples)
+            carrier_leg_count[leg.carrier] += 1
 
-        for cxr in sim.airlines:
+        for cxr in sim.carriers:
             avg_sold = cxr.gt_sold / num_samples
             avg_rev = cxr.gt_revenue / num_samples
-            asm = airline_asm[cxr.name] / num_samples
-            rpm = airline_rpm[cxr.name] / num_samples
+            asm = carrier_asm[cxr.name] / num_samples
+            rpm = carrier_rpm[cxr.name] / num_samples
             # sys_lf = 100.0 * cxr.gt_revenue_passenger_miles / asm if asm > 0 else 0.0
-            denom = airline_asm[cxr.name]
-            sys_lf = (100.0 * airline_rpm[cxr.name] / denom) if denom > 0 else 0
+            denom = carrier_asm[cxr.name]
+            sys_lf = (100.0 * carrier_rpm[cxr.name] / denom) if denom > 0 else 0
             if to_log:
                 logger.info(
-                    f"Airline: {cxr.name}, AvgSold: {round(avg_sold, 2)}, "
+                    f"Carrier: {cxr.name}, AvgSold: {round(avg_sold, 2)}, "
                     f"LF {sys_lf:.2f}%,  AvgRev ${avg_rev:10,.2f}"
                 )
 
@@ -1393,8 +1393,8 @@ class Simulation(BaseSimulation):
                     "sold": avg_sold,
                     "sys_lf": sys_lf,
                     "avg_leg_lf": 100
-                    * airline_leg_lf[cxr.name]
-                    / airline_leg_count[cxr.name],
+                    * carrier_leg_lf[cxr.name]
+                    / carrier_leg_count[cxr.name],
                     "avg_rev": avg_rev,
                     "avg_price": avg_rev / avg_sold if avg_sold > 0 else 0,
                     "asm": asm,
@@ -1425,7 +1425,7 @@ class Simulation(BaseSimulation):
         and only actually sold-out flights are in the 100% bin.
         """
         result = {}
-        for carrier in sim.airlines:
+        for carrier in sim.carriers:
             lf = pd.Series(
                 carrier.raw_load_factor_distribution(),
                 index=pd.RangeIndex(101, name="leg_load_factor"),
@@ -1458,7 +1458,7 @@ class Simulation(BaseSimulation):
         a passenger on a connecting itinerary only counts once.
         """
         result = {}
-        for carrier in sim.airlines:
+        for carrier in sim.carriers:
             fc = carrier.raw_fare_class_distribution()
             fc_sold = pd.Series(
                 {k: v["sold"] for k, v in fc.items()},
@@ -1494,7 +1494,7 @@ class Simulation(BaseSimulation):
     ) -> pd.DataFrame:
         """Compute the bid price history for each leg."""
         result = {}
-        for carrier in sim.airlines:
+        for carrier in sim.carriers:
             bp = carrier.raw_bid_price_trace()
             result[carrier.name] = (
                 pd.DataFrame.from_dict(bp, orient="index")

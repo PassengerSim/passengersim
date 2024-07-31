@@ -6,7 +6,7 @@ include:
 simulation_controls:
   demand_multiplier: 1.1
 
-airlines:
+carriers:
   - name: AL1
     rm_system: rm_no_detruncation
   - name: AL2

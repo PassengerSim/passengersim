@@ -856,7 +856,7 @@ class SummaryTables:
     ):
         if errorbands:
             if by_carrier is True:
-                raise NotImplementedError("error bands for all airlines is messy")
+                raise NotImplementedError("error bands for all carriers is messy")
             return self._fig_bookings_by_timeframe_errorband(
                 by_carrier=by_carrier, raw_df=raw_df
             )

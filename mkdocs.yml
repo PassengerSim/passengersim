@@ -132,7 +132,7 @@ nav:
     - Config:
       - API/config/00-configs.md
       - API/config/01-simulation-controls.md
-      - API/config/airlines.md
+      - API/config/carriers.md
       - API/config/booking_curves.md
       - API/config/choice_model.md
       - API/config/database.md
@@ -157,7 +157,7 @@ nav:
     - Core:
       - API/Core/index.md
       - API/Core/00-SimulationEngine.md
-      - API/Core/Airline.md
+      - API/Core/Carrier.md
       - API/Core/BookingCurves.md
       - API/Core/Bucket.md
       - API/Core/ChoiceModel.md

@@ -2,7 +2,7 @@
 # DOC-NAME: 01-simulation-controls
 from __future__ import annotations
 
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import ValidationInfo, confloat, conint, field_validator
 
@@ -148,7 +148,7 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     """
     Remove all advance purchase settings used in the simulation.
 
-    This applies to all airlines and all fare products.
+    This applies to all carriers and all fare products.
     """
 
     demand_multiplier: confloat(gt=0) = 1.0
@@ -179,7 +179,7 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     If set to False, the automatic path generation algorithm is applied.
     """
 
-    use_3seg: Optional[bool] = False
+    use_3seg: bool | None = False
     """
     Use the new A* search to build connections, it can create 3seg connects
 
@@ -253,13 +253,13 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     """
 
     # A bunch of debug flags, these are only used for development !!!
-    debug_availability: Optional[bool] = False
-    debug_choice: Optional[bool] = False
-    debug_connections: Optional[bool] = False
-    debug_events: Optional[bool] = False
-    debug_fares: Optional[bool] = False
-    debug_offers: Optional[bool] = False
-    debug_orders: Optional[bool] = False
+    debug_availability: bool | None = False
+    debug_choice: bool | None = False
+    debug_connections: bool | None = False
+    debug_events: bool | None = False
+    debug_fares: bool | None = False
+    debug_offers: bool | None = False
+    debug_orders: bool | None = False
 
     @field_validator("controller_time_zone", mode="before")
     def _time_zone_convert_hours_to_seconds(cls, v):
@@ -275,8 +275,3 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     """
     Which algorithm to use for time frame demand allocation.
     """
-
-
-
-
-

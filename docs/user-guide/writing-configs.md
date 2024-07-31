@@ -101,7 +101,7 @@ choice_models:
     emult: 1.6
     basefare_mult: 2.5
     path_quality:  [38.30,  0.10]
-    preferred_airline:  [-12.29,  0.17]
+    preferred_carrier:  [-12.29,  0.17]
     tolerance: 2.0
     r1: 0.30
     r2: 0.10
@@ -112,7 +112,7 @@ choice_models:
     emult: 1.5
     basefare_mult: 1.0
     path_quality:  [2.02, 0.12]
-    preferred_airline:  [-1.98, 0.11]
+    preferred_carrier:  [-1.98, 0.11]
     tolerance: 5.0
     r1: 0.30
     r2: 0.15
@@ -124,7 +124,7 @@ choice_models:
 ## Define Carriers
 
 ```yaml
-airlines:
+carriers:
 - name: AL1
   rm_system: rm_test1
 - name: AL2

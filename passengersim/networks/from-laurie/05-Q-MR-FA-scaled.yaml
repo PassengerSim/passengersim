@@ -23,7 +23,7 @@ rm_systems:
           algorithm: emsrb
           kind: leg
 
-airlines:
+carriers:
   - name: AL1
     rm_system: rm_hybrid4
     frat5: curve_C

@@ -659,14 +659,14 @@ choice_models:
     emult: 1.6
     basefare_mult: 2.5
     path_quality:  [38.30,  0.10]
-#    preferred_airline:  [-12.29,  0.17]
+#    preferred_carrier:  [-12.29,  0.17]
 
   leisure:
     kind: pods
     emult: 1.5
     basefare_mult: 1.0
     path_quality:  [2.02, 0.12]
-#    preferred_airline:  [-1.98, 0.11]
+#    preferred_carrier:  [-1.98, 0.11]
     hhi: [0.0, 0.0001]
     #    r1: 0.70
     #    r2: 0.35
@@ -675,7 +675,7 @@ choice_models:
 #    buffer_threshold: 25
 #    buffer_time: [0, 0.1]
 
-airlines:
+carriers:
   - name: AL1
     rm_system: rm_hybrid_mr
     frat5: curve_C

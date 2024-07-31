@@ -197,8 +197,8 @@ def sim_with_truncation_rule(truncation_rule=1) -> SummaryTables:
     cfg.simulation_controls.num_trials = 1
     cfg.simulation_controls.num_samples = 500
     cfg.outputs.reports.add(("od_fare_class_mix", "BOS", "ORD"))
-    cfg.airlines["AL1"].truncation_rule = truncation_rule
-    cfg.airlines["AL2"].truncation_rule = truncation_rule
+    cfg.carriers["AL1"].truncation_rule = truncation_rule
+    cfg.carriers["AL2"].truncation_rule = truncation_rule
     sim = Simulation(cfg)
     summary = sim.run()
     summary.sim = sim

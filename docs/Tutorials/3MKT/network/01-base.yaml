@@ -110,7 +110,7 @@ choice_models:
     emult: 1.6
     basefare_mult: 1.0
 
-airlines:
+carriers:
   - name: AL1
     rm_system: rm_test1
   - name: AL2

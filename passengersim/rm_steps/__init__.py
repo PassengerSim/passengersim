@@ -60,7 +60,7 @@ class RmStep(RmStepBase, ABC):
     def run(
         self,
         sim: SimulationEngine,
-        airline: str,
+        carrier: str,
         dcp_index: int,
         dcp: int,
         debug: bool = False,

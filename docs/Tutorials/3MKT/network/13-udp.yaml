@@ -38,7 +38,7 @@ rm_systems:
       - step_type: udpupdate
         name: optimization
 
-airlines:
+carriers:
   - name: AL1
     rm_system: rm_udp
   - name: AL2

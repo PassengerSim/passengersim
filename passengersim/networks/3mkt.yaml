@@ -38,7 +38,7 @@ choice_models:
     emult: 1.6
     basefare_mult: 2.5
     path_quality:  [38.30,  0.10]
-    preferred_airline:  [-12.29,  0.17]
+    preferred_carrier:  [-12.29,  0.17]
     tolerance: 2.0
     r1: 1.0
     r2: 0.35
@@ -49,13 +49,13 @@ choice_models:
     emult: 1.5
     basefare_mult: 1.0
     path_quality:  [2.02, 0.12]
-    preferred_airline:  [-1.98, 0.11]
+    preferred_carrier:  [-1.98, 0.11]
     tolerance: 5.0
     r1: 0.70
     r2: 0.35
     r3: 0.35
 #    r4: 0.20
-airlines:
+carriers:
 - name: AL1
   rm_system: rm_test1
 - name: AL2
@@ -1325,7 +1325,7 @@ fares:
   - R1
   - R2
   - R3
-    
+
 # paths:
 # - orig: BOS
 #   dest: SFO

@@ -3,11 +3,13 @@ import zoneinfo
 from typing import Literal
 
 import altair
+import numpy as np
 import pytest
 from pytest import approx
 
 from passengersim import Simulation, demo_network
 from passengersim.config import Config
+from passengersim.database import Database
 from passengersim.summary import SummaryTables
 
 DEFAULT_TOLERANCE = dict(rtol=2e-02, atol=1e-06)
@@ -23,6 +25,7 @@ def summary() -> SummaryTables:
     cfg.outputs.reports.add("load_factor_distribution")
     sim = Simulation(cfg)
     summary = sim.run()
+    summary.sim = sim
     return summary
 
 
@@ -44,6 +47,48 @@ def test_3mkt_01_time_zones():
     assert leg.dep_time == 1583067600
     assert leg.arr_time == 1583078400
     assert leg.distance == approx(863.753282)
+
+
+def test_3mkt_01_basic(summary):
+    assert isinstance(summary, SummaryTables)
+    assert isinstance(summary.cnx, Database)
+    assert summary.cnx.is_open
+    assert summary.cnx.engine == "sqlite"
+    assert str(summary.cnx.filename) == ":memory:"
+    assert isinstance(summary.sim, Simulation)
+    assert summary.sim.sim.carriers[0].name == "AL1"
+    assert summary.sim.sim.carriers[0].raw_load_factor_distribution() == approx(
+        np.concat(
+            (
+                (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                (0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1),
+                (0, 1, 1, 0, 1, 1, 4, 1, 0, 0, 2, 2, 4, 1, 4, 1, 6, 1, 2, 2, 2),
+                (5, 10, 4, 11, 5, 9, 8, 7, 3, 4, 13, 11, 9, 8, 10, 17, 18, 14),
+                (13, 18, 28, 20, 15, 11, 25, 30, 26, 26, 31, 25, 31, 22, 21, 18),
+                (24, 33, 34, 26, 25, 20, 873),
+            )
+        )
+    )
+    assert summary.sim.sim.legs[0].flt_no == 101
+    # assert isinstance(summary.sim.sim.legs[0].carrier, Carrier)
+    # assert summary.sim.sim.legs[0].carrier.name == "AL1"
+    assert summary.sim.sim.legs[0].avg_load_factor == approx(89.9775)
+    assert summary.sim.sim.legs[0].avg_local == approx(41.91047761940485)
+
+    # for each leg, check that the sum of gt_sold for all paths equals the leg's gt_sold
+    for leg in summary.sim.sim.legs:
+        local_sold, total_sold = 0, 0
+        for pth in summary.sim.sim.paths:
+            if pth.get_leg_id(0) == leg.leg_id:
+                if pth.num_legs() == 1:
+                    local_sold += pth.gt_sold
+                total_sold += pth.gt_sold
+            if pth.num_legs() == 2:
+                if pth.get_leg_id(1) == leg.leg_id:
+                    total_sold += pth.gt_sold
+        assert leg.gt_sold == total_sold
+        assert leg.gt_sold_local == local_sold
+        assert leg.avg_local == (local_sold / total_sold) * 100
 
 
 def test_3mkt_01_bookings_by_timeframe(summary, dataframe_regression):

@@ -16,6 +16,7 @@ from .reporting import report_figure
 
 if TYPE_CHECKING:
     from .config import Config
+    from .driver import Simulation
 
 logger = logging.getLogger("passengersim.summary")
 
@@ -410,6 +411,8 @@ class SummaryTables:
         *,
         name: str | None = "name?",
         config: Config | None = None,
+        cnx: database.Database | None = None,
+        sim: Simulation | None = None,
         demands: pd.DataFrame | None = None,
         fares: pd.DataFrame | None = None,
         legs: pd.DataFrame | None = None,
@@ -437,6 +440,12 @@ class SummaryTables:
     ):
         self.config = config
         """Configuration used in the simulation that generated the summary tables."""
+
+        self.cnx = cnx
+        """The database connection used to load the summary tables."""
+
+        self.sim = sim
+        """The simulation object that generated the summary tables."""
 
         self.demands = demands
         self.fares = fares

@@ -1414,7 +1414,7 @@ class Simulation(BaseSimulation):
                     "sys_lf": sys_lf,
                     "avg_leg_lf": 100
                     * carrier_leg_lf[cxr.name]
-                    / carrier_leg_count[cxr.name],
+                    / max(carrier_leg_count[cxr.name], 1),
                     "avg_rev": avg_rev,
                     "avg_price": avg_rev / avg_sold if avg_sold > 0 else 0,
                     "asm": asm,

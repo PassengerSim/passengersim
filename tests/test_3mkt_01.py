@@ -72,7 +72,7 @@ def test_3mkt_01_basic(summary):
     assert summary.sim.sim.legs[0].flt_no == 101
     # assert isinstance(summary.sim.sim.legs[0].carrier, Carrier)
     # assert summary.sim.sim.legs[0].carrier.name == "AL1"
-    assert summary.sim.sim.legs[0].avg_load_factor == approx(89.9775)
+    assert summary.sim.sim.legs[0].avg_load_factor() == approx(89.9775)
     assert summary.sim.sim.legs[0].avg_local == approx(41.91047761940485)
 
     # for each leg, check that the sum of gt_sold for all paths equals the leg's gt_sold
@@ -109,6 +109,15 @@ def test_3mkt_01_carriers(summary, dataframe_regression):
     dataframe_regression.check(
         df,
         basename="carriers",
+        default_tolerance=DEFAULT_TOLERANCE,
+    )
+
+
+def test_3mkt_01_leg_forecasts(summary, dataframe_regression):
+    assert isinstance(summary, SummaryTables)
+    dataframe_regression.check(
+        summary.leg_forecasts,
+        basename="leg_forecasts",
         default_tolerance=DEFAULT_TOLERANCE,
     )
 
@@ -260,7 +269,7 @@ def test_3mkt_01_fig_leg_forecasts(summary, dataframe_regression):
 
 
 @pytest.mark.parametrize("by_carrier", [False, True, "AL1"])
-@pytest.mark.parametrize("source", ["raw", "db"])
+@pytest.mark.parametrize("source", ["leg_avg", "raw", "db"])
 def test_3mkt_01_fig_load_factor_grouped(
     summary, dataframe_regression, by_carrier, source: Literal["raw", "db"]
 ):

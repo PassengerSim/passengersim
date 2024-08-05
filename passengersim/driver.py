@@ -1106,7 +1106,10 @@ class Simulation(BaseSimulation):
         path_df = self.compute_path_report(sim, to_log, to_db)
         path_classes_df = self.compute_path_class_report(sim, to_log, to_db)
         carrier_df = self.compute_carrier_report(sim, to_log, to_db)
-        load_factor_dist_df = self.compute_raw_load_factor_distribution(
+        raw_load_factor_dist_df = self.compute_raw_load_factor_distribution(
+            sim, to_log, to_db
+        )
+        leg_avg_load_factor_dist_df = self.compute_leg_avg_load_factor_distribution(
             sim, to_log, to_db
         )
         fare_class_dist_df = self.compute_raw_fare_class_mix(sim, to_log, to_db)
@@ -1122,7 +1125,8 @@ class Simulation(BaseSimulation):
             path_classes=path_classes_df,
             carriers=carrier_df,
             bid_price_history=bid_price_history_df,
-            raw_load_factor_distribution=load_factor_dist_df,
+            raw_load_factor_distribution=raw_load_factor_dist_df,
+            leg_avg_load_factor_distribution=leg_avg_load_factor_dist_df,
             raw_fare_class_mix=fare_class_dist_df,
             n_total_samples=num_samples,
         )
@@ -1455,7 +1459,52 @@ class Simulation(BaseSimulation):
                 index=pd.RangeIndex(101, name="leg_load_factor"), columns=[]
             )
         if to_db and to_db.is_open:
-            to_db.save_dataframe("load_factor_distribution", df)
+            to_db.save_dataframe("raw_load_factor_distribution", df)
+        return df
+
+    @staticmethod
+    def compute_leg_avg_load_factor_distribution(
+        sim: SimulationEngine,
+        to_log: bool = True,
+        to_db: database.Database | None = None,
+    ) -> pd.DataFrame:
+        """
+        Compute a leg average load factor distribution report.
+
+        This report is a dataframe, with integer index values from 0 to 100,
+        and column for each carrier in the simulation. The values are the
+        frequency of each leg average load factor observed over the simulation
+        (excluding any burn period).  The values for leg average load factors
+        are rounded down, so that a leg average load factor of 99.9% is counted
+        as 99, and only always sold-out flights are in the 100% bin.
+
+        This is different from the raw load factor distribution, which is the
+        distribution of load factors across sample days.  The number of
+        observations in the leg average load factor (this distribution) is
+        equal to the number of legs, while the raw load factor distribution
+        has one observation per leg per sample day.  The variance of this
+        distribution is much lower than the raw load factor distribution.
+        """
+        idx = pd.RangeIndex(101, name="leg_load_factor")
+        result = {
+            carrier.name: pd.Series(np.zeros(101, dtype=np.int32), index=idx)
+            for carrier in sim.carriers
+        }
+        for leg in sim.legs:
+            lf = int(np.floor(leg.avg_load_factor()))
+            if lf > 100:
+                lf = 100
+            if lf < 0:
+                lf = 0
+            result[leg.carrier_name].iloc[lf] += 1
+        if result:
+            df = pd.concat(result, axis=1, names=["carrier"])
+        else:
+            df = pd.DataFrame(
+                index=pd.RangeIndex(101, name="leg_load_factor"), columns=[]
+            )
+        if to_db and to_db.is_open:
+            to_db.save_dataframe("leg_avg_load_factor_distribution", df)
         return df
 
     def compute_raw_fare_class_mix(

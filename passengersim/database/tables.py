@@ -53,7 +53,7 @@ def create_table_leg_defs(cnx: Database, legs: Iterable | None = None):
             (
                 leg.leg_id,
                 leg.flt_no,
-                leg.carrier,
+                leg.carrier_name,
                 leg.orig,
                 leg.dest,
                 leg.dep_time,

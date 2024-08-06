@@ -648,13 +648,6 @@ class Config(YamlConfig, extra="forbid"):
                 if place is not None:
                     tz = place.time_zone_info
                     if tz is not None:
-                        # construct a datetime object as if it is UTC
-                        # t = datetime.utcfromtimestamp(t)
-                        # naively inject the desired timezone
-                        # t = t.replace(tzinfo=tz)
-                        # convert "back" to UTC
-                        # t = t.astimezone(timezone.utc)
-
                         # Alan's approach
                         # It was converted as a local time, so unpack it and
                         #   create a new datetime in the given TZ

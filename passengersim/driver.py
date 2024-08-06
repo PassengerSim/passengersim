@@ -368,6 +368,10 @@ class Simulation(BaseSimulation):
         for code, p in config.places.items():
             a = Airport(code, p.label)
             a.latitude, a.longitude = p.lat, p.lon
+            if p.country is not None:
+                a.country = p.country
+            if p.state is not None:
+                a.state = p.state
             if p.mct is not None:
                 a.set_mct(p.mct[0], p.mct[1], p.mct[2], p.mct[3])
             self.sim.add_airport(a)
@@ -390,7 +394,9 @@ class Simulation(BaseSimulation):
             dmd.base_demand = dmd_config.base_demand * self.demand_multiplier
             dmd.price = dmd_config.reference_fare
             dmd.reference_fare = dmd_config.reference_fare
-            if len(self.airports) > 0:
+            if dmd_config.distance > 0.01:
+                dmd.distance = dmd_config.distance
+            elif len(self.airports) > 0:
                 dmd.distance = self.get_mileage(dmd.orig, dmd.dest)
             model_name = dmd_config.choice_model
             cm = self.choice_models.get(model_name, None)

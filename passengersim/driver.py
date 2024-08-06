@@ -1387,10 +1387,13 @@ class Simulation(BaseSimulation):
         carrier_leg_lf = defaultdict(float)
         carrier_leg_count = defaultdict(float)
         for leg in sim.legs:
-            carrier_asm[leg.carrier] += leg.distance * leg.capacity * num_samples
-            carrier_rpm[leg.carrier] += leg.distance * leg.gt_sold
-            carrier_leg_lf[leg.carrier] += leg.gt_sold / (leg.capacity * num_samples)
-            carrier_leg_count[leg.carrier] += 1
+            carrier_name = (
+                leg.carrier_name if hasattr(leg, "carrier_name") else leg.carrier
+            )  # TODO: remove hasattr
+            carrier_asm[carrier_name] += leg.distance * leg.capacity * num_samples
+            carrier_rpm[carrier_name] += leg.distance * leg.gt_sold
+            carrier_leg_lf[carrier_name] += leg.gt_sold / (leg.capacity * num_samples)
+            carrier_leg_count[carrier_name] += 1
 
         for cxr in sim.carriers:
             avg_sold = cxr.gt_sold / num_samples

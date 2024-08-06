@@ -90,6 +90,16 @@ def test_3mkt_01_basic(summary):
         assert leg.gt_sold_local == local_sold
         assert leg.avg_local == (local_sold / total_sold) * 100
 
+    # check that buckets have static fares attached
+    assert [b.fcst_revenue for b in summary.sim.legs[101].buckets] == [
+        400.0,
+        300.0,
+        200.0,
+        150.0,
+        125.0,
+        100.0,
+    ]
+
 
 def test_3mkt_01_bookings_by_timeframe(summary, dataframe_regression):
     assert isinstance(summary, SummaryTables)

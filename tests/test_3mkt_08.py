@@ -1,10 +1,14 @@
 from typing import Literal
 
 import altair
+import numpy as np
 import pytest
+from pytest import approx
 
 from passengersim import Simulation, demo_network
 from passengersim.config import Config
+from passengersim.database import Database
+from passengersim.database.common_queries import leg_forecast_trace, leg_sales_trace
 from passengersim.summary import SummaryTables
 
 DEFAULT_TOLERANCE = dict(rtol=2e-02, atol=1e-06)
@@ -19,7 +23,60 @@ def summary() -> SummaryTables:
     cfg.outputs.reports.add(("od_fare_class_mix", "BOS", "ORD"))
     sim = Simulation(cfg)
     summary = sim.run()
+    summary.sim = sim
     return summary
+
+
+def test_3mkt_08_basic(summary):
+    assert isinstance(summary, SummaryTables)
+    assert isinstance(summary.cnx, Database)
+    assert summary.cnx.is_open
+    assert summary.cnx.engine == "sqlite"
+    assert str(summary.cnx.filename) == ":memory:"
+    assert isinstance(summary.sim, Simulation)
+    assert summary.sim.sim.carriers[0].name == "AL1"
+    assert summary.sim.sim.carriers[0].raw_load_factor_distribution() == approx(
+        np.concat(
+            (
+                (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0),
+                (0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0),
+                (0, 5, 2, 2, 1, 3, 6, 5, 2, 6, 3, 4, 6, 10, 4, 6, 10, 5, 7, 12),
+                (4, 7, 13, 13, 15, 19, 14, 15, 30, 24, 25, 16, 21, 20, 20, 19),
+                (24, 25, 40, 38, 29, 29, 32, 36, 36, 32, 35, 35, 47, 37, 39),
+                (35, 36, 51, 34, 39, 33, 30, 448),
+            )
+        )
+    )
+    assert summary.sim.sim.legs[0].flt_no == 101
+    # assert isinstance(summary.sim.sim.legs[0].carrier, Carrier)
+    # assert summary.sim.sim.legs[0].carrier.name == "AL1"
+    assert summary.sim.sim.legs[0].avg_load_factor() == approx(83.815)
+    assert summary.sim.sim.legs[0].avg_local == approx(41.82723856111675)
+
+    # for each leg, check that the sum of gt_sold for all paths equals the leg's gt_sold
+    for leg in summary.sim.sim.legs:
+        local_sold, total_sold = 0, 0
+        for pth in summary.sim.sim.paths:
+            if pth.get_leg_id(0) == leg.leg_id:
+                if pth.num_legs() == 1:
+                    local_sold += pth.gt_sold
+                total_sold += pth.gt_sold
+            if pth.num_legs() == 2:
+                if pth.get_leg_id(1) == leg.leg_id:
+                    total_sold += pth.gt_sold
+        assert leg.gt_sold == total_sold
+        assert leg.gt_sold_local == local_sold
+        assert leg.avg_local == (local_sold / total_sold) * 100
+
+    # check that buckets have static fares attached
+    assert [b.fcst_revenue for b in summary.sim.legs[101].buckets] == [
+        400.0,
+        300.0,
+        200.0,
+        150.0,
+        125.0,
+        100.0,
+    ]
 
 
 def test_3mkt_08_bookings_by_timeframe(summary, dataframe_regression):
@@ -67,6 +124,46 @@ def test_3mkt_08_demand_to_come(summary, dataframe_regression):
     dataframe_regression.check(
         summary.demand_to_come,
         basename="demand_to_come",
+        default_tolerance=DEFAULT_TOLERANCE,
+    )
+
+
+@pytest.mark.parametrize("leg_id", [101, 111])
+@pytest.mark.parametrize("days_prior", [63, 7, 1])
+@pytest.mark.parametrize("booking_class", ["Y0", "Y4", "Y5"])
+def test_3mkt_08_forecast_traces(
+    summary, leg_id, days_prior, booking_class, dataframe_regression
+):
+    assert isinstance(summary, SummaryTables)
+    df = leg_forecast_trace(
+        summary.cnx,
+        leg_id=leg_id,
+        booking_class=booking_class,
+        days_prior=days_prior,
+        burn_samples=0,
+    )
+    dataframe_regression.check(
+        df,
+        default_tolerance=DEFAULT_TOLERANCE,
+    )
+
+
+@pytest.mark.parametrize("leg_id", [101, 111])
+@pytest.mark.parametrize("days_prior", [63, 7, 0])
+@pytest.mark.parametrize("booking_class", ["Y0", "Y4", "Y5"])
+def test_3mkt_08_sales_traces(
+    summary, leg_id, days_prior, booking_class, dataframe_regression
+):
+    assert isinstance(summary, SummaryTables)
+    df = leg_sales_trace(
+        summary.cnx,
+        leg_id=leg_id,
+        booking_class=booking_class,
+        days_prior=days_prior,
+        burn_samples=0,
+    )
+    dataframe_regression.check(
+        df,
         default_tolerance=DEFAULT_TOLERANCE,
     )
 

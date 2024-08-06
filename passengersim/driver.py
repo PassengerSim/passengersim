@@ -478,7 +478,12 @@ class Simulation(BaseSimulation):
         for leg in self.sim.legs:
             for fare in self.sim.fares:
                 if (
-                    fare.carrier_name == leg.carrier
+                    fare.carrier_name
+                    == (
+                        leg.carrier_name
+                        if hasattr(leg, "carrier_name")
+                        else leg.carrier
+                    )  # TODO: clean me
                     and fare.orig == leg.orig
                     and fare.dest == leg.dest
                 ):
@@ -1491,12 +1496,19 @@ class Simulation(BaseSimulation):
             for carrier in sim.carriers
         }
         for leg in sim.legs:
-            lf = int(np.floor(leg.avg_load_factor()))
+            try:
+                lf = int(np.floor(leg.avg_load_factor()))
+            except TypeError:
+                # TODO: remove this
+                lf = int(np.floor(leg.avg_load_factor))
             if lf > 100:
                 lf = 100
             if lf < 0:
                 lf = 0
-            result[leg.carrier_name].iloc[lf] += 1
+            # TODO remove hasattr
+            result[
+                leg.carrier_name if hasattr(leg, "carrier_name") else leg.carrier
+            ].iloc[lf] += 1
         if result:
             df = pd.concat(result, axis=1, names=["carrier"])
         else:

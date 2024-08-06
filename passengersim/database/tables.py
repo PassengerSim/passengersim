@@ -53,7 +53,9 @@ def create_table_leg_defs(cnx: Database, legs: Iterable | None = None):
             (
                 leg.leg_id,
                 leg.flt_no,
-                leg.carrier_name,
+                leg.carrier_name
+                if hasattr(leg, "carrier_name")
+                else leg.carrier,  # TODO remove this
                 leg.orig,
                 leg.dest,
                 leg.dep_time,

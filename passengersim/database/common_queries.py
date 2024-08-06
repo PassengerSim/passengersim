@@ -390,7 +390,8 @@ def leg_forecasts(
     ).set_index(["carrier", "leg_id", "bucket_number", "booking_class", "days_prior"])
 
 
-def leg_forecast_trace(
+def _leg_bucket_trace(
+    target_cols: str,
     cnx: "Database",
     scenario: str | None = None,
     burn_samples: int = 100,
@@ -466,15 +467,13 @@ def leg_forecast_trace(
     SELECT
         {cols}{comma}
         sample,
-        forecast_mean,
-        forecast_stdev,
-        forecast_closed_in_tf,
-        forecast_closed_in_future
+        {target_cols}
     FROM
         leg_bucket_detail LEFT JOIN leg_defs USING (leg_id)
     WHERE
         {conds}
     """.format(
+        target_cols=target_cols,
         cols=", ".join(columns),
         conds=" AND ".join(conditions),
         comma="," if columns else "",
@@ -490,6 +489,115 @@ def leg_forecast_trace(
             days_prior=days_prior,
         ),
     ).set_index(indexers + ["sample"])
+
+
+def leg_forecast_trace(
+    cnx: "Database",
+    scenario: str | None = None,
+    burn_samples: int = 100,
+    carrier: str | None = None,
+    leg_id: int | None = None,
+    booking_class: str | None = None,
+    days_prior: int | None = None,
+) -> pd.DataFrame:
+    """
+    Recorded forecast of demand by leg.
+
+    This query requires that the simulation was run while recording leg bucket
+    details (i.e. with the `bucket` flag set on `Config.db.write_items`).  This
+    function is provided primarily for testing and debugging purposes.
+
+    Parameters
+    ----------
+    cnx : Database
+    scenario : str
+    burn_samples : int, default 100
+        The forecasts will be analyzed ignoring this many samples from the
+        beginning of each trial.
+    carrier : str, optional
+        If provided, only return forecasts for this carrier.
+    leg_id : int, optional
+        If provided, only return forecasts for this leg.
+    booking_class : str, optional
+        If provided, only return forecasts for this booking class.
+    days_prior : int, optional
+        If provided, only return forecasts for this many days prior to departure.
+
+    Returns
+    -------
+    pandas.DataFrame
+        The resulting dataframe is indexed by any of `carrier`, `leg_id`,
+        `booking_class`, and/or `days_prior` that were not filtered, and has
+        these columns:
+        - `forecast_mean`: Forecast mean (mu).
+        - `forecast_stdev`: Forecast standard deviation (sigma).
+        - `forecast_closed_in_tf`: Fraction of time the timeframe was
+            closed in the data used to make a forecast.
+        - `forecast_closed_in_tf`: Fraction of time any future timeframe
+            was closed in the data used to make a forecast.
+    """
+    return _leg_bucket_trace(
+        "forecast_mean, forecast_stdev, "
+        "forecast_closed_in_tf, forecast_closed_in_future",
+        cnx,
+        scenario=scenario,
+        burn_samples=burn_samples,
+        carrier=carrier,
+        leg_id=leg_id,
+        booking_class=booking_class,
+        days_prior=days_prior,
+    )
+
+
+def leg_sales_trace(
+    cnx: "Database",
+    scenario: str | None = None,
+    burn_samples: int = 100,
+    carrier: str | None = None,
+    leg_id: int | None = None,
+    booking_class: str | None = None,
+    days_prior: int | None = None,
+) -> pd.DataFrame:
+    """
+    Recorded forecast of demand by leg.
+
+    This query requires that the simulation was run while recording leg bucket
+    details (i.e. with the `bucket` flag set on `Config.db.write_items`).  This
+    function is provided primarily for testing and debugging purposes.
+
+    Parameters
+    ----------
+    cnx : Database
+    scenario : str
+    burn_samples : int, default 100
+        The forecasts will be analyzed ignoring this many samples from the
+        beginning of each trial.
+    carrier : str, optional
+        If provided, only return forecasts for this carrier.
+    leg_id : int, optional
+        If provided, only return forecasts for this leg.
+    booking_class : str, optional
+        If provided, only return forecasts for this booking class.
+    days_prior : int, optional
+        If provided, only return forecasts for this many days prior to departure.
+
+    Returns
+    -------
+    pandas.DataFrame
+        The resulting dataframe is indexed by any of `carrier`, `leg_id`,
+        `booking_class`, and/or `days_prior` that were not filtered, and has
+        these columns: `sold`, `revenue`, `auth`
+    """
+    return _leg_bucket_trace(
+        "sold, revenue, auth",
+        cnx,
+        scenario=scenario,
+        burn_samples=burn_samples,
+        carrier=carrier,
+        leg_id=leg_id,
+        booking_class=booking_class,
+        days_prior=days_prior,
+    )
 
 
 def path_forecasts(

@@ -123,6 +123,15 @@ def test_3mkt_01_carriers(summary, dataframe_regression):
     )
 
 
+def test_3mkt_01_leg_local_dist(summary, dataframe_regression):
+    assert isinstance(summary, SummaryTables)
+    dataframe_regression.check(
+        summary.leg_local_fraction_distribution,
+        basename="leg_local_fraction_distribution",
+        default_tolerance=DEFAULT_TOLERANCE,
+    )
+
+
 def test_3mkt_01_leg_forecasts(summary, dataframe_regression):
     assert isinstance(summary, SummaryTables)
     dataframe_regression.check(

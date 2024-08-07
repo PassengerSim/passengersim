@@ -13,6 +13,12 @@ class Place(BaseModel, extra="forbid", validate_assignment=True):
     label: str
     """A descriptive label for this place."""
 
+    country: str | None = None
+    """Country code, recommend to use ISO 3166-1 alpha-2 codes, ie. US / GB / AU / MX / etc."""
+
+    state: str | None = None
+    """State code"""
+
     lat: float | None = None
     """Latitude in degrees."""
 
@@ -23,6 +29,9 @@ class Place(BaseModel, extra="forbid", validate_assignment=True):
     """
     The time zone for this location.
     """
+
+    tz_offset: int | None = None
+    """Hours offset from GMT"""
 
     mct: List[int] | None = None
     """

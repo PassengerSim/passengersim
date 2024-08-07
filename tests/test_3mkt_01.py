@@ -73,7 +73,7 @@ def test_3mkt_01_basic(summary):
     # assert isinstance(summary.sim.sim.legs[0].carrier, Carrier)
     # assert summary.sim.sim.legs[0].carrier.name == "AL1"
     assert summary.sim.sim.legs[0].avg_load_factor() == approx(89.9775)
-    assert summary.sim.sim.legs[0].avg_local == approx(41.91047761940485)
+    assert summary.sim.sim.legs[0].avg_local() == approx(41.91047761940485)
 
     # for each leg, check that the sum of gt_sold for all paths equals the leg's gt_sold
     for leg in summary.sim.sim.legs:
@@ -88,7 +88,7 @@ def test_3mkt_01_basic(summary):
                     total_sold += pth.gt_sold
         assert leg.gt_sold == total_sold
         assert leg.gt_sold_local == local_sold
-        assert leg.avg_local == (local_sold / total_sold) * 100
+        assert leg.avg_local() == (local_sold / total_sold) * 100
 
     # check that buckets have static fares attached
     assert [b.fcst_revenue for b in summary.sim.legs[101].buckets] == [

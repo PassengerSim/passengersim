@@ -6,7 +6,7 @@ scenario: AW_test
 simulation_controls:
   num_trials: 5
   num_samples: 600
-  random_seed: 42
+#  random_seed: 42
   sys_k_factor: 0.1
   mkt_k_factor: 0.15
 #  pax_type_k_factor: 0.2

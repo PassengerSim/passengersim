@@ -1296,36 +1296,33 @@ class Simulation(BaseSimulation):
                 logger.info(
                     f"{path}, avg_sold={avg_sold:6.2f}, avg_rev=${avg_rev:10,.2f}"
                 )
+            data = dict(
+                orig=path.orig,
+                dest=path.dest,
+                carrier1=path.get_leg_carrier(0),
+                leg_id1=path.get_leg_id(0),
+                carrier2=None,
+                leg_id2=None,
+                carrier3=None,
+                leg_id3=None,
+                avg_sold=avg_sold,
+                avg_sold_priceable=avg_sold_priceable,
+                avg_rev=avg_rev,
+            )
             if path.num_legs() == 1:
-                path_df.append(
-                    dict(
-                        orig=path.orig,
-                        dest=path.dest,
-                        carrier1=path.get_leg_carrier(0),
-                        leg_id1=path.get_leg_id(0),
-                        carrier2=None,
-                        leg_id2=None,
-                        avg_sold=avg_sold,
-                        avg_sold_priceable=avg_sold_priceable,
-                        avg_rev=avg_rev,
-                    )
-                )
+                path_df.append(data)
             elif path.num_legs() == 2:
-                path_df.append(
-                    dict(
-                        orig=path.orig,
-                        dest=path.dest,
-                        carrier1=path.get_leg_carrier(0),
-                        leg_id1=path.get_leg_id(0),
-                        carrier2=path.get_leg_carrier(1),
-                        leg_id2=path.get_leg_id(1),
-                        avg_sold=avg_sold,
-                        avg_sold_priceable=avg_sold_priceable,
-                        avg_rev=avg_rev,
-                    )
-                )
+                data["carrier2"] = path.get_leg_carrier(1)
+                data["leg_id2"] = path.get_leg_id(1)
+                path_df.append(data)
+            elif path.num_legs() == 3:
+                data["carrier2"] = path.get_leg_carrier(1)
+                data["leg_id2"] = path.get_leg_id(1)
+                data["carrier3"] = path.get_leg_carrier(2)
+                data["leg_id3"] = path.get_leg_id(2)
+                path_df.append(data)
             else:
-                raise NotImplementedError("path with other than 1 or 2 legs")
+                raise NotImplementedError("path with more than 3 legs")
         path_df = pd.DataFrame(path_df)
         if to_db and to_db.is_open:
             to_db.save_dataframe("path_summary", path_df)

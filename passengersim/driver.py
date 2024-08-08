@@ -186,6 +186,19 @@ class Simulation(BaseSimulation):
         sim.snapshot_filters = x
 
     def _initialize(self, config: Config):
+        self._init_sim_and_parms(config)
+        self._init_rm_systems(config)
+        self._init_todd_curves(config)
+        self._init_choice_models(config)
+        self._init_frat5_curves(config)
+        self._init_load_factor_curves(config)
+        self._init_carriers(config)
+        self._init_booking_curves(config)
+        self._init_airports(config)
+        self._init_demands(config)
+        self._init_fares(config)
+
+    def _init_sim_and_parms(self, config):
         self.sim = passengersim.core.SimulationEngine(name=config.scenario)
         self.sim.config = config
         self.sim.random_generator = self.random_generator
@@ -238,6 +251,7 @@ class Simulation(BaseSimulation):
                 self.sim.add_dcp(dcp_index, days_prior)
                 self.dcps.append(days_prior)
 
+    def _init_rm_systems(self, config):
         self.rm_systems = {}
         from passengersim_core.carrier.rm_system import Rm_System
 
@@ -270,6 +284,7 @@ class Simulation(BaseSimulation):
             #     )
             x.availability_control = availability_control
 
+    def _init_todd_curves(self, config):
         for todd_name, todd in config.todd_curves.items():
             dwm = DecisionWindow(todd_name)
             if todd.k_factor:
@@ -295,12 +310,11 @@ class Simulation(BaseSimulation):
                 dwm.dwm_tod = list(todd.probabilities.values())
             self.todd_curves[todd_name] = dwm
 
+    def _init_choice_models(self, config):
         for cm_name, cm in config.choice_models.items():
             x = passengersim.core.ChoiceModel(cm_name, cm.kind)
             for pname, pvalue in cm:
-                if pname in ("kind", "name"):
-                    continue
-                if pvalue is None:
+                if pname in ("kind", "name") or pvalue is None:
                     continue
 
                 if pname == "todd_curve":
@@ -313,6 +327,7 @@ class Simulation(BaseSimulation):
             x.random_generator = self.random_generator
             self.choice_models[cm_name] = x
 
+    def _init_frat5_curves(self, config):
         for f5_name, f5_data in config.frat5_curves.items():
             f5 = Frat5(f5_name)
             for _dcp, val in f5_data.curve.items():
@@ -320,16 +335,18 @@ class Simulation(BaseSimulation):
             self.sim.add_frat5(f5)
             self.frat5curves[f5_name] = f5
 
+    def _init_load_factor_curves(self, config):
         for lf_name, lf_curve in config.load_factor_curves.items():
             self.load_factor_curves[lf_name] = lf_curve
 
-        carriers = {}
+    def _init_carriers(self, config):
+        self.carriers_dict = {}
         for carrier_name, carrier_config in config.carriers.items():
             availability_control = self.rm_systems[
                 carrier_config.rm_system
             ].availability_control
             carrier = passengersim.core.Carrier(carrier_name, availability_control)
-            carriers[carrier_name] = carrier
+            self.carriers_dict[carrier_name] = carrier
             carrier.rm_system = self.rm_systems[carrier_config.rm_system]
             carrier.truncation_rule = carrier_config.truncation_rule
             carrier.continuous_pricing = carrier_config.continuous_pricing
@@ -339,7 +356,7 @@ class Simulation(BaseSimulation):
                 # in case two carriers are using the same curve,
                 # and we want to adjust one of them using ML
                 f5_data = config.frat5_curves[carrier_config.frat5]
-                f5 = Frat5(f5_name)
+                f5 = Frat5(f5_data.name)
                 for _dcp, val in f5_data.curve.items():
                     f5.add_vals(val)
                 # f5 = self.frat5curves[carrier_config.frat5]
@@ -363,6 +380,7 @@ class Simulation(BaseSimulation):
         self.init_rm = {}  # TODO
         self.dcps = config.dcps
 
+    def _init_airports(self, config):
         # Load the places into Airport objects.  We use lat/lon to get
         # great circle distance, and this also has the MCT data
         for code, p in config.places.items():
@@ -376,6 +394,7 @@ class Simulation(BaseSimulation):
                 a.set_mct(p.mct[0], p.mct[1], p.mct[2], p.mct[3])
             self.sim.add_airport(a)
 
+    def _init_booking_curves(self, config):
         self.curves = {}
         for curve_name, curve_config in config.booking_curves.items():
             bc = passengersim.core.BookingCurve(curve_name)
@@ -387,6 +406,7 @@ class Simulation(BaseSimulation):
         # It got more complex with cabins and buckets, so now it's in a separate method
         self._initialize_leg_cabin_bucket(config)
 
+    def _init_demands(self, config):
         for dmd_config in config.demands:
             dmd = passengersim.core.Demand(
                 dmd_config.orig, dmd_config.dest, dmd_config.segment
@@ -414,10 +434,11 @@ class Simulation(BaseSimulation):
             if self.debug:
                 print(f"Added demand: {dmd}, base_demand = {dmd.base_demand}")
 
+    def _init_fares(self, config):
         # self.fares = []
         for fare_config in config.fares:
             fare = passengersim.core.Fare(
-                carriers[fare_config.carrier],
+                self.carriers_dict[fare_config.carrier],
                 fare_config.orig,
                 fare_config.dest,
                 fare_config.booking_class,
@@ -457,11 +478,11 @@ class Simulation(BaseSimulation):
             self.sim.add_path(p)
 
         # Go through and make sure things are linked correctly
+        fares_dict = defaultdict(list)
+        for f in self.sim.fares:
+            fares_dict[(f.orig, f.dest)].append(f)
         for dmd in self.sim.demands:
-            tmp_fares = []
-            for fare in self.sim.fares:
-                if fare.orig == dmd.orig and fare.dest == dmd.dest:
-                    tmp_fares.append(fare)
+            tmp_fares = fares_dict[(dmd.orig, dmd.dest)]
             tmp_fares = sorted(tmp_fares, reverse=True, key=lambda p: p.price)
             for fare in tmp_fares:
                 dmd.add_fare(fare)

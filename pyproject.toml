@@ -57,7 +57,7 @@ passengersim = [
 
 [metadata]
 description = "User interface for PassengerSim"
-author = "Passenger Simulation Labs, LLC"
+author = "PassengerSim LLC"
 
 [tool.ruff]
 fix = true

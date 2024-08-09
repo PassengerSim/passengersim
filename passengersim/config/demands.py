@@ -5,8 +5,29 @@ from pydantic import BaseModel, field_validator
 
 class Demand(BaseModel, extra="forbid"):
     orig: str
+    """Origin location for this demand.
+
+    This is commonly a three letter airport code, but it need not be limited
+    to airports.  It can be any location that is relevant to the simulation.
+
+    If using 'places' for locations, this should match the 'name' field of
+    a Place object."""
+
     dest: str
+    """Destination location for this demand.
+
+    This is commonly a three letter airport code, but it need not be limited
+    to airports.  It can be any location that is relevant to the simulation.
+
+    If using 'places' for locations, this should match the 'name' field of
+    a Place object."""
+
     segment: str
+    """Customer segment that this demand belongs to.
+
+    For many applications, segments include 'business' and 'leisure', but
+    they are not limited to these two categories."""
+
     base_demand: float
     reference_fare: float
     distance: float | None = 0.0

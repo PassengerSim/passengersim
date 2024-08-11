@@ -1363,7 +1363,7 @@ class Simulation(BaseSimulation):
                     data["carrier2"] = path.get_leg_carrier(1)
                     data["leg_id2"] = path.get_leg_id(1)
                     path_class_df.append(data)
-                elif path.num_legs() == 2:
+                elif path.num_legs() == 3:
                     data["carrier2"] = path.get_leg_carrier(1)
                     data["leg_id2"] = path.get_leg_id(1)
                     data["carrier3"] = path.get_leg_carrier(2)

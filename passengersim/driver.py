@@ -1146,6 +1146,9 @@ class Simulation(BaseSimulation):
         )
         fare_class_dist_df = self.compute_raw_fare_class_mix(sim, to_log, to_db)
         bid_price_history_df = self.compute_bid_price_history(sim, to_log, to_db)
+        local_fraction_dist_df = self.compute_leg_local_fraction_distribution(
+            sim, to_log, to_db
+        )
 
         summary = SummaryTables(
             name=sim.name,
@@ -1160,6 +1163,7 @@ class Simulation(BaseSimulation):
             raw_load_factor_distribution=raw_load_factor_dist_df,
             leg_avg_load_factor_distribution=leg_avg_load_factor_dist_df,
             raw_fare_class_mix=fare_class_dist_df,
+            leg_local_fraction_distribution=local_fraction_dist_df,
             n_total_samples=num_samples,
         )
         summary.load_additional_tables(self.cnx, sim.name, sim.burn_samples, additional)
@@ -1620,6 +1624,40 @@ class Simulation(BaseSimulation):
         df = df.fillna(0)
         if to_db and to_db.is_open:
             to_db.save_dataframe("bid_price_history", df)
+        return df
+
+    def compute_leg_local_fraction_distribution(
+        self,
+        sim: SimulationEngine,
+        to_log: bool = True,
+        to_db: database.Database | None = None,
+    ) -> pd.DataFrame:
+        """
+        Compute a report on the fraction of leg passengers who are local.
+
+        This report is a dataframe, with integer index values from 0 to 100,
+        and column for each carrier in the simulation. The values are the
+        frequency of the local leg-passenger fraction on each leg observed
+        over the simulation (excluding any burn period).  The values are
+        rounded down, so that a leg local fraction of 99.9% is counted
+        as 99, and only always-local flights are in the 100% bin.
+        """
+        result = {}
+        for carrier in sim.carriers:
+            lf = pd.Series(
+                sim.distribution_local_by_carrier(carrier),
+                index=pd.RangeIndex(101, name="local_fraction"),
+                name="frequency",
+            )
+            result[carrier.name] = lf
+        if result:
+            df = pd.concat(result, axis=1, names=["carrier"])
+        else:
+            df = pd.DataFrame(
+                index=pd.RangeIndex(101, name="local_fraction"), columns=[]
+            )
+        if to_db and to_db.is_open:
+            to_db.save_dataframe("leg_local_fraction_distribution", df)
         return df
 
     def reseed(self, seed: int | list[int] | None = 42):

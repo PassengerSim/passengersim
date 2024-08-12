@@ -1238,7 +1238,7 @@ class Simulation(BaseSimulation):
                 )
             leg_df.append(
                 dict(
-                    carrier=leg.carrier,
+                    carrier=leg.carrier_name,
                     flt_no=leg.flt_no,
                     orig=leg.orig,
                     dest=leg.dest,

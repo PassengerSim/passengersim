@@ -228,6 +228,7 @@ class Simulation(BaseSimulation):
             # for now to not break config files reading
             elif pname in [
                 "base_date",
+                "capture_competitor_data",
                 "dcp_hour",
                 "double_capacity_until",
                 "dwm_lite",

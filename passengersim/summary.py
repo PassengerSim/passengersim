@@ -702,7 +702,7 @@ class SummaryTables:
     def fig_load_factor_distribution(
         self,
         by_carrier: bool | str = True,
-        breakpoints: Collection[int, ...] = (
+        breakpoints: Collection[int] = (
             50,
             55,
             60,
@@ -873,6 +873,147 @@ class SummaryTables:
                 )
             )
 
+        return chart
+
+    def fig_leg_local_fraction_distribution(
+        self,
+        by_carrier: bool | str = True,
+        breakpoints: Collection[int] = (
+            50,
+            55,
+            60,
+            65,
+            70,
+            75,
+            80,
+            85,
+            90,
+            95,
+            100,
+        ),
+        raw_df=False,
+    ):
+        """
+        Figure showing the distribution of fraction of leg passengers who are local.
+
+        Parameters
+        ----------
+        by_carrier : bool or str, default True
+            If True, show the distribution by carrier.  If a string, show the
+            distribution for that carrier. If False, show the distribution
+            aggregated over all carriers.
+        breakpoints : Collection[int, ...], default (50, 55, 60, 65, ..., 90, 95, 100)
+            The breakpoints for the local fraction ranges, which represent the lowest
+            local fraction value in each bin. The first and last breakpoints are always
+            bounded to 0 and 101, respectively; these bounds can be included explicitly
+            or omitted to be included implicitly. Setting the top value to 101 ensures
+            that the highest local fraction value (100) is included in the last bin.
+        raw_df : bool, default False
+            Return the raw data for this figure as a pandas DataFrame, instead
+            of generating the figure itself.
+
+        Returns
+        -------
+        altair.Chart or pd.DataFrame
+        """
+        title = "Local Fraction Frequency"  # default title
+        if self.leg_local_fraction_distribution is None:
+            raise AttributeError(
+                "leg_local_fraction_distribution not found, "
+                "it is required for using raw source data."
+            )
+        df_for_chart = (
+            self.leg_local_fraction_distribution.rename_axis(columns="carrier")
+            .stack()
+            .rename("Count")
+            .reset_index()
+        )
+        if not isinstance(breakpoints, tuple):
+            breakpoints = tuple(breakpoints)
+        if breakpoints[0] <= 0:
+            breakpoints = (-1,) + breakpoints[1:]
+        else:
+            breakpoints = (-1,) + breakpoints
+        if breakpoints[-1] >= 101:
+            breakpoints = breakpoints[:-1] + (101,)
+        else:
+            breakpoints = breakpoints + (101,)
+
+        # Create labels for categories
+        def make_label(i, j):
+            if i == j - 1:
+                return f"{i}"
+            else:
+                return f"{i}-{j-1}"
+
+        labels = [make_label(0, breakpoints[1])]
+        for i in range(1, len(breakpoints) - 2):
+            labels += [make_label(breakpoints[i], breakpoints[i + 1])]
+        if breakpoints[-2] < 100:
+            labels += [make_label(breakpoints[-2], 101)]
+        else:
+            labels += ["100"]
+
+        breaker = pd.cut(
+            df_for_chart.local_fraction,
+            bins=breakpoints,
+            right=False,
+            labels=labels,
+        ).rename("Leg Local Fraction Range")
+        df_for_chart = (
+            df_for_chart.groupby(["carrier", breaker], observed=False)
+            .Count.sum()
+            .reset_index()
+        )
+
+        if not by_carrier:
+            df_for_chart = (
+                df_for_chart.groupby(["Leg Local Fraction Range"])
+                .Count.sum()
+                .reset_index()
+            )
+        elif isinstance(by_carrier, str):
+            df_for_chart = df_for_chart[df_for_chart["carrier"] == by_carrier]
+            df_for_chart = df_for_chart.drop(columns=["carrier"])
+
+        if raw_df:
+            return df_for_chart
+
+        import altair as alt
+
+        if by_carrier is True:
+            chart = (
+                alt.Chart(df_for_chart)
+                .mark_bar()
+                .encode(
+                    x=alt.X(
+                        "Leg Local Fraction Range", title="Leg Local Fraction Range"
+                    ),
+                    y=alt.Y("Count:Q", title="Count"),
+                    facet=alt.Facet("carrier:N", columns=2, title="Carrier"),
+                    tooltip=[
+                        alt.Tooltip("carrier", title="Carrier"),
+                        alt.Tooltip("Count", title="Count"),
+                    ],
+                )
+                .properties(width=300, height=250, title=f"{title} by Carrier")
+            )
+        else:
+            chart = (
+                alt.Chart(df_for_chart)
+                .mark_bar()
+                .encode(
+                    x=alt.X(
+                        "Leg Local Fraction Range", title="Leg Local Fraction Range"
+                    ),
+                    y=alt.Y("Count:Q", title="Count"),
+                )
+                .properties(
+                    width=600,
+                    height=400,
+                    title=title if not by_carrier else f"{title} ({by_carrier})",
+                )
+            )
         return chart
 
     @report_figure

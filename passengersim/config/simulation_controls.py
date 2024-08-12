@@ -233,6 +233,14 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     delay the recalculation into later in the night (or the next day).
     """
 
+    capture_competitor_data: bool = False
+    """
+    Turns on the capturing of competitor data.
+
+    This feature captures lowest available fare data captured by market, for potential
+    use in competitive analysis RM strategies.
+    """
+
     capture_choice_set_file: str = ""
     """
     Turns on the capturing of the choice set and writes the data to the specified file

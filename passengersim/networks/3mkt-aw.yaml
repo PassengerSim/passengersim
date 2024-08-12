@@ -966,6 +966,7 @@ demands:
     segment: business
     base_demand: 120.0
     reference_fare: 375.0
+    distance: 1745
     choice_model: business
     curve: c1
   - orig: ORD
@@ -973,6 +974,7 @@ demands:
     segment: leisure
     base_demand: 150.0
     reference_fare: 150.0
+    distance: 1745
     choice_model: leisure
     curve: c2
   - orig: BOS
@@ -980,6 +982,7 @@ demands:
     segment: business
     base_demand: 100.0
     reference_fare: 500.0
+#    distance: 2611
     choice_model: business
     curve: c1
   - orig: BOS
@@ -987,6 +990,7 @@ demands:
     segment: leisure
     base_demand: 140.0
     reference_fare: 200.0
+#    distance: 2611
     choice_model: leisure
     curve: c2
 

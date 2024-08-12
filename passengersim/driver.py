@@ -18,6 +18,7 @@ from scipy.stats import gamma
 
 import passengersim.config.rm_systems
 import passengersim.core
+from passengersim_core.utils.airsim_utils  import get_mileage, great_circle
 from passengersim.config import Config
 from passengersim.config.manipulate import revalidate
 from passengersim.config.snapshot_filter import SnapshotFilter
@@ -128,7 +129,7 @@ class Simulation(BaseSimulation):
         self.fare_details_revenue = defaultdict(float)
         self.demand_multiplier = 1.0
         self.capacity_multiplier = 1.0
-        self.airports = []
+        self.airports = {}
         self.choice_models = {}
         self.frat5curves = {}
         self.load_factor_curves = {}
@@ -393,6 +394,7 @@ class Simulation(BaseSimulation):
                 a.state = p.state
             if p.mct is not None:
                 a.set_mct(p.mct[0], p.mct[1], p.mct[2], p.mct[3])
+            self.airports[code] = a
             self.sim.add_airport(a)
 
     def _init_booking_curves(self, config):
@@ -417,8 +419,8 @@ class Simulation(BaseSimulation):
             dmd.reference_fare = dmd_config.reference_fare
             if dmd_config.distance > 0.01:
                 dmd.distance = dmd_config.distance
-            elif len(self.airports) > 0:
-                dmd.distance = self.get_mileage(dmd.orig, dmd.dest)
+            elif dmd.orig in self.airports and dmd.dest in self.airports:
+                dmd.distance = get_mileage(self.airports, dmd.orig, dmd.dest)
             model_name = dmd_config.choice_model
             cm = self.choice_models.get(model_name, None)
             if cm is not None:

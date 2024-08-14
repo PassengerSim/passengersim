@@ -80,7 +80,9 @@ class YamlConfig(PrettyModel):
         for filename in filenames:
             if isinstance(filename, str) and "\n" in filename:
                 # explicit YAML content cannot have include statements
-                content = addicty.Dict.load(filename, freeze=False)
+                content = addicty.Dict.load(
+                    filename, freeze=False, Loader=yaml.CSafeLoader
+                )
                 raw_config.update(content)
                 continue
             filename = pathlib.Path(filename)
@@ -97,7 +99,9 @@ class YamlConfig(PrettyModel):
                             "cannot load compressed files from web yet"
                         )
                 with opener(filename) as f:
-                    content = addicty.Dict.load(f, freeze=False)
+                    content = addicty.Dict.load(
+                        f, freeze=False, Loader=yaml.CSafeLoader
+                    )
                     include = content.pop("include", None)
                     if include is not None:
                         if isinstance(include, str):
@@ -220,7 +224,7 @@ class YamlConfig(PrettyModel):
                 warnings=warnings,
             )
         )
-        b = yaml.dump(y, encoding="utf8", Dumper=yaml.SafeDumper)
+        b = yaml.dump(y, encoding="utf8", Dumper=yaml.CSafeDumper)
         if isinstance(stream, str):
             stream = pathlib.Path(stream)
         if isinstance(stream, pathlib.Path):

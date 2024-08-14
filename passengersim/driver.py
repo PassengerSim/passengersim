@@ -14,11 +14,11 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from passengersim_core import Ancillary
+from passengersim_core.utils.airsim_utils import get_mileage
 from scipy.stats import gamma
 
 import passengersim.config.rm_systems
 import passengersim.core
-from passengersim_core.utils.airsim_utils  import get_mileage, great_circle
 from passengersim.config import Config
 from passengersim.config.manipulate import revalidate
 from passengersim.config.snapshot_filter import SnapshotFilter
@@ -410,10 +410,14 @@ class Simulation(BaseSimulation):
         self._initialize_leg_cabin_bucket(config)
 
     def _init_demands(self, config):
+        markets = {}
         for dmd_config in config.demands:
-            dmd = passengersim.core.Demand(
-                dmd_config.orig, dmd_config.dest, dmd_config.segment
-            )
+            if f"{dmd_config.orig}-{dmd_config.dest}" not in markets:
+                mkt = passengersim.core.Market(dmd_config.orig, dmd_config.dest)
+                markets[f"{dmd_config.orig}-{dmd_config.dest}"] = mkt
+            else:
+                mkt = markets[f"{dmd_config.orig}-{dmd_config.dest}"]
+            dmd = passengersim.core.Demand(segment=dmd_config.segment, market=mkt)
             dmd.base_demand = dmd_config.base_demand * self.demand_multiplier
             dmd.price = dmd_config.reference_fare
             dmd.reference_fare = dmd_config.reference_fare

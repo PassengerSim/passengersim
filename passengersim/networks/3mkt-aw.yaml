@@ -4,7 +4,7 @@
 
 scenario: AW_test
 simulation_controls:
-  num_trials: 25
+  num_trials: 5
   num_samples: 600
 #  random_seed: 42
   sys_k_factor: 0.1
@@ -405,7 +405,7 @@ rm_systems:
           algorithm: emsrb
           kind: leg
 
-  rm_bid_price:
+  rm_pro_bp:
     availability_control: bp
     processes:
       DCP:
@@ -746,7 +746,6 @@ choice_models:
     basefare_mult: 1.0
     path_quality:  [2.02, 0.12]
     preferred_carrier:  [-1.98, 0.11]
-    hhi: [0.0, 0.0001]
     r1: 0.70
     r2: 0.35
     r3: 0.35
@@ -761,7 +760,7 @@ choice_models:
 
 carriers:
   - name: AL1
-    rm_system: rm_leg
+    rm_system: rm_pro_bp
     frat5: curve_G
     #    fare_adjustment_scale: 0.3
     #    load_factor_curve: lf_curve1
@@ -775,7 +774,7 @@ carriers:
       - (Y4, Y)
       - (Y5, Y)
   - name: AL2
-    rm_system: rm_test1
+    rm_system: rm_lp
     frat5: curve_C
     fare_adjustment_scale: 0.5
     load_factor_curve: lf_curve1

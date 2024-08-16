@@ -163,21 +163,6 @@ class YamlConfig(PrettyModel):
 
         return apply_tags(data)
 
-    @model_validator(mode="before")
-    @classmethod
-    def _market_demand_adjustment(cls, data: Any) -> Any:
-        """Apply market level demand adjustments."""
-        if "market_demand_adjustments" in data:
-            for adj in data["market_demand_adjustments"]:
-                orig = adj["orig"]
-                dest = adj["dest"]
-                mult = adj["multiplier"]
-                for dmd in data["demands"]:
-                    if dmd["orig"] == orig and dmd["dest"] == dest:
-                        dmd["base_demand"] *= mult
-            del data["market_demand_adjustments"]
-        return data
-
     def to_yaml(
         self,
         stream: os.PathLike | io.FileIO | None = None,

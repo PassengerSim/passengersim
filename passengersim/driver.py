@@ -7,6 +7,7 @@ import sqlite3
 import time
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from collections.abc import Mapping
 from datetime import datetime, timezone
 from math import sqrt
 from typing import Any
@@ -27,6 +28,7 @@ from passengersim.core import (
     DecisionWindow,
     Event,
     Frat5,
+    Market,
     PathClass,
     SimulationEngine,
 )
@@ -83,6 +85,11 @@ class BaseSimulation(ABC):
         for p in self._sim.paths:
             result[p.path_id] = str(p)
         return result
+
+    @property
+    def markets(self) -> Mapping[str, Market]:
+        """Access markets in the simulation."""
+        return self._sim.markets
 
     @property
     def paths(self):
@@ -198,6 +205,7 @@ class Simulation(BaseSimulation):
         self._init_airports(config)
         self._init_demands(config)
         self._init_fares(config)
+        self.sim.connect_markets()
 
     def _init_sim_and_parms(self, config):
         self.sim = passengersim.core.SimulationEngine(name=config.scenario)
@@ -411,14 +419,24 @@ class Simulation(BaseSimulation):
 
     def _init_demands(self, config):
         markets = {}
+        market_multipliers = {}
+        for mkt_config in config.markets:
+            market_multipliers[f"{mkt_config.orig}~{mkt_config.dest}"] = (
+                mkt_config.demand_multiplier
+            )
         for dmd_config in config.demands:
-            if f"{dmd_config.orig}-{dmd_config.dest}" not in markets:
+            mkt_ident = f"{dmd_config.orig}~{dmd_config.dest}"
+            if mkt_ident not in markets:
                 mkt = passengersim.core.Market(dmd_config.orig, dmd_config.dest)
-                markets[f"{dmd_config.orig}-{dmd_config.dest}"] = mkt
+                markets[mkt_ident] = mkt
             else:
-                mkt = markets[f"{dmd_config.orig}-{dmd_config.dest}"]
+                mkt = markets[mkt_ident]
             dmd = passengersim.core.Demand(segment=dmd_config.segment, market=mkt)
-            dmd.base_demand = dmd_config.base_demand * self.demand_multiplier
+            dmd.base_demand = (
+                dmd_config.base_demand
+                * self.demand_multiplier
+                * market_multipliers.get(mkt_ident, 1.0)
+            )
             dmd.price = dmd_config.reference_fare
             dmd.reference_fare = dmd_config.reference_fare
             if dmd_config.distance > 0.01:
@@ -694,16 +712,16 @@ class Simulation(BaseSimulation):
 
         # Market share computation (MIDT-lite), might move to C++ in a future version
         alpha = 0.15
-        for m in self.sim.markets:
+        for m in self.sim.markets.values():
             sold = float(m.sold)
             for a in self.sim.carriers:
-                try:
-                    carrier_sold = m.get_carrier_sold(a.name)
-                except Exception as e:
-                    print(e)
+                carrier_sold = m.get_carrier_sold(a.name)
                 share = carrier_sold / sold if sold > 0 else 0
                 if self.sim.sample > 1:
-                    old_share = m.get_carrier_share(a.name)
+                    try:
+                        old_share = m.get_carrier_share(a.name)
+                    except KeyError:
+                        old_share = 0.0
                     new_share = alpha * share + (1.0 - alpha) * old_share
                     m.set_carrier_share(a.name, new_share)
                 else:
@@ -944,7 +962,7 @@ class Simulation(BaseSimulation):
             raise
 
     def capture_competitor_data(self):
-        for mkt in self.sim.markets:
+        for mkt in self.sim.markets.values():
             lowest = self.sim.shop(mkt.orig, mkt.dest)
             for cxr, price in lowest:
                 mkt.set_competitor_price(cxr, price)

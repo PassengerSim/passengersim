@@ -31,6 +31,7 @@ from .fares import Fare
 from .frat5_curves import Frat5Curve
 from .legs import Leg
 from .load_factor_curves import LoadFactorCurve
+from .markets import Market
 from .named import DictOfNamed
 from .outputs import OutputConfig
 from .paths import Path
@@ -161,6 +162,21 @@ class YamlConfig(PrettyModel):
             return x
 
         return apply_tags(data)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _market_demand_adjustment(cls, data: Any) -> Any:
+        """Apply market level demand adjustments."""
+        if "market_demand_adjustments" in data:
+            for adj in data["market_demand_adjustments"]:
+                orig = adj["orig"]
+                dest = adj["dest"]
+                mult = adj["multiplier"]
+                for dmd in data["demands"]:
+                    if dmd["orig"] == orig and dmd["dest"] == dest:
+                        dmd["base_demand"] *= mult
+            del data["market_demand_adjustments"]
+        return data
 
     def to_yaml(
         self,
@@ -401,6 +417,7 @@ class Config(YamlConfig, extra="forbid"):
     demands: list[Demand] = []
     fares: list[Fare] = []
     paths: list[Path] = []
+    markets: list[Market] = []
 
     snapshot_filters: list[SnapshotFilter] = []
 

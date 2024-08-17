@@ -4,6 +4,7 @@ import logging
 import os
 import pathlib
 import sqlite3
+import sys  # noqa: F401
 import time
 from abc import ABC, abstractmethod
 from collections import defaultdict
@@ -14,6 +15,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import psutil  # noqa: F401
 from passengersim_core import Ancillary
 from passengersim_core.utils.airsim_utils import get_mileage
 from scipy.stats import gamma
@@ -33,11 +35,23 @@ from passengersim.core import (
     SimulationEngine,
 )
 from passengersim.summary import SummaryTables
+from passengersim.utils.si import si_units  # noqa: F401
 
 from . import database
 from .progressbar import DummyProgressBar, ProgressBar
 
 logger = logging.getLogger("passengersim")
+
+
+def memory_log(tag):
+    pass
+    # p = psutil.Process()
+    # mem_info = p.memory_info()
+    # print(
+    #     f"\nPSUTIL {tag}: rss={si_units(mem_info.rss, kind='B')} "
+    #     f"vmw={si_units(mem_info.vms, kind='B')}",
+    #     file=sys.stderr,
+    # )
 
 
 class BaseSimulation(ABC):
@@ -458,6 +472,8 @@ class Simulation(BaseSimulation):
             self.sim.add_demand(dmd)
             if self.debug:
                 print(f"Added demand: {dmd}, base_demand = {dmd.base_demand}")
+        # Hold PyObjects for markets in a dictionary in order to avoid duplicates
+        self._markets = {k: v for k, v in self.markets.items()}
 
     def _init_fares(self, config):
         # self.fares = []
@@ -736,6 +752,7 @@ class Simulation(BaseSimulation):
         update_freq: int | None = None,
     ):
         """Run a single trial of the simulation."""
+        memory_log(f"begin _run_single_trial {trial}")
         if not n_samples_total:
             n_samples_total = self.sim.num_trials * self.sim.num_samples
         self.sim.trial = trial
@@ -791,7 +808,9 @@ class Simulation(BaseSimulation):
             # Loop on passengers
             while True:
                 event = self.sim.go()
+                memory_log(f"pre-run_carrier_models {event}")
                 self.run_carrier_models(event)
+                memory_log(f"post-run_carrier_models {event}")
                 if event is None or str(event) == "Done" or (event[0] == "Done"):
                     assert (
                         self.sim.num_events() == 0

@@ -304,12 +304,15 @@ rm_systems:
           algorithm: exp_smoothing
           alpha: 0.15
           kind: leg
+        - step_type: errors
+          bias: 0.05
+          k_factor: 0.2
         - step_type: emsr
           name: leg_optimization
           algorithm: emsrb
           kind: leg
-        - step_type: useradjustment
-          name: user_adjustment
+#        - step_type: useradjustment
+#          name: user_adjustment
 
   rm_test_elasticity:
     availability_control: leg
@@ -760,7 +763,7 @@ choice_models:
 
 carriers:
   - name: AL1
-    rm_system: rm_pro_bp
+    rm_system: rm_leg
     frat5: curve_G
     #    fare_adjustment_scale: 0.3
     #    load_factor_curve: lf_curve1
@@ -774,7 +777,7 @@ carriers:
       - (Y4, Y)
       - (Y5, Y)
   - name: AL2
-    rm_system: rm_lp
+    rm_system: rm_hybrid
     frat5: curve_C
     fare_adjustment_scale: 0.5
     load_factor_curve: lf_curve1

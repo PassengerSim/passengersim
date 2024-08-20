@@ -336,7 +336,9 @@ class Simulation(BaseSimulation):
 
     def _init_choice_models(self, config):
         for cm_name, cm in config.choice_models.items():
-            x = passengersim.core.ChoiceModel(cm_name, cm.kind)
+            x = passengersim.core.ChoiceModel(
+                cm_name, cm.kind, random_generator=self.random_generator
+            )
             for pname, pvalue in cm:
                 if pname in ("kind", "name") or pvalue is None:
                     continue
@@ -348,7 +350,6 @@ class Simulation(BaseSimulation):
                     x.add_parm(pname, *pvalue)
                 else:
                     x.add_parm(pname, pvalue)
-            x.random_generator = self.random_generator
             self.choice_models[cm_name] = x
 
     def _init_frat5_curves(self, config):

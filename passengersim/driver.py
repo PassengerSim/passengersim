@@ -462,8 +462,6 @@ class Simulation(BaseSimulation):
             cm = self.choice_models.get(model_name, None)
             if cm is not None:
                 dmd.add_choice_model(cm)
-            if model_name == "business" or dmd_config.segment == "business":
-                dmd.business = True
             if dmd_config.curve:
                 curve_name = str(dmd_config.curve).strip()
                 curve = self.curves[curve_name]

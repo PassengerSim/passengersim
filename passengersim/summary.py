@@ -12,10 +12,10 @@ import numpy as np
 import pandas as pd
 
 from . import database
+from .config import Config
 from .reporting import report_figure
 
 if TYPE_CHECKING:
-    from .config import Config
     from .driver import Simulation
 
 logger = logging.getLogger("passengersim.summary")
@@ -74,6 +74,38 @@ class SummaryTables:
         summary.cnx = db
         return summary
 
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        if "cnx" in state:
+            del state["cnx"]
+        if "config" in state:
+            # state["_config_yaml"] = state["config"].to_yaml()
+            del state["config"]
+        return state
+
+    def __setstate__(self, state):
+        # if "_config_yaml" in state:
+        #     state["config"] = Config.from_raw_yaml(state.pop("_config_yaml"))
+        self.__dict__.update(state)
+
+    def to_pickle(self, filename: str | pathlib.Path):
+        """Save the object to a pickle file."""
+        import pickle
+
+        with open(filename, "wb") as f:
+            pickle.dump(self, f)
+
+    @classmethod
+    def from_pickle(cls, filename: str | pathlib.Path):
+        """Load the object from a pickle file."""
+        import pickle
+
+        with open(filename, "rb") as f:
+            result = pickle.load(f)
+            if result.__class__.__name__ != cls.__name__:
+                raise TypeError(f"Expected {cls}, got {type(result)}")
+            return result
+
     @classmethod
     def aggregate(cls, summaries: Collection[SummaryTables]):
         """Aggregate multiple summary tables."""
@@ -116,7 +148,8 @@ class SummaryTables:
             summaries
         )
         legs = sum(
-            s.legs.set_index(["carrier", "leg_id", "orig", "dest"]) for s in summaries
+            s.legs.set_index(["carrier", "leg_id", "flt_no", "orig", "dest"])
+            for s in summaries
         ) / len(summaries)
         legs = legs.reset_index()
         paths = sum(
@@ -1070,6 +1103,8 @@ class SummaryTables:
                 )
             return pd.concat({c: y}, names=["paxtype"])
 
+        if self.bookings_by_timeframe is None:
+            raise ValueError("bookings_by_timeframe not found")
         bookings_by_timeframe = self.bookings_by_timeframe.reset_index()
         df0 = _summarize(bookings_by_timeframe, "business")
         df1 = _summarize(bookings_by_timeframe, "leisure")

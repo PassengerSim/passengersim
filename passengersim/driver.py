@@ -405,10 +405,11 @@ class Simulation(BaseSimulation):
         self.init_rm = {}  # TODO
         self.dcps = config.dcps
 
-    def _init_airports(self, config):
+    def _init_airports(self, config: Config):
         # Load the places into Airport objects.  We use lat/lon to get
         # great circle distance, and this also has the MCT data
         for code, p in config.places.items():
+            assert isinstance(p, passengersim.config.Place)
             a = Airport(code, p.label)
             a.latitude, a.longitude = p.lat, p.lon
             if p.country is not None:
@@ -416,7 +417,11 @@ class Simulation(BaseSimulation):
             if p.state is not None:
                 a.state = p.state
             if p.mct is not None:
-                a.set_mct(p.mct[0], p.mct[1], p.mct[2], p.mct[3])
+                assert isinstance(p.mct, passengersim.config.MinConnectTime)
+                a.mct_dd = p.mct.domestic_domestic
+                a.mct_di = p.mct.domestic_international
+                a.mct_id = p.mct.international_domestic
+                a.mct_ii = p.mct.international_international
             self.airports[code] = a
             self.sim.add_airport(a)
 
@@ -511,10 +516,10 @@ class Simulation(BaseSimulation):
             assert (
                 tmp_leg.dest == path_config.dest
             ), "Path statement is corrupted, dest doesn't match"
-            path_carrier = tmp_leg.carrier
-            if path_carrier not in carriers:
-                raise ValueError(f"Carrier {path_carrier} not found")
-            p.add_carrier(carriers[path_carrier])
+            path_carrier_name = tmp_leg.carrier_name
+            if path_carrier_name not in carriers:
+                raise ValueError(f"Carrier {path_carrier_name} not found")
+            p.add_carrier(carriers[path_carrier_name])
             self.sim.add_path(p)
 
         # Go through and make sure things are linked correctly
@@ -1253,7 +1258,7 @@ class Simulation(BaseSimulation):
                 days_prior = self.dcp_list[dcp_index]
                 fare_df.append(
                     dict(
-                        carrier=f.carrier,
+                        carrier=f.carrier.name,
                         orig=f.orig,
                         dest=f.dest,
                         booking_class=f.booking_class,
@@ -1302,6 +1307,7 @@ class Simulation(BaseSimulation):
                 )
             leg_df.append(
                 dict(
+                    leg_id=leg.leg_id,
                     carrier=leg.carrier_name,
                     flt_no=leg.flt_no,
                     orig=leg.orig,

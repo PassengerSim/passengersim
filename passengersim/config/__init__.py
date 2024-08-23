@@ -14,6 +14,7 @@ from .legs import Leg
 from .load_factor_curves import LoadFactorCurve
 from .named import DictOfNamed
 from .paths import Path
+from .places import MinConnectTime, Place
 from .rm_systems import RmSystem
 from .simulation_controls import SimulationSettings
 from .snapshot_filter import SnapshotFilter, SnapshotInstruction

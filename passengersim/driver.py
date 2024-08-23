@@ -1694,7 +1694,7 @@ class Simulation(BaseSimulation):
         result = {}
         for carrier in sim.carriers:
             lf = pd.Series(
-                sim.distribution_local_by_carrier(carrier),
+                sim.distribution_local_leg_passengers(carrier),
                 index=pd.RangeIndex(101, name="local_fraction"),
                 name="frequency",
             )

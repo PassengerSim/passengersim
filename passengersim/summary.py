@@ -185,6 +185,33 @@ class SummaryTables:
         )
         demands = pd.concat([demands_avg, demands_sum], axis=1).reset_index()
 
+        # TODO: aggregate fares
+        # fares has some columns that are (weighted) averages and some that are sums
+        # fares_gt_adj_price = sum(
+        #     s.fares.set_index(
+        #     ["carrier", "orig", "dest", "booking_class", "dcp_index"]
+        #     ).eval("gt_sold * avg_adjusted_price")
+        #     for s in summaries
+        # )
+        # fares_avg = sum(
+        #     s.fares.set_index(
+        #     ["carrier", "orig", "dest", "booking_class", "dcp_index"]
+        #     )[
+        #         ["price", "gt_sold"]
+        #     ]
+        #     for s in summaries
+        # ) / len(summaries)
+        # fares_sum = sum(
+        #     s.fares.set_index(
+        #     ["carrier", "orig", "dest", "booking_class", "dcp_index"]
+        #     )[
+        #         ["gt_sold"]
+        #     ]
+        #     for s in summaries
+        # )
+
+        # TODO: aggregate path_classes
+
         # these are averages, but need to have the index values excluded
         # TODO: the index values should be set properly on the original dataframes
         carriers = sum(s.carriers.set_index("carrier") for s in summaries) / len(
@@ -231,6 +258,7 @@ class SummaryTables:
         raw_load_factor_distribution = sum_count("raw_load_factor_distribution")
         leg_avg_load_factor_distribution = sum_count("leg_avg_load_factor_distribution")
         raw_fare_class_mix = sum_count("raw_fare_class_mix")
+        leg_local_fraction_distribution = sum_count("leg_local_fraction_distribution")
 
         result = cls(
             demands=demands,
@@ -247,6 +275,7 @@ class SummaryTables:
             demand_to_come=demand_to_come,
             demand_to_come_summary=demand_to_come_summary,
             leg_avg_load_factor_distribution=leg_avg_load_factor_distribution,
+            leg_local_fraction_distribution=leg_local_fraction_distribution,
             raw_load_factor_distribution=raw_load_factor_distribution,
             raw_fare_class_mix=raw_fare_class_mix,
             n_total_samples=sum(s.n_total_samples for s in summaries),

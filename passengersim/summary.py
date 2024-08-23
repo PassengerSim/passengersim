@@ -81,6 +81,10 @@ class SummaryTables:
         if "config" in state:
             # state["_config_yaml"] = state["config"].to_yaml()
             del state["config"]
+        if "meta_trials" in state and not state.get("_preserve_meta_trials", True):
+            del state["meta_trials"]
+        if "_preserve_meta_trials" in state:
+            del state["_preserve_meta_trials"]
         return state
 
     def __setstate__(self, state):
@@ -88,17 +92,56 @@ class SummaryTables:
         #     state["config"] = Config.from_raw_yaml(state.pop("_config_yaml"))
         self.__dict__.update(state)
 
-    def to_pickle(self, filename: str | pathlib.Path):
-        """Save the object to a pickle file."""
+    def to_pickle(
+        self,
+        filename: str | pathlib.Path,
+        add_timestamp_ext: bool = True,
+        preserve_meta_trials: bool = False,
+    ):
+        """Save the object to a pickle file.
+
+        Parameters
+        ----------
+        filename : str or Path-like
+            The filename to save the object to.
+        add_timestamp_ext : bool, default True
+            Add a timestamp extension to the filename.
+        """
         import pickle
+        import time
+
+        if add_timestamp_ext:
+            filename = pathlib.Path(filename)
+            timestamp = time.strftime("%Y%m%d-%H%M%S")
+            filename = filename.with_suffix(f".{timestamp}.pkl")
 
         with open(filename, "wb") as f:
+            self._preserve_meta_trials = preserve_meta_trials
             pickle.dump(self, f)
+            del self._preserve_meta_trials
 
     @classmethod
-    def from_pickle(cls, filename: str | pathlib.Path):
-        """Load the object from a pickle file."""
+    def from_pickle(cls, filename: str | pathlib.Path, read_latest: bool = True):
+        """Load the object from a pickle file.
+
+        Parameters
+        ----------
+        filename : str or Path-like
+            The filename to load the object from.
+        read_latest : bool, default True
+            If True, read the latest file matching the pattern.
+        """
+        import glob
         import pickle
+
+        if read_latest:
+            filename_glob = pathlib.Path(filename).with_suffix(".*.pkl")
+            files = sorted(glob.glob(str(filename_glob)))
+            if not files:
+                if not os.path.exists(filename):
+                    raise FileNotFoundError(filename)
+            else:
+                filename = files[-1]
 
         with open(filename, "rb") as f:
             result = pickle.load(f)

@@ -545,6 +545,7 @@ class SummaryTables:
         raw_load_factor_distribution: pd.DataFrame | None = None,
         raw_fare_class_mix: pd.DataFrame | None = None,
         leg_local_fraction_distribution: pd.DataFrame | None = None,
+        local_fraction_by_place: pd.DataFrame | None = None,
         n_total_samples: int = 0,
     ):
         self.config = config
@@ -589,6 +590,9 @@ class SummaryTables:
 
         self.leg_local_fraction_distribution = leg_local_fraction_distribution
         """Fraction of local passengers on each leg."""
+
+        self.local_fraction_by_place = local_fraction_by_place
+        """Fraction of local passengers by place."""
 
         self.n_total_samples = n_total_samples
         """Total number of sample departures simulated to create these summaries.

@@ -1197,6 +1197,9 @@ class Simulation(BaseSimulation):
         local_fraction_dist_df = self.compute_leg_local_fraction_distribution(
             sim, to_log, to_db
         )
+        local_fraction_by_place = self.compute_local_fraction_by_place(
+            sim, to_log, to_db
+        )
 
         summary = SummaryTables(
             name=sim.name,
@@ -1212,6 +1215,7 @@ class Simulation(BaseSimulation):
             leg_avg_load_factor_distribution=leg_avg_load_factor_dist_df,
             raw_fare_class_mix=fare_class_dist_df,
             leg_local_fraction_distribution=local_fraction_dist_df,
+            local_fraction_by_place=local_fraction_by_place,
             n_total_samples=num_samples,
         )
         summary.load_additional_tables(self.cnx, sim.name, sim.burn_samples, additional)
@@ -1707,6 +1711,40 @@ class Simulation(BaseSimulation):
             )
         if to_db and to_db.is_open:
             to_db.save_dataframe("leg_local_fraction_distribution", df)
+        return df
+
+    def compute_local_fraction_by_place(
+        self,
+        sim: SimulationEngine,
+        to_log: bool = True,
+        to_db: database.Database | None = None,
+    ) -> pd.DataFrame:
+        """
+        Compute a report on the fraction of leg passengers who are local.
+
+        Parameters
+        ----------
+        sim
+        to_log
+        to_db
+
+        Returns
+        -------
+        pd.DataFrame
+        """
+        result = {}
+        for carrier in sim.carriers:
+            df = pd.Series(
+                sim.fraction_local_by_carrier_and_place(carrier.name),
+                name=carrier.name,
+            )
+            result[carrier.name] = df
+        if result:
+            df = pd.concat(result, axis=1, names=["carrier"])
+        else:
+            df = pd.DataFrame(index=[], columns=[])
+        if to_db and to_db.is_open:
+            to_db.save_dataframe("local_fraction_by_place", df)
         return df
 
     def reseed(self, seed: int | list[int] | None = 42):

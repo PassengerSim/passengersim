@@ -433,7 +433,7 @@ class Config(YamlConfig, extra="forbid"):
             v = []
         return v
 
-    raw_license_certificate: bytes | None = None
+    raw_license_certificate: bytes | None | bool = None
 
     @field_validator("raw_license_certificate", mode="before")
     def _handle_license_certificate(cls, v):
@@ -447,6 +447,11 @@ class Config(YamlConfig, extra="forbid"):
 
         if isinstance(self.raw_license_certificate, bytes):
             return load_pem_x509_certificate(self.raw_license_certificate)
+        elif self.raw_license_certificate is False:
+            return False
+        elif self.raw_license_certificate is None:
+            return None
+        raise ValueError("invalid license certificate")
 
     @model_validator(mode="after")
     def _manual_paths(cls, m: Config):

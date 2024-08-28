@@ -492,7 +492,7 @@ class Simulation(BaseSimulation):
                 print(f"Added fare: {fare}")
             # self.fares.append(fare)
 
-        carriers = {cxr.name: cxr for cxr in self.sim.carriers}
+        carrier_codes = {cxr.name: cxr for cxr in self.sim.carriers}
         for path_config in config.paths:
             p = passengersim.core.Path(path_config.orig, path_config.dest, 0.0)
             p.path_quality_index = path_config.path_quality_index
@@ -511,10 +511,10 @@ class Simulation(BaseSimulation):
             assert (
                 tmp_leg.dest == path_config.dest
             ), "Path statement is corrupted, dest doesn't match"
-            path_carrier = tmp_leg.carrier
-            if path_carrier not in carriers:
-                raise ValueError(f"Carrier {path_carrier} not found")
-            p.add_carrier(carriers[path_carrier])
+            path_carrier_code = tmp_leg.carrier
+            if path_carrier_code not in carrier_codes:
+                raise ValueError(f"Carrier {path_carrier_code} not found")
+            p.add_carrier(carrier_codes[path_carrier_code])
             self.sim.add_path(p)
 
         # Go through and make sure things are linked correctly

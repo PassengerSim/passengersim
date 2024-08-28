@@ -21,8 +21,8 @@ simulation_controls:
   manual_paths: false
 #  debug_orders: false
   timeframe_demand_allocation: pods
-#  capture_choice_set_file: choice-set.csv
-#  capture_choice_set_obs: 10000
+  capture_choice_set_file: choice-set.csv
+  capture_choice_set_obs: 10000
   # Mountain Standard Time (for me)
   controller_time_zone: -7
   generate_3seg: true

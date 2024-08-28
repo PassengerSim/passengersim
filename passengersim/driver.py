@@ -405,10 +405,11 @@ class Simulation(BaseSimulation):
         self.init_rm = {}  # TODO
         self.dcps = config.dcps
 
-    def _init_airports(self, config):
+    def _init_airports(self, config: Config):
         # Load the places into Airport objects.  We use lat/lon to get
         # great circle distance, and this also has the MCT data
         for code, p in config.places.items():
+            assert isinstance(p, passengersim.config.Place)
             a = Airport(code, p.label)
             a.latitude, a.longitude = p.lat, p.lon
             if p.country is not None:
@@ -416,7 +417,11 @@ class Simulation(BaseSimulation):
             if p.state is not None:
                 a.state = p.state
             if p.mct is not None:
-                a.set_mct(p.mct[0], p.mct[1], p.mct[2], p.mct[3])
+                assert isinstance(p.mct, passengersim.config.MinConnectTime)
+                a.mct_dd = p.mct.domestic_domestic
+                a.mct_di = p.mct.domestic_international
+                a.mct_id = p.mct.international_domestic
+                a.mct_ii = p.mct.international_international
             self.airports[code] = a
             self.sim.add_airport(a)
 
@@ -492,7 +497,7 @@ class Simulation(BaseSimulation):
                 print(f"Added fare: {fare}")
             # self.fares.append(fare)
 
-        carrier_codes = {cxr.name: cxr for cxr in self.sim.carriers}
+        carriers = {cxr.name: cxr for cxr in self.sim.carriers}
         for path_config in config.paths:
             p = passengersim.core.Path(path_config.orig, path_config.dest, 0.0)
             p.path_quality_index = path_config.path_quality_index
@@ -511,10 +516,10 @@ class Simulation(BaseSimulation):
             assert (
                 tmp_leg.dest == path_config.dest
             ), "Path statement is corrupted, dest doesn't match"
-            path_carrier_code = tmp_leg.carrier
-            if path_carrier_code not in carrier_codes:
-                raise ValueError(f"Carrier {path_carrier_code} not found")
-            p.add_carrier(carrier_codes[path_carrier_code])
+            path_carrier_name = tmp_leg.carrier_name
+            if path_carrier_name not in carriers:
+                raise ValueError(f"Carrier {path_carrier_name} not found")
+            p.add_carrier(carriers[path_carrier_name])
             self.sim.add_path(p)
 
         # Go through and make sure things are linked correctly
@@ -1192,6 +1197,9 @@ class Simulation(BaseSimulation):
         local_fraction_dist_df = self.compute_leg_local_fraction_distribution(
             sim, to_log, to_db
         )
+        local_fraction_by_place = self.compute_local_fraction_by_place(
+            sim, to_log, to_db
+        )
 
         summary = SummaryTables(
             name=sim.name,
@@ -1207,6 +1215,7 @@ class Simulation(BaseSimulation):
             leg_avg_load_factor_distribution=leg_avg_load_factor_dist_df,
             raw_fare_class_mix=fare_class_dist_df,
             leg_local_fraction_distribution=local_fraction_dist_df,
+            local_fraction_by_place=local_fraction_by_place,
             n_total_samples=num_samples,
         )
         summary.load_additional_tables(self.cnx, sim.name, sim.burn_samples, additional)
@@ -1253,7 +1262,7 @@ class Simulation(BaseSimulation):
                 days_prior = self.dcp_list[dcp_index]
                 fare_df.append(
                     dict(
-                        carrier=f.carrier,
+                        carrier=f.carrier.name,
                         orig=f.orig,
                         dest=f.dest,
                         booking_class=f.booking_class,
@@ -1302,6 +1311,7 @@ class Simulation(BaseSimulation):
                 )
             leg_df.append(
                 dict(
+                    leg_id=leg.leg_id,
                     carrier=leg.carrier_name,
                     flt_no=leg.flt_no,
                     orig=leg.orig,
@@ -1688,7 +1698,7 @@ class Simulation(BaseSimulation):
         result = {}
         for carrier in sim.carriers:
             lf = pd.Series(
-                sim.distribution_local_by_carrier(carrier),
+                sim.distribution_local_leg_passengers(carrier),
                 index=pd.RangeIndex(101, name="local_fraction"),
                 name="frequency",
             )
@@ -1701,6 +1711,40 @@ class Simulation(BaseSimulation):
             )
         if to_db and to_db.is_open:
             to_db.save_dataframe("leg_local_fraction_distribution", df)
+        return df
+
+    def compute_local_fraction_by_place(
+        self,
+        sim: SimulationEngine,
+        to_log: bool = True,
+        to_db: database.Database | None = None,
+    ) -> pd.DataFrame:
+        """
+        Compute a report on the fraction of leg passengers who are local.
+
+        Parameters
+        ----------
+        sim
+        to_log
+        to_db
+
+        Returns
+        -------
+        pd.DataFrame
+        """
+        result = {}
+        for carrier in sim.carriers:
+            df = pd.Series(
+                sim.fraction_local_by_carrier_and_place(carrier.name),
+                name=carrier.name,
+            )
+            result[carrier.name] = df
+        if result:
+            df = pd.concat(result, axis=1, names=["carrier"])
+        else:
+            df = pd.DataFrame(index=[], columns=[])
+        if to_db and to_db.is_open:
+            to_db.save_dataframe("local_fraction_by_place", df)
         return df
 
     def reseed(self, seed: int | list[int] | None = 42):

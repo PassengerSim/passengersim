@@ -74,7 +74,9 @@ class MultiSimulation(BaseSimulation):
                 )
                 for trial_id in range(self.config.simulation_controls.num_trials)
             )
-        return SummaryTables.aggregate(results)
+        result = SummaryTables.aggregate(results)
+        result.config = self.config.model_copy(deep=True)
+        return result
 
     def sequential_run(self):
         results = []

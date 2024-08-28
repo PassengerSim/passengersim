@@ -43,6 +43,8 @@ from .snapshot_filter import SnapshotFilter
 from .todd_curves import ToddCurve
 
 if typing.TYPE_CHECKING:
+    from typing import Self
+
     from pydantic.main import IncEx
 
 logger = logging.getLogger("passengersim.config")
@@ -119,9 +121,9 @@ class YamlConfig(PrettyModel):
     def from_yaml(
         cls: type[TConfig],
         filenames: pathlib.Path | list[pathlib.Path],
-    ) -> TConfig:
+    ) -> Self:
         """
-        Read from YAML to an unvalidated addicty.Dict.
+        Read from YAML.
 
         Parameters
         ----------
@@ -135,6 +137,25 @@ class YamlConfig(PrettyModel):
         Config
         """
         raw_config = cls._load_unformatted_yaml(filenames)
+        return cls.model_validate(raw_config.to_dict())
+
+    @classmethod
+    def from_raw_yaml(cls, content: str | bytes) -> Self:
+        """
+        Read from raw YAML content.
+
+        Parameters
+        ----------
+        content : str or bytes
+            The YAML content to parse.
+
+        Returns
+        -------
+        Config
+        """
+        if isinstance(content, bytes):
+            content = content.decode("utf8")
+        raw_config = addicty.Dict.load(content, freeze=False, Loader=yaml.CSafeLoader)
         return cls.model_validate(raw_config.to_dict())
 
     tags: dict[str, Any] = {}

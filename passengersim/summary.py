@@ -12,10 +12,10 @@ import numpy as np
 import pandas as pd
 
 from . import database
+from .config import Config
 from .reporting import report_figure
 
 if TYPE_CHECKING:
-    from .config import Config
     from .driver import Simulation
 
 logger = logging.getLogger("passengersim.summary")
@@ -74,6 +74,81 @@ class SummaryTables:
         summary.cnx = db
         return summary
 
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        if "cnx" in state:
+            del state["cnx"]
+        if "config" in state:
+            # state["_config_yaml"] = state["config"].to_yaml()
+            del state["config"]
+        if "meta_trials" in state and not state.get("_preserve_meta_trials", True):
+            del state["meta_trials"]
+        if "_preserve_meta_trials" in state:
+            del state["_preserve_meta_trials"]
+        return state
+
+    def __setstate__(self, state):
+        # if "_config_yaml" in state:
+        #     state["config"] = Config.from_raw_yaml(state.pop("_config_yaml"))
+        self.__dict__.update(state)
+
+    def to_pickle(
+        self,
+        filename: str | pathlib.Path,
+        add_timestamp_ext: bool = True,
+        preserve_meta_trials: bool = False,
+    ):
+        """Save the object to a pickle file.
+
+        Parameters
+        ----------
+        filename : str or Path-like
+            The filename to save the object to.
+        add_timestamp_ext : bool, default True
+            Add a timestamp extension to the filename.
+        """
+        import pickle
+        import time
+
+        if add_timestamp_ext:
+            filename = pathlib.Path(filename)
+            timestamp = time.strftime("%Y%m%d-%H%M%S")
+            filename = filename.with_suffix(f".{timestamp}.pkl")
+
+        with open(filename, "wb") as f:
+            self._preserve_meta_trials = preserve_meta_trials
+            pickle.dump(self, f)
+            del self._preserve_meta_trials
+
+    @classmethod
+    def from_pickle(cls, filename: str | pathlib.Path, read_latest: bool = True):
+        """Load the object from a pickle file.
+
+        Parameters
+        ----------
+        filename : str or Path-like
+            The filename to load the object from.
+        read_latest : bool, default True
+            If True, read the latest file matching the pattern.
+        """
+        import glob
+        import pickle
+
+        if read_latest:
+            filename_glob = pathlib.Path(filename).with_suffix(".*.pkl")
+            files = sorted(glob.glob(str(filename_glob)))
+            if not files:
+                if not os.path.exists(filename):
+                    raise FileNotFoundError(filename)
+            else:
+                filename = files[-1]
+
+        with open(filename, "rb") as f:
+            result = pickle.load(f)
+            if result.__class__.__name__ != cls.__name__:
+                raise TypeError(f"Expected {cls}, got {type(result)}")
+            return result
+
     @classmethod
     def aggregate(cls, summaries: Collection[SummaryTables]):
         """Aggregate multiple summary tables."""
@@ -110,13 +185,41 @@ class SummaryTables:
         )
         demands = pd.concat([demands_avg, demands_sum], axis=1).reset_index()
 
+        # TODO: aggregate fares
+        # fares has some columns that are (weighted) averages and some that are sums
+        # fares_gt_adj_price = sum(
+        #     s.fares.set_index(
+        #     ["carrier", "orig", "dest", "booking_class", "dcp_index"]
+        #     ).eval("gt_sold * avg_adjusted_price")
+        #     for s in summaries
+        # )
+        # fares_avg = sum(
+        #     s.fares.set_index(
+        #     ["carrier", "orig", "dest", "booking_class", "dcp_index"]
+        #     )[
+        #         ["price", "gt_sold"]
+        #     ]
+        #     for s in summaries
+        # ) / len(summaries)
+        # fares_sum = sum(
+        #     s.fares.set_index(
+        #     ["carrier", "orig", "dest", "booking_class", "dcp_index"]
+        #     )[
+        #         ["gt_sold"]
+        #     ]
+        #     for s in summaries
+        # )
+
+        # TODO: aggregate path_classes
+
         # these are averages, but need to have the index values excluded
         # TODO: the index values should be set properly on the original dataframes
         carriers = sum(s.carriers.set_index("carrier") for s in summaries) / len(
             summaries
         )
         legs = sum(
-            s.legs.set_index(["carrier", "leg_id", "orig", "dest"]) for s in summaries
+            s.legs.set_index(["carrier", "leg_id", "flt_no", "orig", "dest"])
+            for s in summaries
         ) / len(summaries)
         legs = legs.reset_index()
         paths = sum(
@@ -155,6 +258,7 @@ class SummaryTables:
         raw_load_factor_distribution = sum_count("raw_load_factor_distribution")
         leg_avg_load_factor_distribution = sum_count("leg_avg_load_factor_distribution")
         raw_fare_class_mix = sum_count("raw_fare_class_mix")
+        leg_local_fraction_distribution = sum_count("leg_local_fraction_distribution")
 
         result = cls(
             demands=demands,
@@ -171,6 +275,7 @@ class SummaryTables:
             demand_to_come=demand_to_come,
             demand_to_come_summary=demand_to_come_summary,
             leg_avg_load_factor_distribution=leg_avg_load_factor_distribution,
+            leg_local_fraction_distribution=leg_local_fraction_distribution,
             raw_load_factor_distribution=raw_load_factor_distribution,
             raw_fare_class_mix=raw_fare_class_mix,
             n_total_samples=sum(s.n_total_samples for s in summaries),
@@ -440,6 +545,7 @@ class SummaryTables:
         raw_load_factor_distribution: pd.DataFrame | None = None,
         raw_fare_class_mix: pd.DataFrame | None = None,
         leg_local_fraction_distribution: pd.DataFrame | None = None,
+        local_fraction_by_place: pd.DataFrame | None = None,
         n_total_samples: int = 0,
     ):
         self.config = config
@@ -484,6 +590,9 @@ class SummaryTables:
 
         self.leg_local_fraction_distribution = leg_local_fraction_distribution
         """Fraction of local passengers on each leg."""
+
+        self.local_fraction_by_place = local_fraction_by_place
+        """Fraction of local passengers by place."""
 
         self.n_total_samples = n_total_samples
         """Total number of sample departures simulated to create these summaries.
@@ -1070,6 +1179,8 @@ class SummaryTables:
                 )
             return pd.concat({c: y}, names=["paxtype"])
 
+        if self.bookings_by_timeframe is None:
+            raise ValueError("bookings_by_timeframe not found")
         bookings_by_timeframe = self.bookings_by_timeframe.reset_index()
         df0 = _summarize(bookings_by_timeframe, "business")
         df1 = _summarize(bookings_by_timeframe, "leisure")

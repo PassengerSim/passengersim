@@ -1,8 +1,63 @@
 # Installation
 
-Install instructions will be here.
+```{note}
+PassengerSim is currently available only for Mac and Linux operating systems.
+Support for other operating systems is not planned for the near future.
+```
 
-## Docker Quick-start
+## Before you begin: install `conda` if needed
+
+PassengerSim is a Python package that is most easily installed in an environment
+managed by `conda`.  To check if you have `conda` installed, open a terminal
+and type `conda --version`.  If you see a version number, you have `conda`.
+
+If you have `conda`, but with an outdated version (i.e. less than 24), you can
+update it by running `conda update conda`.
+
+If you don't have `conda`, you can install it by pasting the following command
+into your terminal:
+
+```shell
+curl -L -O https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh
+bash Miniforge3-$(uname)-$(uname -m).sh
+```
+
+## Installing PassengerSim
+
+If you have received a file named something like `install-passengersim-mac-v0.0-20240101.sh`,
+you can use it to install PassengerSim in a conda environment.  To do so, open a terminal
+and navigate to the directory where the file is located.  Then, run the following command:
+
+```shell
+bash install-passengersim-mac-v0.0-20240101.sh
+```
+
+```{tip}
+Don't copy-paste the command above, as the exact filename of the installation script
+will vary based on the version of PassengerSim and the release data.  Instead, use the
+filename of the file you have received.
+```
+
+This should install PassengerSim in a conda environment named `SKY`.  If you already
+have a conda environment named `SKY`, the installation script will update the environment
+to the relevant version of PassengerSim.  If you prefer to install PassengerSim in a
+different environment (e.g. `myenv`), you can specify the environment name as an argument
+to the installation script:
+
+```shell
+bash install-passengersim-mac-v0.0-20240101.sh -n myenv
+```
+
+## Running PassengerSim
+
+After the installation is complete, you can start a Jupyter Lab session from the environment
+by running the following command:
+
+```shell
+conda run -n SKY jupyter lab
+```
+
+## Alternative Installation: Docker
 
 Do you have a link to a `sky` docker image file? If not, these are not the install
 instructions you are looking for. If you do have a link, go ahead and download

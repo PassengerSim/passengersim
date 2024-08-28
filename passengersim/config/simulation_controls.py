@@ -180,6 +180,7 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     """
 
     use_3seg: bool | None = False
+    generate_3seg: bool | None = False
     """
     Use the new A* search to build connections, it can create 3seg connects
 

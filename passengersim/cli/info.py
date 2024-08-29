@@ -15,8 +15,7 @@ def info():
    Core Version {__core_version__}
    Copyright (c) 2024 PassengerSim LLC
    This in-development tool is not for public distribution.
-   [red]This build expires {build_expiration().astimezone()}[/red]
-"""
+   [red]This build expires {build_expiration().astimezone()}[/red]"""
     )
     license_info()
     print(

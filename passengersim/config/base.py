@@ -57,6 +57,12 @@ def web_opener(x):
     return urlopen(x.parts[0] + "//" + "/".join(x.parts[1:]))
 
 
+class OptionalPath(pathlib.Path):
+    """A pathlib.Path that, if missing, is ignored by the Yaml loader."""
+
+    pass
+
+
 class YamlConfig(PrettyModel):
     @classmethod
     def _load_unformatted_yaml(
@@ -88,7 +94,8 @@ class YamlConfig(PrettyModel):
                 )
                 raw_config.update(content)
                 continue
-            filename = pathlib.Path(filename)
+            if not isinstance(filename, pathlib.Path):
+                filename = pathlib.Path(filename)
             if filename.suffix in (".pem", ".crt", ".cert"):
                 # license certificate
                 with open(filename, "rb") as f:
@@ -101,6 +108,8 @@ class YamlConfig(PrettyModel):
                         raise NotImplementedError(
                             "cannot load compressed files from web yet"
                         )
+                if isinstance(filename, OptionalPath) and not filename.exists():
+                    continue
                 with opener(filename) as f:
                     content = addicty.Dict.load(
                         f, freeze=False, Loader=yaml.CSafeLoader

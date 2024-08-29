@@ -7,7 +7,7 @@ except ImportError:
 
 from ._version import __version__, __version_tuple__
 from .cli.info import info  # noqa: F401
-from .config import Config
+from .config import Config, OptionalPath
 from .driver import Simulation
 from .mp_driver import MultiSimulation
 from .summary import SummaryTables
@@ -16,6 +16,7 @@ __all__ = [
     "Config",
     "Simulation",
     "MultiSimulation",
+    "OptionalPath",
     "SummaryTables",
     "demo_network",
     "__version__",

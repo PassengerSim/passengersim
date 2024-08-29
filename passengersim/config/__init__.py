@@ -2,7 +2,7 @@
 # DOC-NAME: 00-configs
 from __future__ import annotations
 
-from .base import Config
+from .base import Config, OptionalPath
 from .booking_curves import BookingCurve
 from .carriers import Carrier
 from .choice_model import ChoiceModel

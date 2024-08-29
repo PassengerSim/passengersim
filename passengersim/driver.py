@@ -592,6 +592,8 @@ class Simulation(BaseSimulation):
             )
             leg.dep_time = leg_config.dep_time
             leg.arr_time = leg_config.arr_time
+            leg.dep_time_offset = leg_config.dep_time_offset
+            leg.arr_time_offset = leg_config.arr_time_offset
             if leg_config.distance:
                 leg.distance = leg_config.distance
             elif len(self.airports) > 0:

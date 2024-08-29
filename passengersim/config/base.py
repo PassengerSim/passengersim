@@ -12,7 +12,7 @@ import sys
 import time
 import typing
 import warnings
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from urllib.request import urlopen
 
@@ -678,7 +678,7 @@ class Config(YamlConfig, extra="forbid"):
                         # Alan's approach
                         # It was converted as a local time, so unpack it and
                         #   create a new datetime in the given TZ
-                        dt = datetime.fromtimestamp(t)
+                        dt = datetime.fromtimestamp(t) #, tz=timezone.utc)
                         dt2 = datetime(
                             dt.year,
                             dt.month,
@@ -689,19 +689,22 @@ class Config(YamlConfig, extra="forbid"):
                             0,
                             tzinfo=tz,
                         )
-                        return int(dt2.timestamp())
-                return t
+                        new_ts = int(dt2.timestamp())
+                        return new_ts, t - new_ts
+                return t, 0
 
-            place_o = self.places.get(leg.orig, None)
-            leg.dep_time = adjust_time_zone(leg.dep_time, place_o)
-            leg.orig_timezone = str(place_o.time_zone_info) if place_o else None
-            place_d = self.places.get(leg.dest, None)
-            leg.arr_time = adjust_time_zone(leg.arr_time, place_d)
-            leg.dest_timezone = str(place_d.time_zone_info) if place_d else None
-            if place_o is None:
-                warnings.warn(f"No defined place for {leg.orig}", stacklevel=2)
-            if place_d is None:
-                warnings.warn(f"No defined place for {leg.dest}", stacklevel=2)
+            if not leg.time_adjusted:
+                place_o = self.places.get(leg.orig, None)
+                leg.dep_time, leg.dep_time_offset = adjust_time_zone(leg.dep_time, place_o)
+                leg.orig_timezone = str(place_o.time_zone_info) if place_o else None
+                place_d = self.places.get(leg.dest, None)
+                leg.arr_time, leg.arr_time_offset = adjust_time_zone(leg.arr_time, place_d)
+                leg.dest_timezone = str(place_d.time_zone_info) if place_d else None
+                if place_o is None:
+                    warnings.warn(f"No defined place for {leg.orig}", stacklevel=2)
+                if place_d is None:
+                    warnings.warn(f"No defined place for {leg.dest}", stacklevel=2)
+                leg.time_adjusted = True
         return self
 
     def __repr__(self):

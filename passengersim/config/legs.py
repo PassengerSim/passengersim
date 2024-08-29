@@ -66,6 +66,8 @@ class Leg(BaseModel, extra="forbid"):
 
     Unix time is the number of seconds since 00:00:00 UTC on 1 Jan 1970."""
 
+    dep_time_offset: int = 0
+
     @property
     def dep_localtime(self) -> datetime:
         """Departure time for this leg in local time at the origin."""
@@ -83,6 +85,8 @@ class Leg(BaseModel, extra="forbid"):
 
     Unix time is the number of seconds since 00:00:00 UTC on 1 Jan 1970."""
 
+    arr_time_offset: int = 0
+
     @property
     def arr_localtime(self) -> datetime:
         """Arrival time for this leg in local time at the destination."""
@@ -92,6 +96,7 @@ class Leg(BaseModel, extra="forbid"):
             t = t.astimezone(z)
         return t
 
+    time_adjusted: bool = False
     capacity: int | dict[str, int]
     distance: float | None = None
 

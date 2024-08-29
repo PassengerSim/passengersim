@@ -24,7 +24,7 @@ simulation_controls:
   capture_choice_set_file: choice-set.csv
   capture_choice_set_obs: 10000
   # Mountain Standard Time (for me)
-  controller_time_zone: -7
+  controller_time_zone: 0  # -7
   generate_3seg: true
   debug_connections: false
 

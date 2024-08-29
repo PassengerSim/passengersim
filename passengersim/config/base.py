@@ -694,6 +694,8 @@ class Config(YamlConfig, extra="forbid"):
                 return t, 0
 
             if not leg.time_adjusted:
+                if leg.orig == "DFW" and leg.dest == "CLE":
+                    pass
                 place_o = self.places.get(leg.orig, None)
                 leg.dep_time, leg.dep_time_offset = adjust_time_zone(leg.dep_time, place_o)
                 leg.orig_timezone = str(place_o.time_zone_info) if place_o else None

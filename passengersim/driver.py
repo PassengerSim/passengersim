@@ -161,7 +161,7 @@ class Simulation(BaseSimulation):
         self.sample_done_callback = lambda n, n_total: None
         self.choice_set_file = None
         self.choice_set_obs = 0
-        self.segmentation_by_timeframe: dict[int, pd.DataFrame] = {}
+        self.segmentation_data_by_timeframe: dict[int, pd.DataFrame] = {}
         """Bookings and revenue segmentation by timeframe.
 
         The key is the trial number, and the value is a DataFrame with a
@@ -783,7 +783,7 @@ class Simulation(BaseSimulation):
         if len(data) == 0:
             return None
         df = pd.concat(data, axis=0, names=["carrier"])
-        self.segmentation_by_timeframe[self.sim.trial] = df
+        self.segmentation_data_by_timeframe[self.sim.trial] = df
         return df
 
     def _run_single_trial(
@@ -1554,13 +1554,13 @@ class Simulation(BaseSimulation):
         return carrier_df
 
     def compute_segmentation_by_timeframe(self) -> pd.DataFrame | None:
-        if self.segmentation_by_timeframe:
+        if self.segmentation_data_by_timeframe:
             df = (
-                pd.concat(self.segmentation_by_timeframe, axis=0, names=["trial"])
+                pd.concat(self.segmentation_data_by_timeframe, axis=0, names=["trial"])
                 .reorder_levels(["trial", "carrier", "booking_class", "days_prior"])
                 .sort_index()
             )
-            df["Total"] = df.sum(axis=1)
+            # df["Total"] = df.sum(axis=1)
             return df
 
     @staticmethod

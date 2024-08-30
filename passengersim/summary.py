@@ -1403,6 +1403,98 @@ class SummaryTables:
             )
         )
 
+    def fig_segmentation_by_timeframe(
+        self,
+        by_carrier: bool | str = True,
+        by_class: bool | str = False,
+        raw_df: bool = False,
+        exclude_nogo: bool = True,
+    ):
+        if self.segmentation_by_timeframe is None:
+            raise ValueError("segmentation_by_timeframe not found")
+        df = self.segmentation_by_timeframe.stack().rename("sold").reset_index()
+
+        title = "Segmentation by Timeframe"
+        if by_class is True:
+            title = "Segmentation by Timeframe and Booking Class"
+        title_annot = []
+        if not by_carrier:
+            g = ["days_prior", "segment"]
+            if by_class:
+                g += ["booking_class"]
+            df = df.groupby(g, observed=False)[["sold"]].sum().reset_index()
+        if by_carrier and not by_class:
+            df = (
+                df.groupby(["carrier", "days_prior", "segment"], observed=False)[
+                    ["sold"]
+                ]
+                .sum()
+                .reset_index()
+            )
+        if isinstance(by_carrier, str):
+            df = df[df["carrier"] == by_carrier]
+            df = df.drop(columns=["carrier"])
+            title_annot.append(by_carrier)
+            by_carrier = False
+        if isinstance(by_class, str):
+            df = df[df["booking_class"] == by_class]
+            df = df.drop(columns=["booking_class"])
+            title_annot.append(f"Class {by_class}")
+            by_class = False
+        if title_annot:
+            title = f"{title} ({', '.join(title_annot)})"
+        if exclude_nogo and "carrier" in df.columns:
+            df = df[df["carrier"] != "NONE"]
+        if raw_df:
+            return df
+
+        import altair as alt
+
+        if by_carrier:
+            color = "carrier:N"
+            color_title = "Carrier"
+        elif by_class:
+            color = "booking_class:N"
+            color_title = "Booking Class"
+        else:
+            color = "segment:N"
+            color_title = "Passenger Type"
+
+        chart = (
+            alt.Chart(df)
+            .mark_bar()
+            .encode(
+                color=alt.Color(color).title(color_title),
+                x=alt.X("days_prior:O")
+                .scale(reverse=True)
+                .title("Days Prior to Departure"),
+                y=alt.Y("sold"),
+                tooltip=(
+                    [alt.Tooltip("carrier").title("Carrier")] if by_carrier else []
+                )
+                + (
+                    [alt.Tooltip("booking_class").title("Booking Class")]
+                    if by_class
+                    else []
+                )
+                + [
+                    alt.Tooltip("segment", title="Passenger Type"),
+                    alt.Tooltip("days_prior", title="Days Prior"),
+                    alt.Tooltip("sold", format=".2f", title="Sold"),
+                ],
+            )
+            .properties(
+                width=500,
+                height=200,
+            )
+            .facet(
+                row=alt.Row("segment:N", title="Passenger Type"),
+                title=title,
+            )
+            .configure_title(fontSize=18)
+        )
+        return chart
+
     def _fig_carrier_load_factors(
         self,
         raw_df: bool,

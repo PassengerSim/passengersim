@@ -161,6 +161,14 @@ class Simulation(BaseSimulation):
         self.sample_done_callback = lambda n, n_total: None
         self.choice_set_file = None
         self.choice_set_obs = 0
+        self.segmentation_by_timeframe: dict[int, pd.DataFrame] = {}
+        """Bookings and revenue segmentation by timeframe.
+
+        The key is the trial number, and the value is a DataFrame with a
+        breakdown of bookings and revenue by timeframe, customer segment,
+        carrier, and booking class.
+        """
+
         self._initialize(config)
         if not config.db:
             self.cnx = database.Database()
@@ -747,6 +755,34 @@ class Simulation(BaseSimulation):
                 else:
                     m.set_carrier_share(a.name, share)
 
+    def end_trial(self):
+        """End of trial processing."""
+        self.extract_segmentation_by_timeframe()
+        if self.cnx.is_open:
+            self.cnx.save_final(self.sim)
+
+    def extract_segmentation_by_timeframe(
+        self,
+    ):
+        # this should be run, if desired, at the end of each trial
+        num_samples = self.sim.num_samples - self.sim.burn_samples
+        data = {}
+        for carrier in self.sim.carriers:
+            carrier_data = {}
+            for segment, values in carrier.raw_bookings_by_segment_fare_dcp().items():
+                carrier_data[segment] = (
+                    pd.DataFrame.from_dict(values, "columns")
+                    .rename_axis(index="days_prior", columns="booking_class")
+                    .stack()
+                )
+            data[carrier.name] = (
+                pd.concat(carrier_data, axis=1, names=["segment"]).fillna(0)
+                / num_samples
+            )
+        df = pd.concat(data, axis=0, names=["carrier"])
+        self.segmentation_by_timeframe[self.sim.trial] = df
+        return df
+
     def _run_single_trial(
         self,
         trial: int,
@@ -826,8 +862,7 @@ class Simulation(BaseSimulation):
             self.end_sample()
 
         self.sim.num_trials_completed += 1
-        if self.cnx.is_open:
-            self.cnx.save_final(self.sim)
+        self.end_trial()
 
     def _run_sim(self):
         update_freq = self.update_frequency
@@ -1165,7 +1200,7 @@ class Simulation(BaseSimulation):
         additional=(
             "fare_class_mix",
             "load_factors",
-            "bookings_by_timeframe",
+            # "bookings_by_timeframe",
             "total_demand",
         ),
     ) -> SummaryTables:
@@ -1186,6 +1221,7 @@ class Simulation(BaseSimulation):
         path_df = self.compute_path_report(sim, to_log, to_db)
         path_classes_df = self.compute_path_class_report(sim, to_log, to_db)
         carrier_df = self.compute_carrier_report(sim, to_log, to_db)
+        segmentation_df = self.compute_segmentation_by_timeframe()
         raw_load_factor_dist_df = self.compute_raw_load_factor_distribution(
             sim, to_log, to_db
         )
@@ -1217,6 +1253,7 @@ class Simulation(BaseSimulation):
             leg_local_fraction_distribution=local_fraction_dist_df,
             local_fraction_by_place=local_fraction_by_place,
             n_total_samples=num_samples,
+            segmentation_by_timeframe=segmentation_df,
         )
         summary.load_additional_tables(self.cnx, sim.name, sim.burn_samples, additional)
         summary.cnx = self.cnx
@@ -1512,6 +1549,13 @@ class Simulation(BaseSimulation):
         if to_db and to_db.is_open:
             to_db.save_dataframe("carrier_summary", carrier_df)
         return carrier_df
+
+    def compute_segmentation_by_timeframe(self):
+        df = pd.concat(
+            self.segmentation_by_timeframe, axis=0, names=["trial"]
+        ).reorder_levels(["trial", "carrier", "booking_class", "days_prior"])
+        df["Total"] = df.sum(axis=1)
+        return df
 
     @staticmethod
     def compute_raw_load_factor_distribution(

@@ -289,6 +289,7 @@ def test_3mkt_01_fig_leg_forecasts(summary, dataframe_regression):
 
 @pytest.mark.parametrize("by_carrier", [False, True, "AL1"])
 @pytest.mark.parametrize("source", ["leg_avg", "raw", "db"])
+@pytest.mark.filterwarnings("error")
 def test_3mkt_01_fig_load_factor_grouped(
     summary, dataframe_regression, by_carrier, source: Literal["raw", "db"]
 ):

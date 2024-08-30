@@ -21,6 +21,7 @@ def summary() -> SummaryTables:
     return summary
 
 
+@pytest.mark.filterwarnings("error")
 def test_3mkt_dp_bookings_by_timeframe(summary, dataframe_regression):
     assert isinstance(summary, SummaryTables)
     dataframe_regression.check(
@@ -30,6 +31,7 @@ def test_3mkt_dp_bookings_by_timeframe(summary, dataframe_regression):
     )
 
 
+@pytest.mark.filterwarnings("error")
 def test_3mkt_dp_carriers(summary, dataframe_regression):
     assert isinstance(summary, SummaryTables)
     df = summary.carriers
@@ -43,6 +45,7 @@ def test_3mkt_dp_carriers(summary, dataframe_regression):
     )
 
 
+@pytest.mark.filterwarnings("error")
 def test_3mkt_dp_fare_class_mix(summary, dataframe_regression):
     assert isinstance(summary, SummaryTables)
     dataframe_regression.check(
@@ -52,6 +55,7 @@ def test_3mkt_dp_fare_class_mix(summary, dataframe_regression):
     )
 
 
+@pytest.mark.filterwarnings("error")
 def test_3mkt_dp_raw_fare_class_mix(summary, dataframe_regression):
     assert isinstance(summary, SummaryTables)
     dataframe_regression.check(
@@ -61,6 +65,7 @@ def test_3mkt_dp_raw_fare_class_mix(summary, dataframe_regression):
     )
 
 
+@pytest.mark.filterwarnings("error")
 def test_3mkt_dp_demand_to_come(summary, dataframe_regression):
     assert isinstance(summary, SummaryTables)
     dataframe_regression.check(

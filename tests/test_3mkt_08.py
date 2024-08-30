@@ -197,6 +197,7 @@ def test_3mkt_08_fig_bookings_by_timeframe(
     )
 
 
+@pytest.mark.filterwarnings("error")
 def test_3mkt_08_fig_carrier_load_factors(summary, dataframe_regression):
     assert isinstance(summary, SummaryTables)
     fig = summary.fig_carrier_load_factors()
@@ -209,6 +210,7 @@ def test_3mkt_08_fig_carrier_load_factors(summary, dataframe_regression):
     )
 
 
+@pytest.mark.filterwarnings("error")
 def test_3mkt_08_fig_carrier_mileage(summary, dataframe_regression):
     assert isinstance(summary, SummaryTables)
     fig = summary.fig_carrier_mileage()
@@ -224,6 +226,7 @@ def test_3mkt_08_fig_carrier_mileage(summary, dataframe_regression):
     )
 
 
+@pytest.mark.filterwarnings("error")
 def test_3mkt_08_fig_carrier_revenues(summary, dataframe_regression):
     assert isinstance(summary, SummaryTables)
     fig = summary.fig_carrier_revenues()
@@ -239,6 +242,7 @@ def test_3mkt_08_fig_carrier_revenues(summary, dataframe_regression):
     )
 
 
+@pytest.mark.filterwarnings("error")
 def test_3mkt_08_fig_carrier_yields(summary, dataframe_regression):
     assert isinstance(summary, SummaryTables)
     fig = summary.fig_carrier_yields()
@@ -251,6 +255,7 @@ def test_3mkt_08_fig_carrier_yields(summary, dataframe_regression):
     )
 
 
+@pytest.mark.filterwarnings("error")
 def test_3mkt_08_fig_fare_class_mix(summary, dataframe_regression):
     assert isinstance(summary, SummaryTables)
     fig = summary.fig_fare_class_mix()
@@ -263,6 +268,7 @@ def test_3mkt_08_fig_fare_class_mix(summary, dataframe_regression):
     )
 
 
+@pytest.mark.filterwarnings("error")
 def test_3mkt_08_fig_od_fare_class_mix(summary, dataframe_regression):
     assert isinstance(summary, SummaryTables)
     fig = summary.fig_od_fare_class_mix(orig="BOS", dest="ORD")

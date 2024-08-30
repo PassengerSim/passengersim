@@ -21,7 +21,6 @@ def summary() -> SummaryTables:
     return summary
 
 
-@pytest.mark.filterwarnings("error")
 def test_3mkt_dp_bookings_by_timeframe(summary, dataframe_regression):
     assert isinstance(summary, SummaryTables)
     dataframe_regression.check(

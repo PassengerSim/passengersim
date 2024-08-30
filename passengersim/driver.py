@@ -775,10 +775,13 @@ class Simulation(BaseSimulation):
                     .rename_axis(index="days_prior", columns="booking_class")
                     .stack()
                 )
-            data[carrier.name] = (
-                pd.concat(carrier_data, axis=1, names=["segment"]).fillna(0)
-                / num_samples
-            )
+            if carrier_data:
+                data[carrier.name] = (
+                    pd.concat(carrier_data, axis=1, names=["segment"]).fillna(0)
+                    / num_samples
+                )
+        if len(data) == 0:
+            return None
         df = pd.concat(data, axis=0, names=["carrier"])
         self.segmentation_by_timeframe[self.sim.trial] = df
         return df
@@ -1550,12 +1553,15 @@ class Simulation(BaseSimulation):
             to_db.save_dataframe("carrier_summary", carrier_df)
         return carrier_df
 
-    def compute_segmentation_by_timeframe(self):
-        df = pd.concat(
-            self.segmentation_by_timeframe, axis=0, names=["trial"]
-        ).reorder_levels(["trial", "carrier", "booking_class", "days_prior"])
-        df["Total"] = df.sum(axis=1)
-        return df
+    def compute_segmentation_by_timeframe(self) -> pd.DataFrame | None:
+        if self.segmentation_by_timeframe:
+            df = (
+                pd.concat(self.segmentation_by_timeframe, axis=0, names=["trial"])
+                .reorder_levels(["trial", "carrier", "booking_class", "days_prior"])
+                .sort_index()
+            )
+            df["Total"] = df.sum(axis=1)
+            return df
 
     @staticmethod
     def compute_raw_load_factor_distribution(

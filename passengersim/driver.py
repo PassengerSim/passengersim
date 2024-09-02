@@ -766,23 +766,28 @@ class Simulation(BaseSimulation):
     ):
         # this should be run, if desired, at the end of each trial
         num_samples = self.sim.num_samples - self.sim.burn_samples
-        data = {}
-        for carrier in self.sim.carriers:
-            carrier_data = {}
-            for segment, values in carrier.raw_bookings_by_segment_fare_dcp().items():
-                carrier_data[segment] = (
-                    pd.DataFrame.from_dict(values, "columns")
-                    .rename_axis(index="days_prior", columns="booking_class")
-                    .stack()
-                )
-            if carrier_data:
-                data[carrier.name] = (
-                    pd.concat(carrier_data, axis=1, names=["segment"]).fillna(0)
-                    / num_samples
-                )
-        if len(data) == 0:
-            return None
-        df = pd.concat(data, axis=0, names=["carrier"])
+        top_level = {}
+        for k in ("bookings", "revenue"):
+            data = {}
+            for carrier in self.sim.carriers:
+                carrier_data = {}
+                for segment, values in getattr(
+                    carrier, f"raw_{k}_by_segment_fare_dcp"
+                )().items():
+                    carrier_data[segment] = (
+                        pd.DataFrame.from_dict(values, "columns")
+                        .rename_axis(index="days_prior", columns="booking_class")
+                        .stack()
+                    )
+                if carrier_data:
+                    data[carrier.name] = (
+                        pd.concat(carrier_data, axis=1, names=["segment"]).fillna(0)
+                        / num_samples
+                    )
+            if len(data) == 0:
+                return None
+            top_level[k] = pd.concat(data, axis=0, names=["carrier"])
+        df = pd.concat(top_level, axis=1, names=["metric"])
         self.segmentation_data_by_timeframe[self.sim.trial] = df
         return df
 

@@ -1405,6 +1405,7 @@ class SummaryTables:
 
     def fig_segmentation_by_timeframe(
         self,
+        metric: Literal["bookings", "revenue"],
         by_carrier: bool | str = True,
         by_class: bool | str = False,
         raw_df: bool = False,
@@ -1412,21 +1413,21 @@ class SummaryTables:
     ):
         if self.segmentation_by_timeframe is None:
             raise ValueError("segmentation_by_timeframe not found")
-        df = self.segmentation_by_timeframe.stack().rename("sold").reset_index()
+        df = self.segmentation_by_timeframe[metric].stack().rename(metric).reset_index()
 
-        title = "Segmentation by Timeframe"
+        title = f"{metric.title()} by Timeframe"
         if by_class is True:
-            title = "Segmentation by Timeframe and Booking Class"
+            title = f"{metric.title()} by Timeframe and Booking Class"
         title_annot = []
         if not by_carrier:
             g = ["days_prior", "segment"]
             if by_class:
                 g += ["booking_class"]
-            df = df.groupby(g, observed=False)[["sold"]].sum().reset_index()
+            df = df.groupby(g, observed=False)[[metric]].sum().reset_index()
         if by_carrier and not by_class:
             df = (
                 df.groupby(["carrier", "days_prior", "segment"], observed=False)[
-                    ["sold"]
+                    [metric]
                 ]
                 .sum()
                 .reset_index()
@@ -1460,6 +1461,11 @@ class SummaryTables:
             color = "segment:N"
             color_title = "Passenger Type"
 
+        if metric == "revenue":
+            metric_fmt = "$,.0f"
+        else:
+            metric_fmt = ",.2f"
+
         chart = (
             alt.Chart(df)
             .mark_bar()
@@ -1468,7 +1474,7 @@ class SummaryTables:
                 x=alt.X("days_prior:O")
                 .scale(reverse=True)
                 .title("Days Prior to Departure"),
-                y=alt.Y("sold"),
+                y=alt.Y(metric),
                 tooltip=(
                     [alt.Tooltip("carrier").title("Carrier")] if by_carrier else []
                 )
@@ -1480,19 +1486,21 @@ class SummaryTables:
                 + [
                     alt.Tooltip("segment", title="Passenger Type"),
                     alt.Tooltip("days_prior", title="Days Prior"),
-                    alt.Tooltip("sold", format=".2f", title="Sold"),
+                    alt.Tooltip(metric, format=metric_fmt, title=metric.title()),
                 ],
             )
             .properties(
                 width=500,
                 height=200,
             )
-            .facet(
+        )
+        if by_carrier or by_class:
+            chart = chart.facet(
                 row=alt.Row("segment:N", title="Passenger Type"),
                 title=title,
-            )
-            .configure_title(fontSize=18)
-        )
+            ).configure_title(fontSize=18)
+        else:
+            chart = chart.configure_title(fontSize=18)
         return chart
 
     def _fig_carrier_load_factors(

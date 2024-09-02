@@ -91,7 +91,7 @@ def test_3mkt_08_bookings_by_timeframe(summary, dataframe_regression):
 def test_3mkt_08_segmentation_by_timeframe(summary, dataframe_regression):
     assert isinstance(summary, SummaryTables)
     dataframe_regression.check(
-        summary.segmentation_by_timeframe,
+        summary.segmentation_by_timeframe.stack(0),
         basename="segmentation_by_timeframe",
         default_tolerance=DEFAULT_TOLERANCE,
     )

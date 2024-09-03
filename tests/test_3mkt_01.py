@@ -110,6 +110,15 @@ def test_3mkt_01_bookings_by_timeframe(summary, dataframe_regression):
     )
 
 
+def test_3mkt_01_segmentation_by_timeframe(summary, dataframe_regression):
+    assert isinstance(summary, SummaryTables)
+    dataframe_regression.check(
+        summary.segmentation_by_timeframe.stack(0),
+        basename="segmentation_by_timeframe",
+        default_tolerance=DEFAULT_TOLERANCE,
+    )
+
+
 def test_3mkt_01_carriers(summary, dataframe_regression):
     assert isinstance(summary, SummaryTables)
     df = summary.carriers
@@ -289,6 +298,7 @@ def test_3mkt_01_fig_leg_forecasts(summary, dataframe_regression):
 
 @pytest.mark.parametrize("by_carrier", [False, True, "AL1"])
 @pytest.mark.parametrize("source", ["leg_avg", "raw", "db"])
+@pytest.mark.filterwarnings("error")
 def test_3mkt_01_fig_load_factor_grouped(
     summary, dataframe_regression, by_carrier, source: Literal["raw", "db"]
 ):

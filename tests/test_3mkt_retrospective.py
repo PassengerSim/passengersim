@@ -5,7 +5,6 @@ from passengersim import Simulation, demo_network
 from passengersim.config import Config
 from passengersim.contrast import Contrast
 from passengersim.summary import SummaryTables
-from passengersim.utils.tempdir import TemporaryDirectory
 
 DEFAULT_TOLERANCE = dict(rtol=2e-02, atol=1e-06)
 
@@ -14,7 +13,6 @@ DEFAULT_TOLERANCE = dict(rtol=2e-02, atol=1e-06)
 def stored_results(tmp_path_factory) -> Contrast:
     retrospect = tmp_path_factory.mktemp("retrospect")
 
-    TemporaryDirectory()
     cfg = Config.from_yaml(demo_network("3MKT/08-untrunc-em"))
     cfg.simulation_controls.num_trials = 1
     cfg.simulation_controls.num_samples = 400

@@ -168,6 +168,7 @@ class SummaryTables:
 
         carrier_history = concat("carrier_history")
         bookings_by_timeframe = concat("bookings_by_timeframe")
+        segmentation_by_timeframe = concat("segmentation_by_timeframe")
         demand_to_come = concat("demand_to_come")
 
         # demands has some columns that are averages and some that are sums
@@ -270,6 +271,7 @@ class SummaryTables:
             path_forecasts=path_forecasts,
             carrier_history=carrier_history,
             bookings_by_timeframe=bookings_by_timeframe,
+            segmentation_by_timeframe=segmentation_by_timeframe,
             bid_price_history=bid_price_history,
             displacement_history=displacement_history,
             demand_to_come=demand_to_come,
@@ -529,6 +531,7 @@ class SummaryTables:
         fare_class_mix: pd.DataFrame | None = None,
         load_factors: pd.DataFrame | None = None,
         bookings_by_timeframe: pd.DataFrame | None = None,
+        segmentation_by_timeframe: pd.DataFrame | None = None,
         total_demand: float | None = None,
         od_fare_class_mix: dict[tuple[str, str], pd.DataFrame] | None = None,
         leg_forecasts: pd.DataFrame | None = None,
@@ -567,6 +570,7 @@ class SummaryTables:
         self.od_fare_class_mix = od_fare_class_mix
         self.load_factors = load_factors
         self.bookings_by_timeframe = bookings_by_timeframe
+        self.segmentation_by_timeframe = segmentation_by_timeframe
         self.total_demand = total_demand
         self.leg_forecasts = leg_forecasts
         self.path_forecasts = path_forecasts
@@ -729,7 +733,7 @@ class SummaryTables:
         import altair as alt
 
         label_threshold_value = (
-            df.groupby("carrier").avg_sold.sum().max() * label_threshold
+            df.groupby("carrier", observed=False).avg_sold.sum().max() * label_threshold
         )
         chart = alt.Chart(
             df, **({"title": title} if title else {})
@@ -869,7 +873,7 @@ class SummaryTables:
                     )
                 df_for_chart = (
                     self.raw_load_factor_distribution.rename_axis(columns="carrier")
-                    .stack()
+                    .stack(future_stack=True)
                     .rename("Count")
                     .reset_index()
                 )
@@ -882,7 +886,7 @@ class SummaryTables:
                     )
                 df_for_chart = (
                     self.leg_avg_load_factor_distribution.rename_axis(columns="carrier")
-                    .stack()
+                    .stack(future_stack=True)
                     .rename("Count")
                     .reset_index()
                 )
@@ -934,14 +938,18 @@ class SummaryTables:
             df_for_chart = self.load_factor_distribution
             df_for_chart.columns.names = ["Load Factor Range"]
             df_for_chart = df_for_chart.set_index("carrier")
-            df_for_chart = df_for_chart.stack().rename("Count").reset_index()
+            df_for_chart = (
+                df_for_chart.stack(future_stack=True).rename("Count").reset_index()
+            )
 
         else:
             raise ValueError(f"Unknown source {source}, should be 'raw' or 'db'")
 
         if not by_carrier:
             df_for_chart = (
-                df_for_chart.groupby(["Load Factor Range"]).Count.sum().reset_index()
+                df_for_chart.groupby(["Load Factor Range"], observed=False)
+                .Count.sum()
+                .reset_index()
             )
         elif isinstance(by_carrier, str):
             df_for_chart = df_for_chart[df_for_chart["carrier"] == by_carrier]
@@ -1033,7 +1041,7 @@ class SummaryTables:
             )
         df_for_chart = (
             self.leg_local_fraction_distribution.rename_axis(columns="carrier")
-            .stack()
+            .stack(future_stack=True)
             .rename("Count")
             .reset_index()
         )
@@ -1077,7 +1085,7 @@ class SummaryTables:
 
         if not by_carrier:
             df_for_chart = (
-                df_for_chart.groupby(["Leg Local Fraction Range"])
+                df_for_chart.groupby(["Leg Local Fraction Range"], observed=False)
                 .Count.sum()
                 .reset_index()
             )
@@ -1149,14 +1157,15 @@ class SummaryTables:
                 x = x.assign(trial=0)
             if by_class:
                 y = (
-                    x.groupby(["trial", "carrier", "booking_class", "days_prior"])[
-                        f"avg_{c}"
-                    ]
+                    x.groupby(
+                        ["trial", "carrier", "booking_class", "days_prior"],
+                        observed=False,
+                    )[f"avg_{c}"]
                     .sum()
                     .unstack(["trial", "carrier", "booking_class"])
                     .sort_index(ascending=False)
                     .apply(differs)
-                    .stack(["carrier", "booking_class"])
+                    .stack(["carrier", "booking_class"], future_stack=True)
                     .aggregate(["mean", "sem"], axis=1)
                     .assign(
                         ci0=lambda x: np.maximum(x["mean"] - 1.96 * x["sem"], 0),
@@ -1165,12 +1174,14 @@ class SummaryTables:
                 )
             else:
                 y = (
-                    x.groupby(["trial", "carrier", "days_prior"])[f"avg_{c}"]
+                    x.groupby(["trial", "carrier", "days_prior"], observed=False)[
+                        f"avg_{c}"
+                    ]
                     .sum()
                     .unstack(["trial", "carrier"])
                     .sort_index(ascending=False)
                     .apply(differs)
-                    .stack("carrier")
+                    .stack("carrier", future_stack=True)
                     .aggregate(["mean", "sem"], axis=1)
                     .assign(
                         ci0=lambda x: np.maximum(x["mean"] - 1.96 * x["sem"], 0),
@@ -1198,7 +1209,11 @@ class SummaryTables:
             g = ["days_prior", "paxtype"]
             if by_class:
                 g += ["booking_class"]
-            df = df.groupby(g)[["sold", "ci0", "ci1"]].sum().reset_index()
+            df = (
+                df.groupby(g, observed=False)[["sold", "ci0", "ci1"]]
+                .sum()
+                .reset_index()
+            )
         if isinstance(by_carrier, str):
             df = df[df["carrier"] == by_carrier]
             df = df.drop(columns=["carrier"])
@@ -1302,12 +1317,14 @@ class SummaryTables:
 
         def _summarize(x, c):
             y = (
-                x.groupby(["trial", "carrier", "days_prior"])[f"avg_{c}"]
+                x.groupby(["trial", "carrier", "days_prior"], observed=False)[
+                    f"avg_{c}"
+                ]
                 .sum()
                 .unstack(["trial", "carrier"])
                 .sort_index(ascending=False)
                 .apply(differs)
-                .stack("carrier")
+                .stack("carrier", future_stack=True)
                 .aggregate(["mean", "sem"], axis=1)
                 .assign(
                     ci0=lambda x: x["mean"] - 1.96 * x["sem"],
@@ -1326,7 +1343,9 @@ class SummaryTables:
         )
         if not by_carrier:
             df = (
-                df.groupby(["days_prior", "paxtype"])[["sold", "ci0", "ci1"]]
+                df.groupby(["days_prior", "paxtype"], observed=False)[
+                    ["sold", "ci0", "ci1"]
+                ]
                 .sum()
                 .reset_index()
             )
@@ -1383,6 +1402,106 @@ class SummaryTables:
                 labelFontSize=15,
             )
         )
+
+    def fig_segmentation_by_timeframe(
+        self,
+        metric: Literal["bookings", "revenue"],
+        by_carrier: bool | str = True,
+        by_class: bool | str = False,
+        raw_df: bool = False,
+        exclude_nogo: bool = True,
+    ):
+        if self.segmentation_by_timeframe is None:
+            raise ValueError("segmentation_by_timeframe not found")
+        df = self.segmentation_by_timeframe[metric].stack().rename(metric).reset_index()
+
+        title = f"{metric.title()} by Timeframe"
+        if by_class is True:
+            title = f"{metric.title()} by Timeframe and Booking Class"
+        title_annot = []
+        if not by_carrier:
+            g = ["days_prior", "segment"]
+            if by_class:
+                g += ["booking_class"]
+            df = df.groupby(g, observed=False)[[metric]].sum().reset_index()
+        if by_carrier and not by_class:
+            df = (
+                df.groupby(["carrier", "days_prior", "segment"], observed=False)[
+                    [metric]
+                ]
+                .sum()
+                .reset_index()
+            )
+        if isinstance(by_carrier, str):
+            df = df[df["carrier"] == by_carrier]
+            df = df.drop(columns=["carrier"])
+            title_annot.append(by_carrier)
+            by_carrier = False
+        if isinstance(by_class, str):
+            df = df[df["booking_class"] == by_class]
+            df = df.drop(columns=["booking_class"])
+            title_annot.append(f"Class {by_class}")
+            by_class = False
+        if title_annot:
+            title = f"{title} ({', '.join(title_annot)})"
+        if exclude_nogo and "carrier" in df.columns:
+            df = df[df["carrier"] != "NONE"]
+        if raw_df:
+            return df
+
+        import altair as alt
+
+        if by_carrier:
+            color = "carrier:N"
+            color_title = "Carrier"
+        elif by_class:
+            color = "booking_class:N"
+            color_title = "Booking Class"
+        else:
+            color = "segment:N"
+            color_title = "Passenger Type"
+
+        if metric == "revenue":
+            metric_fmt = "$,.0f"
+        else:
+            metric_fmt = ",.2f"
+
+        chart = (
+            alt.Chart(df)
+            .mark_bar()
+            .encode(
+                color=alt.Color(color).title(color_title),
+                x=alt.X("days_prior:O")
+                .scale(reverse=True)
+                .title("Days Prior to Departure"),
+                y=alt.Y(metric),
+                tooltip=(
+                    [alt.Tooltip("carrier").title("Carrier")] if by_carrier else []
+                )
+                + (
+                    [alt.Tooltip("booking_class").title("Booking Class")]
+                    if by_class
+                    else []
+                )
+                + [
+                    alt.Tooltip("segment", title="Passenger Type"),
+                    alt.Tooltip("days_prior", title="Days Prior"),
+                    alt.Tooltip(metric, format=metric_fmt, title=metric.title()),
+                ],
+            )
+            .properties(
+                width=500,
+                height=200,
+            )
+        )
+        if by_carrier or by_class:
+            chart = chart.facet(
+                row=alt.Row("segment:N", title="Passenger Type"),
+                title=title,
+            ).configure_title(fontSize=18)
+        else:
+            chart = chart.configure_title(fontSize=18)
+        return chart
 
     def _fig_carrier_load_factors(
         self,

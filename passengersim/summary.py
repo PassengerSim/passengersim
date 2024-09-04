@@ -1413,7 +1413,12 @@ class SummaryTables:
     ):
         if self.segmentation_by_timeframe is None:
             raise ValueError("segmentation_by_timeframe not found")
-        df = self.segmentation_by_timeframe[metric].stack().rename(metric).reset_index()
+        df = self.segmentation_by_timeframe
+        idxs = list(df.index.names)
+        if "trial" in idxs:
+            idxs.remove("trial")
+            df = df.groupby(idxs).mean()
+        df = df[metric].stack().rename(metric).reset_index()
 
         title = f"{metric.title()} by Timeframe"
         if by_class is True:

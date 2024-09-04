@@ -64,6 +64,12 @@ class MultiSimulation(BaseSimulation):
     #     return summary
 
     def run(self):
+        if self.config.raw_license_certificate is None:
+            try:
+                from passengersim_license import raw_license_certificate
+            except ImportError:
+                raw_license_certificate = None
+            self.config.raw_license_certificate = raw_license_certificate
         with joblib.Parallel(
             n_jobs=self.config.simulation_controls.num_trials
         ) as parallel:

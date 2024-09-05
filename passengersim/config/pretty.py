@@ -22,6 +22,8 @@ class PrettyModel(BaseModel):
             if "\n" in val:
                 val_lines = val.split("\n")
                 val = "\n  " + "\n  ".join(val_lines)
+            elif isinstance(v, list):
+                val = "\n  - " + "\n  - ".join(repr(j) for j in v)
             x.append(f"{i}{k}: {val}")
         return "\n".join(x)
 
@@ -45,5 +47,7 @@ def repr_dict_with_indent(d: dict[str, Any], indent=0):
         if "\n" in val:
             val_lines = val.split("\n")
             val = "\n  " + "\n  ".join(val_lines)
+        elif isinstance(v, list):
+            val = "\n  - " + "\n  - ".join(repr(j) for j in v)
         x.append(f"{i}{k}: {val}")
     return "\n".join(x)

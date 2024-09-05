@@ -4,7 +4,7 @@
 
 scenario: AW_test
 simulation_controls:
-  num_trials: 5
+  num_trials: 35
   num_samples: 600
 #  random_seed: 42
   sys_k_factor: 0.1
@@ -763,7 +763,7 @@ choice_models:
 
 carriers:
   - name: AL1
-    rm_system: rm_leg
+    rm_system: rm_pro_bp
     frat5: curve_G
     #    fare_adjustment_scale: 0.3
     #    load_factor_curve: lf_curve1
@@ -777,7 +777,7 @@ carriers:
       - (Y4, Y)
       - (Y5, Y)
   - name: AL2
-    rm_system: rm_hybrid
+    rm_system: rm_lp
     frat5: curve_C
     fare_adjustment_scale: 0.5
     load_factor_curve: lf_curve1

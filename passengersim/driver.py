@@ -35,6 +35,7 @@ from passengersim.core import (
     SimulationEngine,
 )
 from passengersim.summary import SummaryTables
+from passengersim.utils.nested_dict import from_nested_dict  # noqa: F401
 from passengersim.utils.si import si_units  # noqa: F401
 
 from . import database
@@ -1243,6 +1244,7 @@ class Simulation(BaseSimulation):
         fare_class_dist_df = self.compute_raw_fare_class_mix(sim, to_log, to_db)
         bid_price_history_df = self.compute_bid_price_history(sim, to_log, to_db)
         displacement_df = self.compute_displacement_history(sim, to_log, to_db)
+        demand_to_come_df = self.compute_demand_to_come_summary(sim, to_log, to_db)
         local_fraction_dist_df = self.compute_leg_local_fraction_distribution(
             sim, to_log, to_db
         )
@@ -1268,6 +1270,7 @@ class Simulation(BaseSimulation):
             n_total_samples=num_samples,
             segmentation_by_timeframe=segmentation_df,
             displacement_history=displacement_df,
+            demand_to_come_summary=demand_to_come_df,
         )
         summary.load_additional_tables(self.cnx, sim.name, sim.burn_samples, additional)
         summary.cnx = self.cnx
@@ -1770,6 +1773,22 @@ class Simulation(BaseSimulation):
         df = df.fillna(0)
         if to_db and to_db.is_open:
             to_db.save_dataframe("displacement_history", df)
+        return df
+
+    @staticmethod
+    def compute_demand_to_come_summary(
+        sim: SimulationEngine,
+        to_log: bool = True,
+        to_db: database.Database | None = None,
+    ) -> pd.DataFrame:
+        raw = sim.summary_demand_to_come()
+        df = (
+            from_nested_dict(raw, ["segment", "days_prior", "metric"])
+            .sort_index(ascending=[True, False])
+            .rename(
+                columns={"mean": "mean_future_demand", "stdev": "stdev_future_demand"}
+            )
+        )
         return df
 
     def compute_leg_local_fraction_distribution(

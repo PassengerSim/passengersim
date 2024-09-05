@@ -13,12 +13,18 @@ from .summary import SummaryTables
 
 class Contrast(dict):
     def apply(
-        self, func: Callable, axis: int | Literal["index", "columns", "rows"] = 0
+        self,
+        func: Callable,
+        axis: int | Literal["index", "columns", "rows"] = 0,
+        warn_if_missing: bool = False,
     ) -> pd.DataFrame | pd.Series:
         data = {}
         for k, v in self.items():
             if v is not None:
                 data[k] = func(v)
+            else:
+                if warn_if_missing:
+                    warnings.warn(f"no data found for {k!r}", stacklevel=2)
         try:
             return pd.concat(data, axis=axis, names=["source"])
         except TypeError:
@@ -246,6 +252,216 @@ def fig_bookings_by_timeframe(
                     alt.Tooltip("paxtype", title="Passenger Type"),
                     alt.Tooltip("days_prior", title="DfD"),
                     alt.Tooltip("sold", format=".2f"),
+                    *ratio_tooltips,
+                ],
+            )
+            .properties(
+                width=500,
+                height=300,
+            )
+            .configure_axis(
+                labelFontSize=12,
+                titleFontSize=12,
+            )
+            .configure_legend(
+                titleFontSize=12,
+                labelFontSize=15,
+            )
+            .configure_title(fontSize=18)
+        )
+
+
+@report_figure
+def fig_segmentation_by_timeframe(
+    summaries: dict[str, SummaryTables],
+    metric: Literal["bookings", "revenue"],
+    by_carrier: bool | str = True,
+    by_class: bool | str = False,
+    raw_df=False,
+    source_labels: bool = False,
+    ratio: str | bool = False,
+) -> alt.Chart | pd.DataFrame:
+    """
+    Generate a figure contrasting segmentation by timeframe for one or more runs.
+
+    Parameters
+    ----------
+    summaries : dict[str, SummaryTables]
+        One or more SummaryTables to compare. The keys of this dictionary are the
+        text names used to label the "source" for each set of data in the figure.
+    metric : {'bookings', 'revenue'}
+        The metric to display for the segmentation.
+    by_carrier : bool or str, default True
+        Whether to differentiate carriers by colors (the default) or give the name
+        of a particular carrier as a string to filter the results shown in the
+        figure to only that one carrier.
+    by_class : bool or str, default False
+        Whether to differentiate booking class by colors (the default) or give the
+        name of a particular booking class as a string to filter the results shown
+        in the figure to only that one booking class.
+    raw_df : bool, default False
+        Set to true to return the raw dataframe used to generate the figure, instead
+        of the figure itself.
+    source_labels : bool, default False
+        Write source labels above the columns of the figure. Source labels are also
+        available as tool tips, but if the figure is being shared as an image without
+        tooltips, the source labels may make it easier to interpret.
+    ratio : str or bool, default False
+        Compute ratios against a reference point and display them in tooltips.
+
+    Other Parameters
+    ----------------
+    report : xmle.Reporter, optional
+        Giving a reporter for this keyword only argument allow you to automatically
+        append this figure to the report (in addition to returning it for display
+        or other processing).
+    trace : pd.ExcelWriter or (pd.ExcelWriter, str), optional
+        Write the raw dataframe backing this figure to the Excel workbook.
+    """
+    if by_carrier is True and by_class is True:
+        raise NotImplementedError("comparing by both class and carrier is messy")
+    df = _assemble(
+        summaries,
+        "segmentation_by_timeframe",
+        metric=metric,
+        by_carrier=by_carrier,
+        by_class=by_class,
+    )
+    source_order = list(summaries.keys())
+
+    title = f"{metric.title()} by Timeframe"
+    if by_class is True:
+        title = f"{metric.title()} by Timeframe and Booking Class"
+    title_annot = []
+    if isinstance(by_carrier, str):
+        title_annot.append(by_carrier)
+    if isinstance(by_class, str):
+        title_annot.append(f"Class {by_class}")
+    if title_annot:
+        title = f"{title} ({', '.join(title_annot)})"
+
+    against = source_order[0]
+    ratio_tooltips = ()
+    if ratio:
+        if isinstance(ratio, str):
+            against = ratio
+        idx = list(
+            {"source", "carrier", "segment", "days_prior", "booking_class"}
+            & set(df.columns)
+        )
+        df_ = df.set_index(idx)
+        ratios = df_.div(df_.query(f"source == '{against}'").droplevel("source")) - 1.0
+        ratios.columns = ["ratio"]
+        df = df.join(ratios, on=idx)
+        ratio_tooltips = (alt.Tooltip("ratio:Q", title=f"vs {against}", format=".3%"),)
+
+    if raw_df:
+        df.attrs["title"] = title
+        return df
+
+    if by_class:
+        if isinstance(by_class, str):
+            color = alt.Color("source:N", title="Source", sort=source_order).title(
+                "Source"
+            )
+            tooltips = ()
+        else:
+            color = alt.Color("booking_class:N").title("Booking Class")
+            tooltips = (alt.Tooltip("booking_class", title="Booking Class"),)
+        chart = alt.Chart(df.sort_values("source", ascending=False))
+        chart_1 = chart.mark_bar().encode(
+            color=color,
+            x=alt.X("days_prior:O")
+            .scale(reverse=True)
+            .title("Days Prior to Departure"),
+            xOffset=alt.XOffset("source:N", title="Source", sort=source_order),
+            y=alt.Y(metric, stack=True),
+            tooltip=[
+                alt.Tooltip("source:N", title="Source"),
+                alt.Tooltip("segment", title="Passenger Type"),
+                *tooltips,
+                alt.Tooltip("days_prior", title="Days Prior"),
+                alt.Tooltip(metric, format=".2f"),
+                *ratio_tooltips,
+            ],
+        )
+        chart_2 = chart.mark_text(
+            color="#616161",
+            yOffset=-2,
+            angle=270,
+            fontSize=8,
+            baseline="middle",
+            align="left",
+        ).encode(
+            text=alt.Text("source:N", title="Source"),
+            x=alt.X("days_prior:O")
+            .scale(reverse=True)
+            .title("Days Prior to Departure"),
+            xOffset=alt.XOffset("source:N", title="Source", sort=source_order),
+            # shape=alt.Shape("source:N", title="Source", sort=source_order),
+            y=alt.Y(f"sum({metric})", title=None),
+        )
+        return (
+            ((chart_1 + chart_2) if source_labels else chart_1)
+            .properties(
+                width=500,
+                height=200,
+            )
+            .facet(
+                row=alt.Row("segment:N", title="Passenger Type"),
+                title=title,
+            )
+            .configure_title(fontSize=18)
+        )
+    elif by_carrier is True:
+        return (
+            alt.Chart(df.sort_values("source", ascending=False))
+            .mark_bar()
+            .encode(
+                color=alt.Color("carrier:N").title("Carrier"),
+                x=alt.X("days_prior:O")
+                .scale(reverse=True)
+                .title("Days Prior to Departure"),
+                xOffset=alt.XOffset("source:N", title="Source", sort=source_order),
+                y=alt.Y(metric, stack=True, title=metric.title()),
+                tooltip=[
+                    alt.Tooltip("source:N", title="Source"),
+                    alt.Tooltip("segment", title="Passenger Type"),
+                    alt.Tooltip("carrier", title="Carrier"),
+                    alt.Tooltip("days_prior", title="Days Prior"),
+                    alt.Tooltip(metric, format=".2f"),
+                    *ratio_tooltips,
+                ],
+            )
+            .properties(
+                width=500,
+                height=200,
+            )
+            .facet(
+                row=alt.Row("segment:N", title="Passenger Type"),
+                title=title,
+            )
+            .configure_title(fontSize=18)
+        )
+    else:
+        return (
+            alt.Chart(df.sort_values("source", ascending=False), title=title)
+            .mark_line()
+            .encode(
+                color=alt.Color("source:N", title="Source", sort=source_order),
+                x=alt.X("days_prior:O")
+                .scale(reverse=True)
+                .title("Days Prior to Departure"),
+                y=metric,
+                strokeDash=alt.StrokeDash("segment").title("Passenger Type"),
+                strokeWidth=alt.StrokeWidth(
+                    "source:N", title="Source", sort=source_order
+                ),
+                tooltip=[
+                    alt.Tooltip("source:N", title="Source"),
+                    alt.Tooltip("segment", title="Passenger Type"),
+                    alt.Tooltip("days_prior", title="Days Prior"),
+                    alt.Tooltip(metric, format=".2f"),
                     *ratio_tooltips,
                 ],
             )
@@ -924,16 +1140,14 @@ def fig_demand_to_come(
     if func == "mean":
         y_title = "Mean Demand to Come"
         demand_to_come_by_segment = summaries.apply(
-            lambda s: get_values(s, "mean"),
-            axis=1,
+            lambda s: get_values(s, "mean"), axis=1, warn_if_missing=True
         )
         demand_to_come_by_segment.index.names = ["segment", "days_prior"]
         df = demand_to_come_by_segment.stack().rename("dtc").reset_index()
     elif func == "std":
         y_title = "Std Dev Demand to Come"
         demand_to_come_by_segment = summaries.apply(
-            lambda s: get_values(s, "std"),
-            axis=1,
+            lambda s: get_values(s, "std"), axis=1, warn_if_missing=True
         )
         demand_to_come_by_segment.index.names = ["segment", "days_prior"]
         df = demand_to_come_by_segment.stack().rename("dtc").reset_index()

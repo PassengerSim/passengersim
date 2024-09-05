@@ -1020,6 +1020,8 @@ class Simulation(BaseSimulation):
                     self.file_writer.save_details(self.sim, recording_day)
 
             # simulation statistics record
+            if event_type.lower() in {"dcp", "done"}:
+                self.sim.record_dcp_statistics(recording_day)
             self.sim.record_daily_statistics(recording_day)
 
         except Exception as e:
@@ -1240,6 +1242,7 @@ class Simulation(BaseSimulation):
         )
         fare_class_dist_df = self.compute_raw_fare_class_mix(sim, to_log, to_db)
         bid_price_history_df = self.compute_bid_price_history(sim, to_log, to_db)
+        displacement_df = self.compute_displacement_history(sim, to_log, to_db)
         local_fraction_dist_df = self.compute_leg_local_fraction_distribution(
             sim, to_log, to_db
         )
@@ -1264,6 +1267,7 @@ class Simulation(BaseSimulation):
             local_fraction_by_place=local_fraction_by_place,
             n_total_samples=num_samples,
             segmentation_by_timeframe=segmentation_df,
+            displacement_history=displacement_df,
         )
         summary.load_additional_tables(self.cnx, sim.name, sim.burn_samples, additional)
         summary.cnx = self.cnx
@@ -1706,7 +1710,7 @@ class Simulation(BaseSimulation):
         to_log: bool = True,
         to_db: database.Database | None = None,
     ) -> pd.DataFrame:
-        """Compute the bid price history for each leg."""
+        """Compute the average bid price history for each carrier."""
         result = {}
         for carrier in sim.carriers:
             bp = carrier.raw_bid_price_trace()
@@ -1734,6 +1738,38 @@ class Simulation(BaseSimulation):
         df = df.fillna(0)
         if to_db and to_db.is_open:
             to_db.save_dataframe("bid_price_history", df)
+        return df
+
+    @staticmethod
+    def compute_displacement_history(
+        sim: SimulationEngine,
+        to_log: bool = True,
+        to_db: database.Database | None = None,
+    ) -> pd.DataFrame:
+        """Compute the average displacement cost history for each carrier."""
+        result = {}
+        for carrier in sim.carriers:
+            bp = carrier.raw_displacement_cost_trace()
+            result[carrier.name] = (
+                pd.DataFrame.from_dict(bp, orient="index")
+                .sort_index(ascending=False)
+                .rename_axis(index="days_prior")
+            )
+        if result:
+            df = pd.concat(result, axis=0, names=["carrier"])
+        else:
+            df = pd.DataFrame(
+                columns=[
+                    "displacement_mean",
+                    "displacement_stdev",
+                ],
+                index=pd.MultiIndex(
+                    [[], []], [[], []], names=["carrier", "days_prior"]
+                ),
+            )
+        df = df.fillna(0)
+        if to_db and to_db.is_open:
+            to_db.save_dataframe("displacement_history", df)
         return df
 
     def compute_leg_local_fraction_distribution(

@@ -522,6 +522,7 @@ class SummaryTables:
         config: Config | None = None,
         cnx: database.Database | None = None,
         sim: Simulation | None = None,
+        class_dist: pd.DataFrame | None = None,
         demands: pd.DataFrame | None = None,
         fares: pd.DataFrame | None = None,
         legs: pd.DataFrame | None = None,
@@ -560,6 +561,7 @@ class SummaryTables:
         self.sim = sim
         """The simulation object that generated the summary tables."""
 
+        self.class_dist = class_dist
         self.demands = demands
         self.fares = fares
         self.legs = legs

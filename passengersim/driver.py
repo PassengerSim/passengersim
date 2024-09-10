@@ -1225,6 +1225,7 @@ class Simulation(BaseSimulation):
 
         if to_db is True:
             to_db = self.cnx
+        class_dist_df = self.compute_class_dist(sim, to_log, to_db)
         dmd_df = self.compute_demand_report(sim, to_log, to_db)
         fare_df = self.compute_fare_report(sim, to_log, to_db)
         leg_df = self.compute_leg_report(sim, to_log, to_db)
@@ -1249,6 +1250,7 @@ class Simulation(BaseSimulation):
 
         summary = SummaryTables(
             name=sim.name,
+            class_dist=class_dist_df,
             config=sim.config,
             demands=dmd_df,
             fares=fare_df,
@@ -1299,6 +1301,31 @@ class Simulation(BaseSimulation):
         if to_db and to_db.is_open:
             to_db.save_dataframe("demand_summary", dmd_df)
         return dmd_df
+
+    def compute_class_dist(
+            self, sim: SimulationEngine, to_log=True, to_db: database.Database | None = None
+    ):
+        # Get unique segments
+        segs = set([dmd.segment for dmd in sim.demands])
+        dist = defaultdict(int)
+        for f in sim.fares:
+            for seg in segs:
+                k = (f.booking_class, seg)
+                try:
+                    dist[k] += f.get_sales_by_segment(seg)
+                except:
+                    # If the segment isn't found, just ignore it.
+                    # i.e. basic economy won't book Y0
+                    pass
+
+        class_dist_df = []
+        for (cls, seg), sold in dist.items():
+            class_dist_df.append(
+                    dict(booking_class=cls,
+                        segment=seg,
+                        sold=sold))
+        class_dist_df = pd.DataFrame(class_dist_df)
+        return class_dist_df
 
     def compute_fare_report(
         self, sim: SimulationEngine, to_log=True, to_db: database.Database | None = None

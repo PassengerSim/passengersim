@@ -83,7 +83,7 @@ class YamlConfig(PrettyModel):
         -------
         addicty.Dict
         """
-        if isinstance(filenames, str | pathlib.Path):
+        if isinstance(filenames, str | bytes | os.PathLike):
             filenames = [filenames]
         raw_config = addicty.Dict()
         for filename in filenames:

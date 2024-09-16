@@ -4,7 +4,7 @@
 
 scenario: AW_test
 simulation_controls:
-  num_trials: 35
+  num_trials: 5
   num_samples: 600
 #  random_seed: 42
   sys_k_factor: 0.1
@@ -25,8 +25,9 @@ simulation_controls:
   capture_choice_set_obs: 10000
   # Mountain Standard Time (for me)
   controller_time_zone: 0  # -7
-  generate_3seg: true
-  debug_connections: false
+  generate_3seg: True
+  debug_connections: False
+  show_progress_bar: False
 
 #db:
 #  write_items:
@@ -763,7 +764,7 @@ choice_models:
 
 carriers:
   - name: AL1
-    rm_system: rm_pro_bp
+    rm_system: rm_leg
     frat5: curve_G
     #    fare_adjustment_scale: 0.3
     #    load_factor_curve: lf_curve1
@@ -777,7 +778,7 @@ carriers:
       - (Y4, Y)
       - (Y5, Y)
   - name: AL2
-    rm_system: rm_lp
+    rm_system: rm_hybrid
     frat5: curve_C
     fare_adjustment_scale: 0.5
     load_factor_curve: lf_curve1
@@ -1310,21 +1311,21 @@ snapshot_filters:
 #    sample: 35
 #    dcp: 0
 #    flt_no: 202
-#  - type: forecast
-#    title: Snapshot of forecasting
-#    sample: 35
-#    dcp: [14]
-#    flt_no: 211
-  - type: rm
-    title: RM Snapshot, EMSRb leg optimization
-    sample: [35]
+  - type: forecast
+    title: Snapshot of forecasting
+    sample: 35
     dcp: [14]
-    flt_no: 111
-  - type: rm
-    title: RM Snapshot, EMSRb leg optimization
-    sample: [35]
-    dcp: [7]
     flt_no: 211
+#  - type: rm
+#    title: RM Snapshot, EMSRb leg optimization
+#    sample: [35]
+#    dcp: [14]
+#    flt_no: 111
+#  - type: rm
+#    title: RM Snapshot, EMSRb leg optimization
+#    sample: [35]
+#    dcp: [7]
+#    flt_no: 211
 #  - type: pro_bp
 #    title: ProBP Snapshot
 #    sample: [35]

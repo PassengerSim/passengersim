@@ -12,7 +12,7 @@ import sys
 import time
 import typing
 import warnings
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 from urllib.request import urlopen
 
@@ -434,6 +434,30 @@ class Config(YamlConfig, extra="forbid"):
     paths: list[Path] = []
     markets: list[Market] = []
 
+    @property
+    def markets_dict(self):
+        result = {}
+        for m in self.markets:
+            if isinstance(m, dict):
+                m = Market(**m)
+            ident = f"{m.orig}~{m.dest}"
+            if ident in result:
+                raise ValueError(f"Duplicate market {ident}")
+            result[ident] = m
+        return result
+
+    @field_validator("markets")
+    @classmethod
+    def _no_duplicate_markets(cls, v: list[Market]) -> list[Market]:
+        """Check for duplicate markets."""
+        seen = set()
+        for mkt in v:
+            ident = f"{mkt.orig}~{mkt.dest}"
+            if ident in seen:
+                raise ValueError(f"Duplicate market {ident}")
+            seen.add(ident)
+        return v
+
     snapshot_filters: list[SnapshotFilter] = []
 
     @field_validator("snapshot_filters", mode="before")
@@ -692,7 +716,7 @@ class Config(YamlConfig, extra="forbid"):
                         # Alan's approach
                         # It was converted as a local time, so unpack it and
                         #   create a new datetime in the given TZ
-                        dt = datetime.fromtimestamp(t) #, tz=timezone.utc)
+                        dt = datetime.fromtimestamp(t)  # , tz=timezone.utc)
                         dt2 = datetime(
                             dt.year,
                             dt.month,
@@ -711,10 +735,14 @@ class Config(YamlConfig, extra="forbid"):
                 if leg.orig == "DFW" and leg.dest == "CLE":
                     pass
                 place_o = self.places.get(leg.orig, None)
-                leg.dep_time, leg.dep_time_offset = adjust_time_zone(leg.dep_time, place_o)
+                leg.dep_time, leg.dep_time_offset = adjust_time_zone(
+                    leg.dep_time, place_o
+                )
                 leg.orig_timezone = str(place_o.time_zone_info) if place_o else None
                 place_d = self.places.get(leg.dest, None)
-                leg.arr_time, leg.arr_time_offset = adjust_time_zone(leg.arr_time, place_d)
+                leg.arr_time, leg.arr_time_offset = adjust_time_zone(
+                    leg.arr_time, place_d
+                )
                 leg.dest_timezone = str(place_d.time_zone_info) if place_d else None
                 if place_o is None:
                     warnings.warn(f"No defined place for {leg.orig}", stacklevel=2)

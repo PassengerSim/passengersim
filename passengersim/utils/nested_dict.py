@@ -22,6 +22,12 @@ def from_nested_dict(content: dict, dims: list[str]) -> pd.DataFrame:
         return pd.DataFrame.from_dict(content, orient="index").rename_axis(
             index=dims[0], columns=dims[1]
         )
+    elif len(content) == 0:
+        return pd.DataFrame(
+            index=pd.MultiIndex(
+                levels=[[] for _ in dims], codes=[[] for _ in dims], names=dims
+            )
+        )
     else:
         raw = {}
         for k, v in content.items():

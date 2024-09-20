@@ -1405,6 +1405,7 @@ class SummaryTables:
             )
         )
 
+    @report_figure
     def fig_segmentation_by_timeframe(
         self,
         metric: Literal["bookings", "revenue"],

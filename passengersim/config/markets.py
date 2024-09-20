@@ -24,3 +24,7 @@ class Market(BaseModel, extra="forbid"):
 
     demand_multiplier: float = 1.0
     """Multiplier on base demand for all demand segments in this market."""
+
+    @property
+    def identifier(self) -> str:
+        return f"{self.orig}~{self.dest}"

@@ -13,20 +13,16 @@ each module, the SimulationTableItem instance is created using the
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
-import pandas as pd
-
-from .carriers import aggregate_carriers, extract_carriers
-from .generic import SimulationTableItem, _GenericSimulationTables
-from .legs import aggregate_legs, extract_legs
+from .carriers import ST_Carriers, aggregate_carriers, extract_carriers
+from .legs import ST_Legs, aggregate_legs, extract_legs
 from .segmentation_by_timeframe import (
+    ST_SegByTimeframe,
     aggregate_segmentation_by_timeframe,
     extract_segmentation_by_timeframe,
 )
 
 
-class SimulationTables(_GenericSimulationTables):
+class SimulationTables(ST_Legs, ST_Carriers, ST_SegByTimeframe):
     """Container for summary tables and figures extracted from a Simulation.
 
     This class is a subclass of _GenericSimulationTables, which is defined in
@@ -34,9 +30,3 @@ class SimulationTables(_GenericSimulationTables):
     SimulationTables class, and provides type hints and (optionally, but
     ideally) documentation for the data that is stored in each item.
     """
-
-    segmentation_by_timeframe: pd.DataFrame
-    legs: pd.DataFrame
-    carriers: pd.DataFrame
-
-    fig_segmentation_by_timeframe: Callable

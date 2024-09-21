@@ -11,8 +11,6 @@ from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
-from passengersim.reporting import report_figure
-
 if TYPE_CHECKING:
     from passengersim import Simulation
     from passengersim.config import Config
@@ -45,6 +43,7 @@ class SimulationTableItem:
         self.name = name
         owner._std_agg[name] = self._aggregation_func
         owner._std_extract[name] = self._extraction_func
+        setattr(owner, "_raw_" + name, property(self._get_raw))
 
     def __get__(self, instance, owner):
         if instance is None:
@@ -295,27 +294,3 @@ class _GenericSimulationTables:
             if result.__class__.__name__ != cls.__name__:
                 raise TypeError(f"Expected {cls}, got {type(result)}")
             return result
-
-
-def SimulationTable_add_item(name: str, *args, **kwargs):
-    item = SimulationTableItem(*args, **kwargs)
-    setattr(_GenericSimulationTables, name, item)
-    item.__set_name__(_GenericSimulationTables, name)
-    setattr(_GenericSimulationTables, "_raw_" + name, property(item._get_raw))
-
-
-def simulation_table_figure(func):
-    """Decorator for figures generated on a _GenericSimulationTables object."""
-
-    wrapped = report_figure(func)
-
-    setattr(_GenericSimulationTables, func.__name__, wrapped)
-
-    # @wraps(func)
-    # @report_figure
-    # def wrapper(self, *args, **kwargs):
-    #     fig = func(self, *args, **kwargs)
-    #     self.add_figure(fig)
-    #     return fig
-
-    return wrapped

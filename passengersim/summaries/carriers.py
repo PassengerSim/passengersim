@@ -5,7 +5,12 @@ from typing import TYPE_CHECKING, Literal
 
 import pandas as pd
 
-from .generic import SimulationTable_add_item, simulation_table_figure
+from passengersim.reporting import report_figure
+
+from .generic import (
+    SimulationTableItem,
+    _GenericSimulationTables,
+)
 
 if TYPE_CHECKING:
     from passengersim import Simulation
@@ -74,193 +79,193 @@ def aggregate_carriers(summaries: list[SimulationTables]) -> pd.DataFrame | None
     return None
 
 
-SimulationTable_add_item(
-    "carriers",
-    aggregation_func=aggregate_carriers,
-    extraction_func=extract_carriers,
-    computed_fields={
-        "avg_price": "avg_rev / avg_sold",
-        "yield": "avg_rev / rpm",
-        "sys_lf": "100.0 * rpm / asm",
-    },
-    doc="Carrier-level summary data.",
-)
+class ST_Carriers(_GenericSimulationTables):
+    """Container for summary tables and figures extracted from a Simulation.
 
+    This class is a subclass of _GenericSimulationTables, which is defined in
+    the generic module.  It lists the items that are available in the
+    SimulationTables class, and provides type hints and (optionally, but
+    ideally) documentation for the data that is stored in each item.
+    """
 
-def _fig_carrier_attribute(
-    self: SimulationTables,
-    raw_df: bool,
-    load_measure: str,
-    measure_name: str,
-    measure_format: str = ".2f",
-    orient: Literal["h", "v"] = "h",
-    title: str | None = None,
-):
-    df = self.carriers.reset_index()[["carrier", load_measure]]
-    if raw_df:
-        return df
-    import altair as alt
+    carriers: pd.DataFrame = SimulationTableItem(
+        aggregation_func=aggregate_carriers,
+        extraction_func=extract_carriers,
+        computed_fields={
+            "avg_price": "avg_rev / avg_sold",
+            "yield": "avg_rev / rpm",
+            "sys_lf": "100.0 * rpm / asm",
+        },
+        doc="Carrier-level summary data.",
+    )
 
-    chart = alt.Chart(df)
-    if orient == "v":
+    def _fig_carrier_attribute(
+        self,
+        raw_df: bool,
+        load_measure: str,
+        measure_name: str,
+        measure_format: str = ".2f",
+        orient: Literal["h", "v"] = "h",
+        title: str | None = None,
+    ):
+        df = self.carriers.reset_index()[["carrier", load_measure]]
+        if raw_df:
+            return df
+        import altair as alt
+
+        chart = alt.Chart(df)
+        if orient == "v":
+            bars = chart.mark_bar().encode(
+                x=alt.X("carrier:N", title="Carrier"),
+                y=alt.Y(f"{load_measure}:Q", title=measure_name).stack("zero"),
+                tooltip=[
+                    alt.Tooltip("carrier", title="Carrier"),
+                    alt.Tooltip(
+                        f"{load_measure}:Q", title=measure_name, format=measure_format
+                    ),
+                ],
+            )
+            text = chart.mark_text(dx=0, dy=3, color="white", baseline="top").encode(
+                x=alt.X("carrier:N", title="Carrier"),
+                y=alt.Y(f"{load_measure}:Q", title=measure_name).stack("zero"),
+                text=alt.Text(f"{load_measure}:Q", format=measure_format),
+            )
+        else:
+            bars = chart.mark_bar().encode(
+                y=alt.Y("carrier:N", title="Carrier"),
+                x=alt.X(f"{load_measure}:Q", title=measure_name).stack("zero"),
+                tooltip=[
+                    alt.Tooltip("carrier", title="Carrier"),
+                    alt.Tooltip(
+                        f"{load_measure}:Q", title=measure_name, format=measure_format
+                    ),
+                ],
+            )
+            text = chart.mark_text(
+                dx=-5, dy=0, color="white", baseline="middle", align="right"
+            ).encode(
+                y=alt.Y("carrier:N", title="Carrier"),
+                x=alt.X(f"{load_measure}:Q", title=measure_name).stack("zero"),
+                text=alt.Text(f"{load_measure}:Q", format=measure_format),
+            )
+        fig = (
+            (bars + text)
+            .properties(
+                width=500,
+                height=10 + 20 * len(df),
+            )
+            .configure_axis(
+                labelFontSize=12,
+                titleFontSize=12,
+            )
+            .configure_legend(
+                titleFontSize=12,
+                labelFontSize=15,
+            )
+        )
+        if title:
+            fig.title = title
+        return fig
+
+    @report_figure
+    def fig_carrier_load_factors(
+        self,
+        load_measure: Literal["sys_lf", "avg_leg_lf"] = "sys_lf",
+        *,
+        raw_df=False,
+    ):
+        measure_name = (
+            "System Load Factor" if load_measure == "sys_lf" else "Leg Load Factor"
+        )
+        return self._fig_carrier_attribute(
+            raw_df,
+            load_measure,
+            measure_name,
+            title=f"Carrier {measure_name}s",
+        )
+
+    @report_figure
+    def fig_carrier_revenues(self, *, raw_df=False):
+        return self._fig_carrier_attribute(
+            raw_df, "avg_rev", "Average Revenue", "$.4s", title="Carrier Revenues"
+        )
+
+    @report_figure
+    def fig_carrier_yields(self, *, raw_df=False):
+        return self._fig_carrier_attribute(
+            raw_df, "yield", "Average Yield", "$.4f", title="Carrier Yields"
+        )
+
+    @report_figure
+    def fig_carrier_total_bookings(self: SimulationTables, *, raw_df=False):
+        return self._fig_carrier_attribute(
+            raw_df,
+            "avg_sold",
+            "Total Bookings",
+            ".4s",
+            title="Carrier Total Bookings",
+        )
+
+    @report_figure
+    def fig_carrier_mileage(self, *, raw_df: bool = False):
+        """
+        Figure showing mileage by carrier.
+
+        ASM is available seat miles, and RPM is revenue passenger miles. Both
+        measures are reported as the average across all non-burned samples.
+
+        Parameters
+        ----------
+        raw_df : bool, default False
+            Return the raw data for this figure as a pandas DataFrame, instead
+            of generating the figure itself.
+        report : xmle.Reporter, optional
+            Also append this figure to the given report.
+        trace : pd.ExcelWriter, optional
+            Also write the data from this figure to the given Excel file.
+        """
+        df = (
+            self.carriers.reset_index()[["carrier", "asm", "rpm"]]
+            .set_index("carrier")
+            .rename_axis(columns="measure")
+            .unstack()
+            .to_frame("value")
+            .reset_index()
+        )
+        if raw_df:
+            return df
+        import altair as alt
+
+        chart = alt.Chart(df, title="Carrier Loads")
         bars = chart.mark_bar().encode(
             x=alt.X("carrier:N", title="Carrier"),
-            y=alt.Y(f"{load_measure}:Q", title=measure_name).stack("zero"),
-            tooltip=[
-                alt.Tooltip("carrier", title="Carrier"),
-                alt.Tooltip(
-                    f"{load_measure}:Q", title=measure_name, format=measure_format
-                ),
-            ],
-        )
-        text = chart.mark_text(dx=0, dy=3, color="white", baseline="top").encode(
-            x=alt.X("carrier:N", title="Carrier"),
-            y=alt.Y(f"{load_measure}:Q", title=measure_name).stack("zero"),
-            text=alt.Text(f"{load_measure}:Q", format=measure_format),
-        )
-    else:
-        bars = chart.mark_bar().encode(
-            y=alt.Y("carrier:N", title="Carrier"),
-            x=alt.X(f"{load_measure}:Q", title=measure_name).stack("zero"),
-            tooltip=[
-                alt.Tooltip("carrier", title="Carrier"),
-                alt.Tooltip(
-                    f"{load_measure}:Q", title=measure_name, format=measure_format
-                ),
-            ],
+            y=alt.Y("value", stack=None, title="miles"),
+            color="measure",
+            tooltip=["carrier", "measure", alt.Tooltip("value", format=".4s")],
         )
         text = chart.mark_text(
-            dx=-5, dy=0, color="white", baseline="middle", align="right"
+            dx=0,
+            dy=5,
+            color="white",
+            baseline="top",
         ).encode(
-            y=alt.Y("carrier:N", title="Carrier"),
-            x=alt.X(f"{load_measure}:Q", title=measure_name).stack("zero"),
-            text=alt.Text(f"{load_measure}:Q", format=measure_format),
+            x=alt.X("carrier:N"),
+            y=alt.Y("value").stack(None),
+            text=alt.Text("value:Q", format=".4s"),
         )
-    fig = (
-        (bars + text)
-        .properties(
-            width=500,
-            height=10 + 20 * len(df),
+        fig = (
+            (bars + text)
+            .properties(
+                width=400,
+                height=300,
+            )
+            .configure_axis(
+                labelFontSize=12,
+                titleFontSize=12,
+            )
+            .configure_legend(
+                titleFontSize=12,
+                labelFontSize=15,
+            )
         )
-        .configure_axis(
-            labelFontSize=12,
-            titleFontSize=12,
-        )
-        .configure_legend(
-            titleFontSize=12,
-            labelFontSize=15,
-        )
-    )
-    if title:
-        fig.title = title
-    return fig
-
-
-@simulation_table_figure
-def fig_carrier_load_factors(
-    self: SimulationTables,
-    load_measure: Literal["sys_lf", "avg_leg_lf"] = "sys_lf",
-    *,
-    raw_df=False,
-):
-    measure_name = (
-        "System Load Factor" if load_measure == "sys_lf" else "Leg Load Factor"
-    )
-    return _fig_carrier_attribute(
-        self,
-        raw_df,
-        load_measure,
-        measure_name,
-        title=f"Carrier {measure_name}s",
-    )
-
-
-@simulation_table_figure
-def fig_carrier_revenues(self: SimulationTables, *, raw_df=False):
-    return _fig_carrier_attribute(
-        self, raw_df, "avg_rev", "Average Revenue", "$.4s", title="Carrier Revenues"
-    )
-
-
-@simulation_table_figure
-def fig_carrier_yields(self: SimulationTables, *, raw_df=False):
-    return _fig_carrier_attribute(
-        self, raw_df, "yield", "Average Yield", "$.4f", title="Carrier Yields"
-    )
-
-
-@simulation_table_figure
-def fig_carrier_total_bookings(self: SimulationTables, *, raw_df=False):
-    return _fig_carrier_attribute(
-        self,
-        raw_df,
-        "avg_sold",
-        "Total Bookings",
-        ".4s",
-        title="Carrier Total Bookings",
-    )
-
-
-@simulation_table_figure
-def fig_carrier_mileage(self, *, raw_df: bool = False):
-    """
-    Figure showing mileage by carrier.
-
-    ASM is available seat miles, and RPM is revenue passenger miles. Both
-    measures are reported as the average across all non-burned samples.
-
-    Parameters
-    ----------
-    raw_df : bool, default False
-        Return the raw data for this figure as a pandas DataFrame, instead
-        of generating the figure itself.
-    report : xmle.Reporter, optional
-        Also append this figure to the given report.
-    trace : pd.ExcelWriter, optional
-        Also write the data from this figure to the given Excel file.
-    """
-    df = (
-        self.carriers.reset_index()[["carrier", "asm", "rpm"]]
-        .set_index("carrier")
-        .rename_axis(columns="measure")
-        .unstack()
-        .to_frame("value")
-        .reset_index()
-    )
-    if raw_df:
-        return df
-    import altair as alt
-
-    chart = alt.Chart(df, title="Carrier Loads")
-    bars = chart.mark_bar().encode(
-        x=alt.X("carrier:N", title="Carrier"),
-        y=alt.Y("value", stack=None, title="miles"),
-        color="measure",
-        tooltip=["carrier", "measure", alt.Tooltip("value", format=".4s")],
-    )
-    text = chart.mark_text(
-        dx=0,
-        dy=5,
-        color="white",
-        baseline="top",
-    ).encode(
-        x=alt.X("carrier:N"),
-        y=alt.Y("value").stack(None),
-        text=alt.Text("value:Q", format=".4s"),
-    )
-    fig = (
-        (bars + text)
-        .properties(
-            width=400,
-            height=300,
-        )
-        .configure_axis(
-            labelFontSize=12,
-            titleFontSize=12,
-        )
-        .configure_legend(
-            titleFontSize=12,
-            labelFontSize=15,
-        )
-    )
-    return fig
+        return fig

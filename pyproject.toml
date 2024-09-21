@@ -43,6 +43,9 @@ reporting = [
     "altair>=5.0",
     "xmle",
 ]
+compression = [
+    "lz4",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]  # list of folders that contain the packages (["."] by default)

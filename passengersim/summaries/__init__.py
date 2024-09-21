@@ -17,6 +17,7 @@ from collections.abc import Callable
 
 import pandas as pd
 
+from .carriers import aggregate_carriers, extract_carriers
 from .generic import SimulationTableItem, _GenericSimulationTables
 from .legs import aggregate_legs, extract_legs
 from .segmentation_by_timeframe import (
@@ -36,5 +37,6 @@ class SimulationTables(_GenericSimulationTables):
 
     segmentation_by_timeframe: pd.DataFrame
     legs: pd.DataFrame
+    carriers: pd.DataFrame
 
     fig_segmentation_by_timeframe: Callable

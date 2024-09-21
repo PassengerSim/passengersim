@@ -4,10 +4,12 @@ from typing import TYPE_CHECKING
 
 import pandas as pd
 
-from .generic import SimulationTable_add_item, SimulationTables
+from .generic import SimulationTable_add_item
 
 if TYPE_CHECKING:
     from passengersim import Simulation
+
+    from . import SimulationTables
 
 
 def extract_legs(sim: Simulation) -> pd.DataFrame:

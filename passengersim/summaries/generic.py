@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
+from passengersim.reporting import report_figure
+
 if TYPE_CHECKING:
     from passengersim import Simulation
     from passengersim.config import Config
@@ -21,7 +23,9 @@ class MissingDataError(KeyError):
 class SimulationTableItem:
     def __init__(
         self,
-        aggregation_func: Callable[[list[SimulationTables]], pd.DataFrame | None],
+        aggregation_func: Callable[
+            [list[_GenericSimulationTables]], pd.DataFrame | None
+        ],
         extraction_func: Callable[[Simulation], pd.DataFrame] = None,
         computed_fields: dict[str, Any] = None,
         doc: str | None = None,
@@ -69,7 +73,7 @@ class SimulationTableItem:
         return df
 
 
-class SimulationTables:
+class _GenericSimulationTables:
     __slots__ = ("_data", "config", "cnx", "sim", "n_total_samples", "meta_summaries")
 
     def __init__(
@@ -102,11 +106,15 @@ class SimulationTables:
         self.meta_summaries = []
         """Summaries that were aggregated to create this summary."""
 
-    _std_agg: dict[str, Callable[[list[SimulationTables]], pd.DataFrame | None]] = {}
+    _std_agg: dict[
+        str, Callable[[list[_GenericSimulationTables]], pd.DataFrame | None]
+    ] = {}
     _std_extract: dict[str, Callable[[Simulation], pd.DataFrame]] = {}
 
     @classmethod
-    def extract(cls, sim: Simulation, items: Collection[str] = ()) -> SimulationTables:
+    def extract(
+        cls, sim: Simulation, items: Collection[str] = ()
+    ) -> _GenericSimulationTables:
         """Extract summary data from a Simulation."""
         eng = sim.sim
         num_samples = eng.num_trials_completed * (eng.num_samples - eng.burn_samples)
@@ -129,7 +137,7 @@ class SimulationTables:
         )
 
     @classmethod
-    def aggregate(cls, summaries: Collection[SimulationTables]):
+    def aggregate(cls, summaries: Collection[_GenericSimulationTables]):
         """Aggregate multiple summary tables."""
         if not summaries:
             return None
@@ -145,6 +153,23 @@ class SimulationTables:
 
 def SimulationTable_add_item(name: str, *args, **kwargs):
     item = SimulationTableItem(*args, **kwargs)
-    setattr(SimulationTables, name, item)
-    item.__set_name__(SimulationTables, name)
-    setattr(SimulationTables, "_raw_" + name, property(item._get_raw))
+    setattr(_GenericSimulationTables, name, item)
+    item.__set_name__(_GenericSimulationTables, name)
+    setattr(_GenericSimulationTables, "_raw_" + name, property(item._get_raw))
+
+
+def simulation_table_figure(func):
+    """Decorator for figures generated on a _GenericSimulationTables object."""
+
+    wrapped = report_figure(func)
+
+    setattr(_GenericSimulationTables, func.__name__, wrapped)
+
+    # @wraps(func)
+    # @report_figure
+    # def wrapper(self, *args, **kwargs):
+    #     fig = func(self, *args, **kwargs)
+    #     self.add_figure(fig)
+    #     return fig
+
+    return wrapped

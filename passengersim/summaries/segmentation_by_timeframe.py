@@ -38,7 +38,7 @@ def aggregate_segmentation_by_timeframe(
     return None
 
 
-class ST_SegByTimeframe(_GenericSimulationTables):
+class SimTabSegByTimeframe(_GenericSimulationTables):
     """Container for summary tables and figures extracted from a Simulation.
 
     This class is a subclass of _GenericSimulationTables, which is defined in

@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import glob
+import inspect
 import os
 import pathlib
 import pickle
 import time
 import warnings
 from collections.abc import Callable, Collection
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import pandas as pd
 
@@ -78,6 +79,15 @@ class SimulationTableItem:
 
 
 class _GenericSimulationTables:
+    _subclasses: ClassVar[set[type[_GenericSimulationTables]]] = set()
+
+    def __init_subclass__(cls, **kwargs):
+        """Capture a set of all concrete subclasses"""
+        super().__init_subclass__(**kwargs)
+        if inspect.isabstract(cls):
+            return  # do not include intermediate abstract base classes
+        cls._subclasses.add(cls)
+
     def __init__(
         self,
         data: dict[str, pd.DataFrame] = None,

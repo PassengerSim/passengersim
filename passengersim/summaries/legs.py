@@ -53,7 +53,7 @@ def aggregate_legs(summaries: list[SimulationTables]) -> pd.DataFrame | None:
     return None
 
 
-class ST_Legs(_GenericSimulationTables):
+class SimTabLegs(_GenericSimulationTables):
     """Container for summary tables and figures extracted from a Simulation.
 
     This class is a subclass of _GenericSimulationTables, which is defined in

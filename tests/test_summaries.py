@@ -57,45 +57,19 @@ def test_table_basic(summary: SimulationTables):
     ]
 
 
-def test_table_segmentation_by_timeframe(summary, dataframe_regression):
+@pytest.mark.parametrize(
+    "table_name",
+    [
+        "demand_to_come",
+        "fare_class_mix",
+        "legs",
+        "carriers",
+        "segmentation_by_timeframe",
+    ],
+)
+def test_table_presence(summary, dataframe_regression, table_name: str):
     assert isinstance(summary, SimulationTables)
+    df = getattr(summary, table_name)
     dataframe_regression.check(
-        summary.segmentation_by_timeframe.stack(0),
-        basename="segmentation_by_timeframe",
-        default_tolerance=DEFAULT_TOLERANCE,
-    )
-
-
-def test_table_carriers(summary, dataframe_regression):
-    assert isinstance(summary, SimulationTables)
-    df = summary.carriers
-    # integer tests are flakey, change to float
-    i = df.select_dtypes(include=["number"]).columns
-    df[i] = df[i].astype("float") * 1.00000001
-    dataframe_regression.check(
-        df,
-        basename="carriers",
-        default_tolerance=DEFAULT_TOLERANCE,
-    )
-
-
-def test_table_legs(summary, dataframe_regression):
-    assert isinstance(summary, SimulationTables)
-    df = summary.legs
-    # integer tests are flakey, change to float
-    i = df.select_dtypes(include=["number"]).columns
-    df[i] = df[i].astype("float") * 1.00000001
-    dataframe_regression.check(
-        df,
-        basename="legs",
-        default_tolerance=DEFAULT_TOLERANCE,
-    )
-
-
-def test_table_demand_to_come(summary, dataframe_regression):
-    assert isinstance(summary, SimulationTables)
-    dataframe_regression.check(
-        summary.demand_to_come,
-        basename="demand_to_come",
-        default_tolerance=DEFAULT_TOLERANCE,
+        df, basename=table_name, default_tolerance=DEFAULT_TOLERANCE
     )

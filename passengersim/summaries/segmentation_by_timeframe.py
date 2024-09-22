@@ -7,11 +7,10 @@ import pandas as pd
 from passengersim.reporting import report_figure
 
 from .generic import SimulationTableItem, _GenericSimulationTables
+from .tools import aggregate_by_concat_dataframe
 
 if TYPE_CHECKING:
     from passengersim import Simulation
-
-    from . import SimulationTables
 
 
 def extract_segmentation_by_timeframe(sim: Simulation) -> pd.DataFrame:
@@ -24,20 +23,6 @@ def extract_segmentation_by_timeframe(sim: Simulation) -> pd.DataFrame:
     return df
 
 
-def aggregate_segmentation_by_timeframe(
-    summaries: list[SimulationTables],
-) -> pd.DataFrame | None:
-    """Aggregate segmentation-by-timeframe summaries."""
-    frames = []
-    for s in summaries:
-        frame = s._raw_segmentation_by_timeframe
-        if frame is not None:
-            frames.append(frame)
-    if frames:
-        return pd.concat(frames)
-    return None
-
-
 class SimTabSegByTimeframe(_GenericSimulationTables):
     """Container for summary tables and figures extracted from a Simulation.
 
@@ -48,7 +33,7 @@ class SimTabSegByTimeframe(_GenericSimulationTables):
     """
 
     segmentation_by_timeframe: pd.DataFrame = SimulationTableItem(
-        aggregation_func=aggregate_segmentation_by_timeframe,
+        aggregation_func=aggregate_by_concat_dataframe("segmentation_by_timeframe"),
         extraction_func=extract_segmentation_by_timeframe,
         doc="Segmentation-by-timeframe summary data.",
     )

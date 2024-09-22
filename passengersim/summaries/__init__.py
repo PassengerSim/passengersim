@@ -13,11 +13,11 @@ each module, the SimulationTableItem instance is created using the
 
 from __future__ import annotations
 
-from . import carriers, legs, segmentation_by_timeframe
+from . import carriers, demand_to_come, legs, segmentation_by_timeframe
 from .generic import _GenericSimulationTables
 
 
-class SimulationTables(*_GenericSimulationTables._subclasses):
+class SimulationTables(*_GenericSimulationTables._subclasses, _GenericSimulationTables):
     """Container for summary tables and figures extracted from a Simulation.
 
     This class is a subclass of _GenericSimulationTables, which is defined in

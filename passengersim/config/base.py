@@ -130,7 +130,7 @@ class YamlConfig(PrettyModel):
     def from_yaml(
         cls: type[TConfig],
         filenames: pathlib.Path | list[pathlib.Path],
-    ) -> Self:
+    ) -> TConfig:
         """
         Read from YAML.
 
@@ -660,6 +660,23 @@ class Config(YamlConfig, extra="forbid"):
         # function from tracebacks
         __tracebackhide__ = True
         return reloaded_class.__pydantic_validator__.validate_python(*args, **kwargs)
+
+    @classmethod
+    @property
+    def as_reloaded(cls) -> type[Config]:
+        """Get the Config class, as most recently reloaded."""
+        module_parent = ".".join(__name__.split(".")[:-1])
+        module = sys.modules.get(module_parent)
+        reloaded_class = getattr(module, cls.__name__)
+        return reloaded_class
+
+    @classmethod
+    def instance_check(cls, obj) -> bool:
+        """Check if an object is an instance of the Config class."""
+        # module_parent = ".".join(__name__.split(".")[:-1])
+        # module = sys.modules.get(module_parent)
+        # reloaded_class = getattr(module, cls.__name__)
+        return isinstance(obj, cls.as_reloaded)
 
     def add_output_prefix(
         self, prefix: pathlib.Path, spool_format: str = "%Y%m%d-%H%M"

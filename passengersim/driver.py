@@ -173,6 +173,12 @@ class Simulation(BaseSimulation):
         carrier, and booking class.
         """
 
+        self.bid_price_traces: dict[int, Any] = {}
+        """Bid price traces for each carrier.
+
+        The key is the trial number, and the value is a dictionary with
+        carrier names as keys and bid price traces as values."""
+
         self._initialize(config)
         if not config.db:
             self.cnx = database.Database()
@@ -764,8 +770,16 @@ class Simulation(BaseSimulation):
     def end_trial(self):
         """End of trial processing."""
         self.extract_segmentation_by_timeframe()
+        self.extract_and_reset_bid_price_traces()
         if self.cnx.is_open:
             self.cnx.save_final(self.sim)
+
+    def extract_and_reset_bid_price_traces(self):
+        self.bid_price_traces[self.sim.trial] = {
+            carrier.name: carrier.raw_bid_price_trace() for carrier in self.sim.carriers
+        }
+        for carrier in self.sim.carriers:
+            carrier.reset_bid_price_trace()
 
     def extract_segmentation_by_timeframe(
         self,

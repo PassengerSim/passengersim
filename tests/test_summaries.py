@@ -72,6 +72,7 @@ TABLES = [
     "demand_to_come",
     "fare_class_mix",
     "legs",
+    "legbuckets",
     "paths",
     "carriers",
     "segmentation_by_timeframe",

@@ -4,6 +4,9 @@ from typing import TYPE_CHECKING
 
 import pandas as pd
 
+from passengersim.reporting import report_figure
+
+from .fare_class_mix import _fig_fare_class_mix
 from .generic import GenericSimulationTables, SimulationTableItem
 from .tools import aggregate_by_summing_dataframe
 
@@ -47,3 +50,27 @@ class SimTabPathClasses(GenericSimulationTables):
         extraction_func=extract_pathclasses,
         doc="Path-Class summary data.",
     )
+
+    @report_figure
+    def fig_od_fare_class_mix(
+        self, orig: str, dest: str, *, raw_df=False, label_threshold=0.06
+    ) -> pd.DataFrame:
+        df = (
+            self.pathclasses[
+                (self.pathclasses["orig"] == orig) & (self.pathclasses["dest"] == dest)
+            ]
+            .groupby(["carrier", "booking_class"])["gt_sold"]
+            .sum()
+            / self.n_total_samples
+        )
+        df = df.rename("avg_sold")
+        df = df.reset_index()[["carrier", "booking_class", "avg_sold"]]
+
+        if raw_df:
+            return df
+
+        return _fig_fare_class_mix(
+            df,
+            label_threshold=label_threshold,
+            title=f"Fare Class Mix for {orig} to {dest}",
+        )

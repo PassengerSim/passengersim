@@ -17,6 +17,7 @@ from . import (
     bid_price_history,
     carriers,
     demand_to_come,
+    displacement_history,
     fare_class_mix,
     legs,
     pathclasses,

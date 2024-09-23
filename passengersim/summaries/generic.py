@@ -40,7 +40,6 @@ class SimulationTableItem:
         self._computed_fields = computed_fields or {}
 
     def __set_name__(self, owner, name):
-        print(f"Setting {name} on {owner}")
         self.name = name
         owner._std_agg[name] = self._aggregation_func
         owner._std_extract[name] = self._extraction_func

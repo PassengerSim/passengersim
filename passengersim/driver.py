@@ -668,6 +668,7 @@ class Simulation(BaseSimulation):
         if num_paths and self.cnx.is_open:
             database.tables.create_table_path_defs(self.cnx._connection, self.sim.paths)
         logger.debug(f"Connections done, num_paths = {num_paths}")
+        self.sim.initialize_pathclasses()
 
         # Airlines using Q-forecasting need to have pathclasses set up for all paths
         # so Q-demand can be forecasted by pathclass even in the absence of bookings
@@ -868,8 +869,9 @@ class Simulation(BaseSimulation):
                     f"Trial={self.sim.trial}, "
                     f"Sample={self.sim.sample}{carrier_info}{d_info}"
                 )
-            if self.sim.trial > 0 or self.sim.sample > 0:
-                self.sim.reset_counters()
+            self.sim.reset_counters()
+            if self.sim.sample == 0:
+                self.sim.reset_trial_counters()
             self.generate_demands()
             # self.generate_demands_gamma()
 

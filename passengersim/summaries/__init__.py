@@ -14,6 +14,7 @@ each module, the SimulationTableItem instance is created using the
 from __future__ import annotations
 
 from . import (
+    bid_price_history,
     carriers,
     demand_to_come,
     fare_class_mix,

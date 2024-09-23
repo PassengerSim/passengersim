@@ -79,7 +79,7 @@ def aggregate_carriers(summaries: list[SimulationTables]) -> pd.DataFrame | None
     return None
 
 
-class ST_Carriers(_GenericSimulationTables):
+class SimTabCarriers(_GenericSimulationTables):
     """Container for summary tables and figures extracted from a Simulation.
 
     This class is a subclass of _GenericSimulationTables, which is defined in

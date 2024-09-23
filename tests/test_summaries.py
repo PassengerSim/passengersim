@@ -75,6 +75,7 @@ TABLES = [
     "carriers",
     "segmentation_by_timeframe",
     "pathclasses",
+    "bid_price_history",
 ]
 
 

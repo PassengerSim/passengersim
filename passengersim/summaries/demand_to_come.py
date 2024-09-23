@@ -8,6 +8,7 @@ import pandas as pd
 from passengersim.utils.nested_dict import from_nested_dict
 
 from .generic import SimulationTableItem, _GenericSimulationTables
+from .tools import combine_sigmas
 
 if TYPE_CHECKING:
     from passengersim import Simulation
@@ -25,25 +26,6 @@ def extract_demand_to_come(sim: Simulation) -> pd.DataFrame:
         .rename(columns={"mean": "mean_future_demand", "stdev": "stdev_future_demand"})
     )
     return df
-
-
-def total_sum_of_squares(mu, sigma, n):
-    return (mu**2 + (sigma**2) * ((n - 1) / (n))) * (n)
-
-
-def total_sum(mu, n):
-    return mu * n
-
-
-def combine_sigmas(sigma, sigma2, mu, mu2, n, n2, ddof=0):
-    nn = n + n2
-    mean_sq = (
-        total_sum_of_squares(mu, sigma, n) + total_sum_of_squares(mu2, sigma2, n2)
-    ) / nn
-    sq_mean = ((total_sum(mu, n) + total_sum(mu2, n2)) / (nn)) ** 2
-    adj = nn / (nn - ddof)
-    raw = mean_sq - sq_mean
-    return raw * adj
 
 
 def aggregate_demand_to_come(

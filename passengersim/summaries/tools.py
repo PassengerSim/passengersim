@@ -83,3 +83,22 @@ def aggregate_by_averaging_dataframe(
         return None
 
     return avg_dataframe
+
+
+def total_sum_of_squares(mu, sigma, n):
+    return (mu**2 + (sigma**2) * ((n - 1) / (n))) * (n)
+
+
+def total_sum(mu, n):
+    return mu * n
+
+
+def combine_sigmas(sigma, sigma2, mu, mu2, n, n2, ddof=0):
+    nn = n + n2
+    mean_sq = (
+        total_sum_of_squares(mu, sigma, n) + total_sum_of_squares(mu2, sigma2, n2)
+    ) / nn
+    sq_mean = ((total_sum(mu, n) + total_sum(mu2, n2)) / (nn)) ** 2
+    adj = nn / (nn - ddof)
+    raw = mean_sq - sq_mean
+    return raw * adj

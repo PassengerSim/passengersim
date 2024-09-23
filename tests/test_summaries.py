@@ -4,7 +4,7 @@ from passengersim import Simulation, demo_network
 from passengersim.config import Config
 from passengersim.summaries import SimulationTables
 
-DEFAULT_TOLERANCE = dict(rtol=2e-02, atol=1e-06)
+DEFAULT_TOLERANCE = dict(rtol=1e-04, atol=1e-06)
 
 
 @pytest.fixture(scope="module")
@@ -24,6 +24,17 @@ def summary(config: Config) -> SimulationTables:
     sim = Simulation(config)
     sim.run()
     return SimulationTables.extract(sim)
+
+
+@pytest.fixture(scope="module")
+def summary2(config: Config) -> SimulationTables:
+    sim0 = Simulation(config)
+    sim0.run_trial(0)
+    sim1 = Simulation(config)
+    sim1.run_trial(1)
+    return SimulationTables.aggregate(
+        [SimulationTables.extract(sim0), SimulationTables.extract(sim1)]
+    )
 
 
 def test_table_basic(summary: SimulationTables):
@@ -57,19 +68,28 @@ def test_table_basic(summary: SimulationTables):
     ]
 
 
-@pytest.mark.parametrize(
-    "table_name",
-    [
-        "demand_to_come",
-        "fare_class_mix",
-        "legs",
-        "carriers",
-        "segmentation_by_timeframe",
-    ],
-)
-def test_table_presence(summary, dataframe_regression, table_name: str):
+TABLES = [
+    "demand_to_come",
+    "fare_class_mix",
+    "legs",
+    "carriers",
+    "segmentation_by_timeframe",
+]
+
+
+@pytest.mark.parametrize("table_name", TABLES)
+def test_table_presence_single_process(summary, dataframe_regression, table_name: str):
     assert isinstance(summary, SimulationTables)
     df = getattr(summary, table_name)
+    dataframe_regression.check(
+        df, basename=table_name, default_tolerance=DEFAULT_TOLERANCE
+    )
+
+
+@pytest.mark.parametrize("table_name", TABLES)
+def test_table_presence_multi_process(summary2, dataframe_regression, table_name: str):
+    assert isinstance(summary2, SimulationTables)
+    df = getattr(summary2, table_name)
     dataframe_regression.check(
         df, basename=table_name, default_tolerance=DEFAULT_TOLERANCE
     )

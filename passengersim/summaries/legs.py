@@ -5,11 +5,10 @@ from typing import TYPE_CHECKING
 import pandas as pd
 
 from .generic import SimulationTableItem, _GenericSimulationTables
+from .tools import aggregate_by_summing_dataframe
 
 if TYPE_CHECKING:
     from passengersim import Simulation
-
-    from . import SimulationTables
 
 
 def extract_legs(sim: Simulation) -> pd.DataFrame:
@@ -33,26 +32,6 @@ def extract_legs(sim: Simulation) -> pd.DataFrame:
     return pd.DataFrame(leg_data).set_index("leg_id")
 
 
-def aggregate_legs(summaries: list[SimulationTables]) -> pd.DataFrame | None:
-    """Aggregate leg-level summaries."""
-    table_sum = []
-    for s in summaries:
-        frame = s._raw_legs
-        if frame is not None:
-            table_sum.append(
-                frame.set_index(
-                    ["carrier", "flt_no", "orig", "dest", "distance"], append=True
-                )
-            )
-    while len(table_sum) > 1:
-        table_sum[0] = table_sum[0].add(table_sum.pop(1), fill_value=0)
-    if table_sum:
-        return table_sum[0].reset_index(
-            ["carrier", "flt_no", "orig", "dest", "distance"]
-        )
-    return None
-
-
 class SimTabLegs(_GenericSimulationTables):
     """Container for summary tables and figures extracted from a Simulation.
 
@@ -63,7 +42,9 @@ class SimTabLegs(_GenericSimulationTables):
     """
 
     legs: pd.DataFrame = SimulationTableItem(
-        aggregation_func=aggregate_legs,
+        aggregation_func=aggregate_by_summing_dataframe(
+            "legs", ["carrier", "flt_no", "orig", "dest", "distance"]
+        ),
         extraction_func=extract_legs,
         computed_fields={
             "avg_load_factor": "100.0 * gt_sold / gt_capacity",

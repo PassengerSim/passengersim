@@ -48,7 +48,38 @@ def aggregate_by_summing_dataframe(
         while len(frames) > 1:
             frames[0] = frames[0].add(frames.pop(1), fill_value=0)
         if frames:
-            return frames[0].reset_index(extra_idxs)
+            if extra_idxs:
+                return frames[0].reset_index(extra_idxs)
+            return frames[0]
         return None
 
     return sum_dataframe
+
+
+def aggregate_by_averaging_dataframe(
+    name: str,
+    extra_idxs: list[str] = None,
+) -> Callable[[list[SimulationTables]], pd.DataFrame | None]:
+    """Create function to aggregate from summaries by summing."""
+
+    def avg_dataframe(
+        summaries: list[SimulationTables],
+    ) -> pd.DataFrame | None:
+        frames = []
+        for s in summaries:
+            frame = getattr(s, f"_raw_{name}", None)
+            if frame is not None:
+                if extra_idxs:
+                    frame = frame.set_index(extra_idxs, append=True)
+                frames.append(frame)
+        n = len(frames)
+        while len(frames) > 1:
+            frames[0] = frames[0].add(frames.pop(1), fill_value=0)
+        if frames:
+            result = frames[0] / n
+            if extra_idxs:
+                result = result.reset_index(extra_idxs)
+            return result
+        return None
+
+    return avg_dataframe

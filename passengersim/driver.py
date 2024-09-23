@@ -1310,7 +1310,7 @@ class Simulation(BaseSimulation):
         return dmd_df
 
     def compute_class_dist(
-            self, sim: SimulationEngine, to_log=True, to_db: database.Database | None = None
+        self, sim: SimulationEngine, to_log=True, to_db: database.Database | None = None
     ):
         # Get unique segments
         segs = set([dmd.segment for dmd in sim.demands])
@@ -1320,17 +1320,14 @@ class Simulation(BaseSimulation):
                 k = (f.booking_class, seg)
                 try:
                     dist[k] += f.get_sales_by_segment(seg)
-                except:
+                except Exception:
                     # If the segment isn't found, just ignore it.
                     # i.e. basic economy won't book Y0
                     pass
 
         class_dist_df = []
         for (cls, seg), sold in dist.items():
-            class_dist_df.append(
-                    dict(booking_class=cls,
-                        segment=seg,
-                        sold=sold))
+            class_dist_df.append(dict(booking_class=cls, segment=seg, sold=sold))
         class_dist_df = pd.DataFrame(class_dist_df)
         return class_dist_df
 
@@ -1943,7 +1940,28 @@ class Simulation(BaseSimulation):
     def run_trial(self, trial: int, log_reports: bool = False) -> SummaryTables:
         self.setup_scenario()
         self.sim.trial = trial
-        self._run_sim()
+
+        update_freq = self.update_frequency
+        logger.debug(
+            f"run_sim, num_trials = {self.sim.num_trials}, "
+            f"num_samples = {self.sim.num_samples}"
+        )
+        self.sim.update_db_write_flags()
+        n_samples_total = self.sim.num_samples
+        n_samples_done = 0
+        self.sample_done_callback(n_samples_done, n_samples_total)
+        if self.sim.config.simulation_controls.show_progress_bar:
+            progress = ProgressBar(total=n_samples_total)
+        else:
+            progress = DummyProgressBar()
+        with progress:
+            self._run_single_trial(
+                trial,
+                n_samples_done,
+                n_samples_total,
+                progress,
+                update_freq,
+            )
         summary = self.compute_reports(
             self.sim,
             to_log=log_reports or self.sim.config.outputs.log_reports,

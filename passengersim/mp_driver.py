@@ -7,11 +7,16 @@ import joblib
 from .config import Config
 from .core import SimulationEngine
 from .driver import BaseSimulation, Simulation
+from .summaries import SimulationTables
 from .summary import SummaryTables
 
 
 def _subprocess_run_trial(
-    trial_id: int, cfg_json: str, output_dir: pathlib.Path | None = None
+    trial_id: int,
+    cfg_json: str,
+    output_dir: pathlib.Path | None = None,
+    *,
+    summarizer=SimulationTables,
 ):
     cfg = Config.model_validate(json.loads(cfg_json))
     if (
@@ -29,7 +34,7 @@ def _subprocess_run_trial(
         output_dir = os.path.join(_tempdir.name, f"passengersim-trial-{trial_id:02}")
 
     sim = Simulation(cfg, output_dir)
-    summary = sim.run(single_trial=trial_id)
+    summary = sim.run(single_trial=trial_id, summarizer=summarizer)
     try:
         del summary.cnx
     except AttributeError:
@@ -63,7 +68,7 @@ class MultiSimulation(BaseSimulation):
     #         pass
     #     return summary
 
-    def run(self):
+    def run(self, *, summarizer=SimulationTables):
         if self.config.raw_license_certificate is None:
             try:
                 from passengersim_license import raw_license_certificate
@@ -76,20 +81,27 @@ class MultiSimulation(BaseSimulation):
             cfg_json = self.config.model_dump_json()
             results = parallel(
                 joblib.delayed(_subprocess_run_trial)(
-                    trial_id, cfg_json, self.output_dir
+                    trial_id,
+                    cfg_json,
+                    self.output_dir,
+                    summarizer=summarizer,
                 )
                 for trial_id in range(self.config.simulation_controls.num_trials)
             )
-        result = SummaryTables.aggregate(results)
+        result = summarizer.aggregate(results)
         result.config = self.config.model_copy(deep=True)
         return result
 
-    def sequential_run(self):
+    def sequential_run(self, *, summarizer=SimulationTables):
         results = []
         cfg_json = self.config.model_dump_json()
         for trial_id in range(self.config.simulation_controls.num_trials):
             print("starting trial", trial_id)
-            results.append(_subprocess_run_trial(trial_id, cfg_json, self.output_dir))
+            results.append(
+                _subprocess_run_trial(
+                    trial_id, cfg_json, self.output_dir, summarizer=summarizer
+                )
+            )
             print("finished trial", trial_id)
         return SummaryTables.aggregate(results)
 

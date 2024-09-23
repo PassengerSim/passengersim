@@ -21,6 +21,7 @@ from . import (
     fare_class_mix,
     legs,
     pathclasses,
+    paths,
     segmentation_by_timeframe,
 )
 from .generic import _GenericSimulationTables

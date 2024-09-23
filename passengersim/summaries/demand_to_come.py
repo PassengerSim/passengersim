@@ -7,7 +7,7 @@ import pandas as pd
 
 from passengersim.utils.nested_dict import from_nested_dict
 
-from .generic import SimulationTableItem, _GenericSimulationTables
+from .generic import GenericSimulationTables, SimulationTableItem
 from .tools import combine_sigmas
 
 if TYPE_CHECKING:
@@ -59,10 +59,10 @@ def aggregate_demand_to_come(
     return None
 
 
-class SimTabDemandToCome(_GenericSimulationTables):
+class SimTabDemandToCome(GenericSimulationTables):
     """Container for summary tables and figures extracted from a Simulation.
 
-    This class is a subclass of _GenericSimulationTables, which is defined in
+    This class is a subclass of GenericSimulationTables, which is defined in
     the generic module.  It lists the items that are available in the
     SimulationTables class, and provides type hints and (optionally, but
     ideally) documentation for the data that is stored in each item.

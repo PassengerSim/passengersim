@@ -11,7 +11,7 @@ from collections import defaultdict
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from math import sqrt
-from typing import Any
+from typing import Any, TypeVar
 
 import numpy as np
 import pandas as pd
@@ -34,6 +34,7 @@ from passengersim.core import (
     PathClass,
     SimulationEngine,
 )
+from passengersim.summaries.generic import GenericSimulationTables
 from passengersim.summary import SummaryTables
 from passengersim.utils.nested_dict import from_nested_dict  # noqa: F401
 from passengersim.utils.si import si_units  # noqa: F401
@@ -42,6 +43,8 @@ from . import database
 from .progressbar import DummyProgressBar, ProgressBar
 
 logger = logging.getLogger("passengersim")
+
+SimulationTablesT = TypeVar("SimulationTablesT", bound=GenericSimulationTables)
 
 
 def memory_log(tag):
@@ -1912,8 +1915,12 @@ class Simulation(BaseSimulation):
         return self.sim.config
 
     def run(
-        self, log_reports: bool = False, single_trial: int | None = None
-    ) -> SummaryTables:
+        self,
+        log_reports: bool = False,
+        *,
+        single_trial: int | None = None,
+        summarizer: type[SimulationTablesT] | SimulationTablesT | None = None,
+    ) -> SummaryTables | SimulationTablesT:
         start_time = time.time()
         self.setup_scenario()
         if single_trial is not None:
@@ -1923,14 +1930,25 @@ class Simulation(BaseSimulation):
         if self.choice_set_file is not None:
             self.choice_set_file.close()
         logger.info("Computing reports")
-        summary = self.compute_reports(
-            self.sim,
-            to_log=log_reports or self.sim.config.outputs.log_reports,
-            additional=self.sim.config.outputs.reports,
-        )
-        logger.info("Saving reports")
-        if self.sim.config.outputs.excel:
-            summary.to_xlsx(self.sim.config.outputs.excel)
+        if summarizer is None:
+            summary = self.compute_reports(
+                self.sim,
+                to_log=log_reports or self.sim.config.outputs.log_reports,
+                additional=self.sim.config.outputs.reports,
+            )
+            logger.info("Saving reports")
+            if self.sim.config.outputs.excel:
+                summary.to_xlsx(self.sim.config.outputs.excel)
+        else:
+            if isinstance(summarizer, GenericSimulationTables):
+                summary = summarizer._extract(self)
+            elif issubclass(summarizer, GenericSimulationTables):
+                summary = summarizer.extract(self)
+            else:
+                raise TypeError(
+                    "summarizer must be an instance or subclass of "
+                    "GenericSimulationTables"
+                )
         logger.info(
             f"Th' th' that's all folks !!!    "
             f"(Elapsed time = {round(time.time() - start_time, 2)})"

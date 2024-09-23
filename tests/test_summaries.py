@@ -22,8 +22,7 @@ def config() -> Config:
 @pytest.fixture(scope="module")
 def summary(config: Config) -> SimulationTables:
     sim = Simulation(config)
-    sim.run()
-    return SimulationTables.extract(sim)
+    return sim.run(summarizer=SimulationTables)
 
 
 @pytest.fixture(scope="module")

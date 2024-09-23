@@ -7,7 +7,7 @@ import pandas as pd
 
 from passengersim.reporting import report_figure
 
-from .generic import SimulationTableItem, _GenericSimulationTables
+from .generic import GenericSimulationTables, SimulationTableItem
 from .tools import combine_sigmas
 
 if TYPE_CHECKING:
@@ -98,7 +98,7 @@ def aggregate_bid_price_history(
     return None
 
 
-class SimTabBidPriceHistory(_GenericSimulationTables):
+class SimTabBidPriceHistory(GenericSimulationTables):
     """Container for summary tables and figures extracted from a Simulation.
 
     This class is a subclass of _Generic

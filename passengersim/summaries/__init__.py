@@ -25,13 +25,13 @@ from . import (
     paths,
     segmentation_by_timeframe,
 )
-from .generic import _GenericSimulationTables
+from .generic import GenericSimulationTables
 
 
-class SimulationTables(*_GenericSimulationTables._subclasses, _GenericSimulationTables):
+class SimulationTables(*GenericSimulationTables._subclasses, GenericSimulationTables):
     """Container for summary tables and figures extracted from a Simulation.
 
-    This class is a subclass of _GenericSimulationTables, which is defined in
+    This class is a subclass of GenericSimulationTables, which is defined in
     the generic module.  It lists the items that are available in the
     SimulationTables class, and provides type hints and (optionally, but
     ideally) documentation for the data that is stored in each item.

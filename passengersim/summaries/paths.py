@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 import pandas as pd
 
-from .generic import SimulationTableItem, _GenericSimulationTables
+from .generic import GenericSimulationTables, SimulationTableItem
 from .tools import aggregate_by_summing_dataframe
 
 if TYPE_CHECKING:
@@ -34,10 +34,10 @@ def extract_paths(sim: Simulation) -> pd.DataFrame:
     return pd.DataFrame(path_data).set_index("path_id")
 
 
-class SimTabPaths(_GenericSimulationTables):
+class SimTabPaths(GenericSimulationTables):
     """Container for summary tables and figures extracted from a Simulation.
 
-    This class is a subclass of _GenericSimulationTables, which is defined in
+    This class is a subclass of GenericSimulationTables, which is defined in
     the generic module.  It lists the items that are available in the
     SimulationTables class, and provides type hints and (optionally, but
     ideally) documentation for the data that is stored in each item.

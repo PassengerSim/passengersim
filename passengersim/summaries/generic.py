@@ -8,7 +8,7 @@ import pickle
 import time
 import warnings
 from collections.abc import Callable, Collection
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, Self
 
 import pandas as pd
 
@@ -28,7 +28,7 @@ class SimulationTableItem:
     def __init__(
         self,
         aggregation_func: Callable[
-            [list[_GenericSimulationTables]], pd.DataFrame | None
+            [list[GenericSimulationTables]], pd.DataFrame | None
         ],
         extraction_func: Callable[[Simulation], pd.DataFrame] = None,
         computed_fields: dict[str, Any] = None,
@@ -77,8 +77,8 @@ class SimulationTableItem:
         return df
 
 
-class _GenericSimulationTables:
-    _subclasses: ClassVar[set[type[_GenericSimulationTables]]] = set()
+class GenericSimulationTables:
+    _subclasses: ClassVar[set[type[GenericSimulationTables]]] = set()
 
     def __init_subclass__(cls, **kwargs):
         """Capture a set of all concrete subclasses"""
@@ -95,6 +95,7 @@ class _GenericSimulationTables:
         cnx: Database | None = None,
         sim: Simulation | None = None,
         n_total_samples: int = 0,
+        items: Collection[str] = (),
     ):
         self._data = data or {}
         """Dataframes that summarize a Simulation run."""
@@ -114,6 +115,11 @@ class _GenericSimulationTables:
         This excludes any burn samples.
         """
 
+        self._items = items
+        """Collection of items that should extracted to create this summary.
+
+        If empty, all items will be extracted."""
+
         self.meta_summaries = []
         """Summaries that were aggregated to create this summary."""
 
@@ -126,6 +132,7 @@ class _GenericSimulationTables:
         "meta_summaries",
         "_preserve_meta_summaries",
         "_preserve_config",
+        "_items",
     }
 
     def __setattr__(self, item, value):
@@ -137,14 +144,12 @@ class _GenericSimulationTables:
             raise AttributeError(f"Cannot set attribute {item!r}")
 
     _std_agg: dict[
-        str, Callable[[list[_GenericSimulationTables]], pd.DataFrame | None]
+        str, Callable[[list[GenericSimulationTables]], pd.DataFrame | None]
     ] = {}
     _std_extract: dict[str, Callable[[Simulation], pd.DataFrame]] = {}
 
     @classmethod
-    def extract(
-        cls, sim: Simulation, items: Collection[str] = ()
-    ) -> _GenericSimulationTables:
+    def extract(cls, sim: Simulation, items: Collection[str] = ()) -> Self:
         """Extract summary data from a Simulation."""
         eng = sim.sim
         num_samples = eng.num_trials_completed * (eng.num_samples - eng.burn_samples)
@@ -166,8 +171,12 @@ class _GenericSimulationTables:
             data, sim=sim, config=sim.config, cnx=sim.cnx, n_total_samples=num_samples
         )
 
+    def _extract(self: Self, sim: Simulation) -> Self:
+        """Extract summary data from a Simulation."""
+        return self.__class__.extract(sim, self._items)
+
     @classmethod
-    def aggregate(cls, summaries: Collection[_GenericSimulationTables]):
+    def aggregate(cls, summaries: Collection[GenericSimulationTables]):
         """Aggregate multiple summary tables."""
         if not summaries:
             return None

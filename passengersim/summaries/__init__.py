@@ -13,7 +13,14 @@ each module, the SimulationTableItem instance is created using the
 
 from __future__ import annotations
 
-from . import carriers, demand_to_come, fare_class_mix, legs, segmentation_by_timeframe
+from . import (
+    carriers,
+    demand_to_come,
+    fare_class_mix,
+    legs,
+    pathclasses,
+    segmentation_by_timeframe,
+)
 from .generic import _GenericSimulationTables
 
 

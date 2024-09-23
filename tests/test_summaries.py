@@ -74,6 +74,7 @@ TABLES = [
     "legs",
     "carriers",
     "segmentation_by_timeframe",
+    "pathclasses",
 ]
 
 

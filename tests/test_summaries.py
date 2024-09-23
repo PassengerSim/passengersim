@@ -1,6 +1,6 @@
 import pytest
 
-from passengersim import Simulation, demo_network
+from passengersim import MultiSimulation, Simulation, demo_network
 from passengersim.config import Config
 from passengersim.summaries import SimulationTables
 
@@ -34,6 +34,12 @@ def summary2(config: Config) -> SimulationTables:
     return SimulationTables.aggregate(
         [SimulationTables.extract(sim0), SimulationTables.extract(sim1)]
     )
+
+
+@pytest.fixture(scope="module")
+def summary_mp(config: Config) -> SimulationTables:
+    sim = MultiSimulation(config)
+    return sim.run(summarizer=SimulationTables)
 
 
 def test_table_basic(summary: SimulationTables):
@@ -91,9 +97,20 @@ def test_table_presence_single_process(summary, dataframe_regression, table_name
 
 
 @pytest.mark.parametrize("table_name", TABLES)
-def test_table_presence_multi_process(summary2, dataframe_regression, table_name: str):
+def test_table_presence_two_process(summary2, dataframe_regression, table_name: str):
     assert isinstance(summary2, SimulationTables)
     df = getattr(summary2, table_name)
+    dataframe_regression.check(
+        df, basename=table_name, default_tolerance=DEFAULT_TOLERANCE
+    )
+
+
+@pytest.mark.parametrize("table_name", TABLES)
+def test_table_presence_multi_process(
+    summary_mp, dataframe_regression, table_name: str
+):
+    assert isinstance(summary_mp, SimulationTables)
+    df = getattr(summary_mp, table_name)
     dataframe_regression.check(
         df, basename=table_name, default_tolerance=DEFAULT_TOLERANCE
     )

@@ -13,7 +13,7 @@ import time
 import typing
 import warnings
 from datetime import datetime
-from typing import Any
+from typing import Any, ClassVar
 from urllib.request import urlopen
 
 import addicty
@@ -37,6 +37,7 @@ from .outputs import OutputConfig
 from .paths import Path
 from .places import Place, great_circle
 from .pretty import PrettyModel, repr_dict_with_indent
+from .rm_steps import RmStepBase
 from .rm_systems import RmSystem
 from .simulation_controls import SimulationSettings
 from .snapshot_filter import SnapshotFilter
@@ -618,6 +619,8 @@ class Config(YamlConfig, extra="forbid"):
                 )
         return m
 
+    __rm_steps_loaded: ClassVar[set[type[RmStepBase]]] = RmStepBase._get_subclasses()
+
     @classmethod
     def model_validate(
         cls,
@@ -650,12 +653,17 @@ class Config(YamlConfig, extra="forbid"):
         Config
             The validated model instance.
         """
-        # reload these to refresh for any newly defined RmSteps
-        module_parent = ".".join(__name__.split(".")[:-1])
-        importlib.reload(sys.modules.get(f"{module_parent}.rm_systems"))
-        importlib.reload(sys.modules.get(__name__))
-        module = importlib.reload(sys.modules.get(module_parent))
-        reloaded_class = getattr(module, cls.__name__)
+        # detect if there are any new RmSteps and reload the Config class
+        # to ensure they are properly registered
+        reloaded_class = cls
+        for k in RmStepBase._get_subclasses():
+            if k not in cls.__rm_steps_loaded:
+                # reload these to refresh for any newly defined RmSteps
+                module_parent = ".".join(__name__.split(".")[:-1])
+                importlib.reload(sys.modules.get(f"{module_parent}.rm_systems"))
+                importlib.reload(sys.modules.get(__name__))
+                module = importlib.reload(sys.modules.get(module_parent))
+                reloaded_class = getattr(module, cls.__name__)
         # `__tracebackhide__` tells pytest and some other tools to omit this
         # function from tracebacks
         __tracebackhide__ = True

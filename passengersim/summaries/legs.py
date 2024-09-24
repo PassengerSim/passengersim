@@ -261,13 +261,28 @@ class SimTabLegs(GenericSimulationTables):
 
     @report_figure
     def fig_leg_load_v_local(
-        self, *, raw_df: bool = False, facet_columns: int | None = 2
+        self,
+        *,
+        orig: str | None = None,
+        dest: str | None = None,
+        place: str | None = None,
+        carrier: str | None = None,
+        raw_df: bool = False,
+        facet_columns: int | None = 2,
     ) -> alt.Chart | pd.DataFrame:
         """
         Figure showing the relationship between leg load factor and local share.
 
         Parameters
         ----------
+        orig : str or None, default None
+            Filter the data to only include legs with this origin.
+        dest : str or None, default None
+            Filter the data to only include legs with this destination.
+        place : str or None, default None
+            Filter the data to only include legs with this origin or destination.
+        carrier : str or None, default None
+            Filter the data to only include legs operated by this carrier.
         raw_df : bool, default False
         facet_columns : int or None, default 2
             The number of columns to use for faceting the plot by carrier. If None,
@@ -277,11 +292,28 @@ class SimTabLegs(GenericSimulationTables):
         -------
         altair.Chart or pd.DataFrame
         """
+        import altair as alt
+
         df = self.legs.assign(capacity=self.legs.gt_capacity / self.n_total_samples)
+        color = "carrier:N"
+        if carrier:
+            df = df[df.carrier == carrier]
+        if orig:
+            df = df[df.orig == orig]
+            if len(df.dest.unique()) < 11:
+                color = alt.Color("dest:N", title="Destination")
+        if dest:
+            df = df[df.dest == dest]
+            if len(df.orig.unique()) < 11:
+                color = alt.Color("orig:N", title="Origin")
+        if place:
+            df = df[(df.orig == place) | (df.dest == place)]
+            df = df.assign(other_place=df.orig.where(df.orig != place, df.dest))
+            if len(df.other_place.unique()) < 11:
+                color = alt.Color("other_place:N", title="Other Place")
+
         if raw_df:
             return df
-
-        import altair as alt
 
         chart = (
             alt.Chart(df.reset_index())
@@ -300,7 +332,7 @@ class SimTabLegs(GenericSimulationTables):
                     alt.Tooltip("avg_local", title="Local Share", format=",.2f"),
                     alt.Tooltip("avg_load_factor", title="Load Factor", format=",.2f"),
                 ],
-                color="carrier:N",
+                color=color,
             )
         )
         return chart.interactive()

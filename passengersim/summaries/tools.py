@@ -102,3 +102,66 @@ def combine_sigmas(sigma, sigma2, mu, mu2, n, n2, ddof=0):
     adj = nn / (nn - ddof)
     raw = mean_sq - sq_mean
     return raw * adj
+
+
+def break_on_integer(
+    s: pd.Series, breakpoints: tuple[int, ...], minimum=0, maximum=100, result_name=None
+):
+    """Break a series into categories based on integer breakpoints.
+
+    Parameters
+    ----------
+    s : pd.Series
+        The series to break into categories.
+    breakpoints : tuple of int
+        The breakpoints for the categories. If the first breakpoint is less than
+        the minimum value it is moved up, and if the last breakpoint is greater
+        than the maximum value it is moved down.
+    minimum : int, default 0
+        The minimum value for the series. Values less than this will be assigned
+        to the first category.
+    maximum : int, default 100
+        The maximum value for the series. Values greater than this will be
+        assigned to the last category.
+    result_name : str, default None
+        The name to assign to the resulting series.
+
+    Returns
+    -------
+    pd.Series
+        A series with categorical values.
+    """
+    if not isinstance(breakpoints, tuple):
+        breakpoints = tuple(breakpoints)
+    if breakpoints[0] <= minimum:
+        breakpoints = (minimum - 1,) + breakpoints[1:]
+    else:
+        breakpoints = (minimum - 1,) + breakpoints
+    if breakpoints[-1] >= maximum + 1:
+        breakpoints = breakpoints[:-1] + (maximum + 1,)
+    else:
+        breakpoints = breakpoints + (maximum + 1,)
+
+    # Create labels for categories
+    def make_label(i, j):
+        if i == j - 1:
+            return f"{i}"
+        else:
+            return f"{i}-{j-1}"
+
+    labels = [make_label(0, breakpoints[1])]
+    for i in range(1, len(breakpoints) - 2):
+        labels += [make_label(breakpoints[i], breakpoints[i + 1])]
+    if breakpoints[-2] < 100:
+        labels += [make_label(breakpoints[-2], maximum + 1)]
+    else:
+        labels += [str(maximum)]
+    breaker = pd.cut(
+        s,
+        bins=breakpoints,
+        right=False,
+        labels=labels,
+    )
+    if result_name:
+        breaker = breaker.rename(result_name)
+    return breaker

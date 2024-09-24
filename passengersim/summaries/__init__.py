@@ -19,6 +19,7 @@ from . import (
     demand_to_come,
     displacement_history,
     fare_class_mix,
+    forecasts,
     legbuckets,
     legs,
     pathclasses,

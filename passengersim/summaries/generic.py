@@ -77,6 +77,49 @@ class SimulationTableItem:
         return df
 
 
+class DatabaseTableItem:
+    def __init__(
+        self,
+        query_func: Callable[[Database], pd.DataFrame],
+        aggregation_func: Callable[
+            [list[GenericSimulationTables]], pd.DataFrame | None
+        ],
+        doc: str | None = None,
+    ):
+        self._doc = doc
+        self._aggregation_func = aggregation_func
+        self._query_func = query_func
+
+    def __set_name__(self, owner, name):
+        self.name = name
+        owner._std_agg[name] = self._aggregation_func
+        owner._std_query[name] = self._query_func
+
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        if self.name not in instance._data:
+            try:
+                instance.run_queries(items=[self.name])
+            except Exception as e:
+                warnings.warn(f"Error querying {self.name}: {e}", stacklevel=2)
+        try:
+            return instance._data[self.name]
+        except KeyError:
+            raise MissingDataError(self.name) from None
+
+    def __set__(self, instance, value):
+        instance._data[self.name] = value
+
+    @property
+    def __doc__(self):
+        return self._doc
+
+    def _get_raw(self, instance):
+        df = instance._data.get(self.name, None)
+        return df
+
+
 class GenericSimulationTables:
     _subclasses: ClassVar[set[type[GenericSimulationTables]]] = set()
 
@@ -147,6 +190,7 @@ class GenericSimulationTables:
         str, Callable[[list[GenericSimulationTables]], pd.DataFrame | None]
     ] = {}
     _std_extract: dict[str, Callable[[Simulation], pd.DataFrame]] = {}
+    _std_query: dict[str, Callable[..., pd.DataFrame]] = {}
 
     @classmethod
     def extract(cls, sim: Simulation, items: Collection[str] = ()) -> Self:
@@ -174,6 +218,31 @@ class GenericSimulationTables:
     def _extract(self: Self, sim: Simulation) -> Self:
         """Extract summary data from a Simulation."""
         return self.__class__.extract(sim, self._items)
+
+    def run_queries(
+        self,
+        cnx: Database = None,
+        items: Collection[str] = (),
+        *,
+        scenario: str = None,
+        burn_samples: int = 100,
+    ) -> Self:
+        """Query summary data from a Database."""
+        if cnx is None:
+            cnx = self.cnx
+        items = set(items) or self._std_query.keys()
+        if burn_samples is None:
+            if self.config is not None:
+                burn_samples = self.config.simulation_controls.burn_samples
+            elif self.sim is not None:
+                burn_samples = self.sim.config.simulation_controls.burn_samples
+        burn_samples = burn_samples or 100
+        for name, query in self._std_query.items():
+            if name in items:
+                self._data[name] = query(
+                    cnx, scenario=scenario, burn_samples=burn_samples
+                )
+        return self
 
     @classmethod
     def aggregate(cls, summaries: Collection[GenericSimulationTables]):

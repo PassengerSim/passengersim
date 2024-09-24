@@ -333,7 +333,7 @@ def bookings_by_timeframe(
 
 
 def leg_forecasts(
-    cnx: Database, scenario: str, burn_samples: int = 100
+    cnx: Database, *, scenario: str = None, burn_samples: int = 100
 ) -> pd.DataFrame:
     """
     Average forecasts of demand by leg, bucket, and days to departure.
@@ -376,18 +376,19 @@ def leg_forecasts(
     FROM
         leg_bucket_detail LEFT JOIN leg_defs USING (leg_id)
     WHERE
-        scenario = ?1
-        AND sample >= ?2
+        sample >= ?1
+        AND scenario = ?2
     GROUP BY
         carrier, leg_id, bucket_number, name, days_prior
     """
-    return cnx.dataframe(
-        qry,
-        (
-            scenario,
-            burn_samples,
-        ),
-    ).set_index(["carrier", "leg_id", "bucket_number", "booking_class", "days_prior"])
+    if scenario is None:
+        qry = qry.replace("AND scenario = ?2", "")
+        params = (burn_samples,)
+    else:
+        params = (burn_samples, scenario)
+    return cnx.dataframe(qry, params).set_index(
+        ["carrier", "leg_id", "bucket_number", "booking_class", "days_prior"]
+    )
 
 
 def _leg_bucket_trace(
@@ -601,7 +602,7 @@ def leg_sales_trace(
 
 
 def path_forecasts(
-    cnx: Database, scenario: str, burn_samples: int = 100
+    cnx: Database, *, scenario: str = None, burn_samples: int = 100
 ) -> pd.DataFrame:
     """
     Average forecasts of demand by path, class, and days to departure.
@@ -642,18 +643,19 @@ def path_forecasts(
     FROM
         path_class_detail
     WHERE
-        scenario = ?1
-        AND sample >= ?2
+        sample >= ?1
+        AND scenario = ?2
     GROUP BY
         path_id, booking_class, days_prior
     """
-    return cnx.dataframe(
-        qry,
-        (
-            scenario,
-            burn_samples,
-        ),
-    ).set_index(["path_id", "booking_class", "days_prior"])
+    if scenario is None:
+        qry = qry.replace("AND scenario = ?2", "")
+        params = (burn_samples,)
+    else:
+        params = (burn_samples, scenario)
+    return cnx.dataframe(qry, params).set_index(
+        ["path_id", "booking_class", "days_prior"]
+    )
 
 
 def demand_to_come(

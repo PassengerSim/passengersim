@@ -1,0 +1,98 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Literal
+
+import pandas as pd
+
+from passengersim.database import common_queries
+from passengersim.reporting import report_figure
+
+from .generic import DatabaseTableItem, GenericSimulationTables
+from .tools import aggregate_by_averaging_dataframe
+
+if TYPE_CHECKING:
+    pass
+
+
+def _fig_forecasts(
+    df,
+    facet_on=None,
+    y="forecast_mean",
+    color="booking_class:N",
+    y_title="Avg Demand Forecast",
+):
+    import altair as alt
+
+    encoding = dict(
+        x=alt.X("days_prior:O").scale(reverse=True).title("Days Prior to Departure"),
+        y=alt.Y(f"{y}:Q", title=y_title),
+    )
+    if color:
+        encoding["color"] = color
+    if not facet_on:
+        return alt.Chart(df).mark_line().encode(**encoding)
+    else:
+        return (
+            alt.Chart(df)
+            .mark_line()
+            .encode(**encoding)
+            .facet(
+                facet=f"{facet_on}:N",
+                columns=3,
+            )
+        )
+
+
+class SimTabForecasts(GenericSimulationTables):
+    """Container for summary tables and figures extracted from a Simulation.
+
+    This class is a subclass of _Generic
+    """
+
+    path_forecasts: pd.DataFrame = DatabaseTableItem(
+        aggregation_func=aggregate_by_averaging_dataframe("path_forecasts"),
+        query_func=common_queries.path_forecasts,
+        doc="Path forecasts.",
+    )
+
+    leg_forecasts: pd.DataFrame = DatabaseTableItem(
+        aggregation_func=aggregate_by_averaging_dataframe("leg_forecasts"),
+        query_func=common_queries.leg_forecasts,
+        doc="Leg forecasts.",
+    )
+
+    @report_figure
+    def fig_path_forecasts(
+        self,
+        by_path_id: bool | int = True,
+        by_class: bool | str = True,
+        of: Literal["mu", "sigma", "closed"] = "mu",
+        raw_df=False,
+    ):
+        if self.path_forecasts is None:
+            raise ValueError("the path_forecasts summary table is not available")
+        of_columns = {
+            "mu": "forecast_mean",
+            "sigma": "forecast_stdev",
+            "closed": "forecast_closed_in_tf",
+        }
+        y = of_columns.get(of)
+        columns = [
+            "path_id",
+            "booking_class",
+            "days_prior",
+            y,
+        ]
+        df = self.path_forecasts.reset_index()[columns]
+        color = "booking_class:N"
+        if isinstance(by_path_id, int) and by_path_id is not True:
+            df = df[df.path_id == by_path_id]
+        if isinstance(by_class, str):
+            df = df[df.booking_class == by_class]
+            color = None
+        if raw_df:
+            return df
+        facet_on = None
+        if by_path_id is True:
+            facet_on = "path_id"
+        return _fig_forecasts(df, facet_on=facet_on, y=y, color=color)

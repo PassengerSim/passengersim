@@ -9,6 +9,7 @@ from .core import SimulationEngine
 from .driver import BaseSimulation, Simulation
 from .summaries import SimulationTables
 from .summary import SummaryTables
+from .utils.caffeine import keep_awake
 
 
 def _subprocess_run_trial(
@@ -75,21 +76,22 @@ class MultiSimulation(BaseSimulation):
             except ImportError:
                 raw_license_certificate = None
             self.config.raw_license_certificate = raw_license_certificate
-        with joblib.Parallel(
-            n_jobs=self.config.simulation_controls.num_trials
-        ) as parallel:
-            cfg_json = self.config.model_dump_json()
-            results = parallel(
-                joblib.delayed(_subprocess_run_trial)(
-                    trial_id,
-                    cfg_json,
-                    self.output_dir,
-                    summarizer=summarizer,
+        with keep_awake():
+            with joblib.Parallel(
+                n_jobs=self.config.simulation_controls.num_trials
+            ) as parallel:
+                cfg_json = self.config.model_dump_json()
+                results = parallel(
+                    joblib.delayed(_subprocess_run_trial)(
+                        trial_id,
+                        cfg_json,
+                        self.output_dir,
+                        summarizer=summarizer,
+                    )
+                    for trial_id in range(self.config.simulation_controls.num_trials)
                 )
-                for trial_id in range(self.config.simulation_controls.num_trials)
-            )
-        result = summarizer.aggregate(results)
-        result.config = self.config.model_copy(deep=True)
+            result = summarizer.aggregate(results)
+            result.config = self.config.model_copy(deep=True)
         return result
 
     def sequential_run(self, *, summarizer=SimulationTables):

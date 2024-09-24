@@ -288,6 +288,7 @@ class GenericSimulationTables:
         *,
         preserve_meta_summaries: bool = False,
         preserve_config: bool = False,
+        mkdir: bool = False,
     ):
         """Save to a pickle file.
 
@@ -305,6 +306,11 @@ class GenericSimulationTables:
         preserve_config : bool, default False
             Preserve the config attribute in the saved object.  This includes
             the entire network, and can potentially be a lot of data.
+        mkdir : bool, default False
+            If True, create the parent directory for the pickle file if it does
+            not already exist.  If the directory is created, it will be created
+            with a `.gitignore` file to prevent accidental inclusion of pickled
+            output in Git repositories.
         """
         if add_timestamp_ext:
             filename = pathlib.Path(filename)
@@ -312,6 +318,12 @@ class GenericSimulationTables:
             filename = filename.with_suffix(f".{timestamp}.pkl")
         else:
             filename = pathlib.Path(filename)
+        if mkdir:
+            if not filename.parent.exists():
+                filename.parent.mkdir(parents=True, exist_ok=True)
+                with open(filename.parent / ".gitignore", "w") as f:
+                    f.write("*.pkl\n")
+                    f.write("*.pkl.lz4\n")
 
         try:
             import lz4.frame

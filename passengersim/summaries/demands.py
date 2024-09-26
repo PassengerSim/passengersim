@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from passengersim import Simulation
 
 
-def extract_demands(sim: Simulation) -> pd.DataFrame:
+def extract_demands(sim: Simulation) -> pd.DataFrame | None:
     """Extract demand-level summary data from a Simulation."""
     dmd_data = []
     for dmd in sim.sim.demands:
@@ -31,6 +31,8 @@ def extract_demands(sim: Simulation) -> pd.DataFrame:
                 "gt_eliminated_wtp": dmd.gt_eliminated_wtp,
             }
         )
+    if len(dmd_data) == 0:
+        return None
     return pd.DataFrame(dmd_data).set_index(["orig", "dest", "segment"])
 
 

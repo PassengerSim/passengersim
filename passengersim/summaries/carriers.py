@@ -58,6 +58,8 @@ def extract_carriers(sim: Simulation) -> pd.DataFrame:
                 "ancillary_rev": tot_anc_rev,
             }
         )
+    if len(carrier_data) == 0:
+        return None
     return pd.DataFrame(carrier_data).set_index("carrier")
 
 

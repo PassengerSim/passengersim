@@ -24,7 +24,7 @@ def summary() -> SummaryTables:
     cfg.outputs.reports.add(("od_fare_class_mix", "BOS", "ORD"))
     cfg.outputs.reports.add("load_factor_distribution")
     sim = Simulation(cfg)
-    summary = sim.run()
+    summary = sim.run(summarizer=None)
     summary.sim = sim
     return summary
 

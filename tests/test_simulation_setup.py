@@ -2,6 +2,7 @@ import pytest
 
 from passengersim import Simulation, demo_network
 from passengersim.config import Config
+from passengersim.summaries import SimulationTables
 from passengersim.summary import SummaryTables
 
 DEFAULT_TOLERANCE = dict(rtol=2e-02, atol=1e-06)
@@ -39,12 +40,21 @@ def test_carrier_defined_path_truncation_rules(default_config):
             raise AssertionError(f"Unexpected carrier {p.carrier}")
 
 
+def test_empty_sim_no_database_summary_tables():
+    c = Config()
+    c.db = None
+    s = Simulation(c)
+    summary = s.run(summarizer=None)
+    assert isinstance(summary, SummaryTables)
+    assert not summary.cnx.is_open
+
+
 def test_empty_sim_no_database():
     c = Config()
     c.db = None
     s = Simulation(c)
     summary = s.run()
-    assert isinstance(summary, SummaryTables)
+    assert isinstance(summary, SimulationTables)
     assert not summary.cnx.is_open
 
 

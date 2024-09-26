@@ -34,6 +34,7 @@ from passengersim.core import (
     PathClass,
     SimulationEngine,
 )
+from passengersim.summaries import SimulationTables
 from passengersim.summaries.generic import GenericSimulationTables
 from passengersim.summary import SummaryTables
 from passengersim.utils.nested_dict import from_nested_dict  # noqa: F401
@@ -1946,7 +1947,9 @@ class Simulation(BaseSimulation):
         log_reports: bool = False,
         *,
         single_trial: int | None = None,
-        summarizer: type[SimulationTablesT] | SimulationTablesT | None = None,
+        summarizer: type[SimulationTablesT]
+        | SimulationTablesT
+        | None = SimulationTables,
     ) -> SummaryTables | SimulationTablesT:
         start_time = time.time()
         self.setup_scenario()

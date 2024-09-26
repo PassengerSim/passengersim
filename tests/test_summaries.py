@@ -1,4 +1,5 @@
 import pytest
+from pytest import approx
 
 from passengersim import MultiSimulation, Simulation, demo_network
 from passengersim.config import Config
@@ -77,8 +78,16 @@ def test_table_basic(summary: SimulationTables):
         100.0,
     ]
 
+    # check that total revenue aligns over all tables
+    carrier_total_revenue = summary.carriers.avg_rev.sum() * summary.n_total_samples
+    assert summary.legs.gt_revenue.sum() == approx(carrier_total_revenue)
+    assert summary.paths.gt_revenue.sum() == approx(carrier_total_revenue)
+    assert summary.pathclasses.gt_revenue.sum() == approx(carrier_total_revenue)
+    assert summary.legbuckets.gt_revenue.sum() == approx(carrier_total_revenue)
+
 
 TABLES = [
+    "demands",
     "demand_to_come",
     "demand_to_come_summary",
     "fare_class_mix",

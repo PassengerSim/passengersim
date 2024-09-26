@@ -47,8 +47,9 @@ class SimTabDemands(GenericSimulationTables):
 
     demands: pd.DataFrame = SimulationTableItem(
         aggregation_func=aggregate_by_summing_dataframe(
-            "demands", ["base_demand", "reference_fare", "distance"]
-        ),
+            "demands",
+            extra_idxs=["base_demand", "reference_fare", "distance"],
+        ),  # don't sum extra_idxs, they should be identical over trials
         extraction_func=extract_demands,
         doc="Demand-level summary data.",
     )

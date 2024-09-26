@@ -65,12 +65,13 @@ class SimTabForecasts(GenericSimulationTables):
     def fig_path_forecasts(
         self,
         by_path_id: bool | int = True,
+        *,
         by_class: bool | str = True,
         of: Literal["mu", "sigma", "closed"] = "mu",
         raw_df=False,
     ):
         if self.path_forecasts is None:
-            raise ValueError("the path_forecasts summary table is not available")
+            raise ValueError("the path_forecasts table is not available")
         of_columns = {
             "mu": "forecast_mean",
             "sigma": "forecast_stdev",
@@ -96,3 +97,54 @@ class SimTabForecasts(GenericSimulationTables):
         if by_path_id is True:
             facet_on = "path_id"
         return _fig_forecasts(df, facet_on=facet_on, y=y, color=color)
+
+    @report_figure
+    def fig_leg_forecasts(
+        self,
+        by_leg_id: bool | int = True,
+        *,
+        by_class: bool | str = True,
+        of: Literal["mu", "sigma"] | list[Literal["mu", "sigma"]] = "mu",
+        raw_df=False,
+    ):
+        if isinstance(of, list):
+            if raw_df:
+                raise NotImplementedError
+            fig = self.fig_leg_forecasts(
+                by_leg_id=by_leg_id,
+                by_class=by_class,
+                of=of[0],
+            )
+            for of_ in of[1:]:
+                fig |= self.fig_leg_forecasts(
+                    by_leg_id=by_leg_id,
+                    by_class=by_class,
+                    of=of_,
+                )
+            return fig
+        y = "forecast_mean" if of == "mu" else "forecast_stdev"
+        columns = [
+            "carrier",
+            "leg_id",
+            "booking_class",
+            "days_prior",
+            y,
+        ]
+        if self.leg_forecasts is None:
+            raise ValueError("the leg_forecasts table is not available")
+        df = self.leg_forecasts.reset_index()[columns]
+        color = "booking_class:N"
+        if isinstance(by_leg_id, int) and by_leg_id is not True:
+            df = df[df.leg_id == by_leg_id]
+        if isinstance(by_class, str):
+            df = df[df.booking_class == by_class]
+            color = None
+        if raw_df:
+            return df
+        return _fig_forecasts(
+            df,
+            facet_on=None,
+            y=y,
+            color=color,
+            y_title="Mean Demand Forecast" if of == "mu" else "Std Dev Demand Forecast",
+        )

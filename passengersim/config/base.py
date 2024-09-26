@@ -488,6 +488,16 @@ class Config(YamlConfig, extra="forbid"):
         raise ValueError("invalid license certificate")
 
     @model_validator(mode="after")
+    def _burn_samples(cls, m: Config):
+        """burn_samples must be strictly less than samples"""
+        if m.simulation_controls.burn_samples >= m.simulation_controls.num_samples:
+            raise ValueError(
+                "burn_samples must be strictly less than samples. "
+                "It will default to 100 if you haven't set a value"
+            )
+        return m
+
+    @model_validator(mode="after")
     def _manual_paths(cls, m: Config):
         """If manual_paths is true, there must be Path items
         if it's set to false, then there shouldn't be any path items"""

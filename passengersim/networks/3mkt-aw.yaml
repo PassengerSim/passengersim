@@ -21,25 +21,38 @@ simulation_controls:
   manual_paths: false
 #  debug_orders: false
   timeframe_demand_allocation: pods
-  capture_choice_set_file: choice-set.csv
-  capture_choice_set_obs: 10000
+#  capture_choice_set_file: choice-set.csv
+#  capture_choice_set_obs: 10000
   # Mountain Standard Time (for me)
   controller_time_zone: 0  # -7
   generate_3seg: True
   debug_connections: False
-  show_progress_bar: False
+  show_progress_bar: True
 
-#db:
-#  write_items:
-#    - leg_final
-#    - fare_final
-#    - demand
-#    - demand_final
-#    - bookings
-#    - bucket
-#  fast: true
-#  engine: sqlite
-#  filename: ":memory:"
+db:
+  write_items:
+    - leg
+    - fare
+    - demand
+    - bookings
+    - bucket
+    - pathclass
+    - leg_final
+    - fare_final
+    - demand_final
+  fast: true
+  engine: sqlite
+  filename: "AW-3MKT.sqlite"
+
+outputs:
+  reports:
+    - leg_forecasts
+    - fare_class_mix
+    - load_factors
+    - bookings_by_timeframe
+    - total_demand
+    - demand_to_come
+    - carrier_history
 
 frat5_curves:
   - name: curve_A
@@ -263,10 +276,11 @@ rm_systems:
         - step_type: untruncation
           name: untruncation
           algorithm: em
+          initialization_method: pods
           kind: leg
         - step_type: forecast
           name: forecast
-          algorithm: exp_smoothing
+          algorithm: additive_pickup
           alpha: 0.15
           kind: leg
         - step_type: emsr
@@ -299,21 +313,23 @@ rm_systems:
         - step_type: untruncation
           name: untruncation
           algorithm: em
+          initialization_method: pods
           kind: leg
         - step_type: forecast
           name: forecast
-          algorithm: exp_smoothing
+          algorithm: additive_pickup
           alpha: 0.15
           kind: leg
-        - step_type: errors
-          bias: 0.05
-          k_factor: 0.2
+#        - step_type: errors
+#          bias: 0.05
+#          k_factor: 0.2
         - step_type: emsr
           name: leg_optimization
           algorithm: emsrb
           kind: leg
-#        - step_type: useradjustment
-#          name: user_adjustment
+        - step_type: useradjustment
+          name: user_adjustment
+          algorithm: booked_lf
 
   rm_test_elasticity:
     availability_control: leg
@@ -416,16 +432,13 @@ rm_systems:
         - step_type: untruncation
           name: untruncation
           algorithm: em
+          initialization_method: pods
           kind: path
         - step_type: forecast
           name: path_forecast
           algorithm: additive_pickup
           alpha: 0.15
           kind: path
-#        - step_type: fareadjustment
-#          name: adjust_fares
-#          algorithm: mr
-#          kind: path
         - step_type: probp
           name: optimization
       DAILY:
@@ -778,7 +791,7 @@ carriers:
       - (Y4, Y)
       - (Y5, Y)
   - name: AL2
-    rm_system: rm_hybrid
+    rm_system: rm_test1
     frat5: curve_C
     fare_adjustment_scale: 0.5
     load_factor_curve: lf_curve1
@@ -1311,11 +1324,11 @@ snapshot_filters:
 #    sample: 35
 #    dcp: 0
 #    flt_no: 202
-  - type: forecast
-    title: Snapshot of forecasting
-    sample: 35
-    dcp: [14]
-    flt_no: 211
+#  - type: forecast
+#    title: Snapshot of forecasting
+#    sample: 35
+#    dcp: [14]
+#    flt_no: 211
 #  - type: rm
 #    title: RM Snapshot, EMSRb leg optimization
 #    sample: [35]

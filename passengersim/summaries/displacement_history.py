@@ -2,73 +2,56 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import numpy as np
 import pandas as pd
 
 from passengersim.reporting import report_figure
+from passengersim.utils.nested_dict import from_nested_dict
 
 from .generic import GenericSimulationTables, SimulationTableItem
-from .tools import combine_sigmas
+from .tools import aggregate_by_concat_dataframe
 
 if TYPE_CHECKING:
     from passengersim import Simulation
-    from passengersim.summaries import SimulationTables
 
 
 def extract_displacement_history(sim: Simulation) -> pd.DataFrame:
     """Extract the average displacement cost history for each carrier."""
-    eng = sim.sim
-    result = {}
-    for carrier in eng.carriers:
-        bp = carrier.raw_displacement_cost_trace()
-        result[carrier.name] = (
-            pd.DataFrame.from_dict(bp, orient="index")
-            .sort_index(ascending=False)
-            .rename_axis(index="days_prior")
-        )
-    if result:
-        df = pd.concat(result, axis=0, names=["carrier"])
-    else:
-        df = pd.DataFrame(
-            columns=[
-                "displacement_mean",
-                "displacement_stdev",
-            ],
-            index=pd.MultiIndex([[], []], [[], []], names=["carrier", "days_prior"]),
-        )
+    df = from_nested_dict(
+        sim.displacement_traces, ["trial", "carrier", "days_prior", "measure"]
+    ).rename_axis(columns=None)
     df = df.fillna(0)
     return df
 
 
-def aggregate_displacement_history(
-    summaries: list[SimulationTables],
-) -> pd.DataFrame | None:
-    frames = []
-    for s in summaries:
-        frame = getattr(s, "_raw_displacement_history", None)
-        if frame is not None:
-            frames.append((frame, s.n_total_samples))
-    while len(frames) > 1:
-        df, df_n = frames[0]
-        other, other_n = frames.pop(1)
-        df["displacement_stdev"] = np.sqrt(
-            combine_sigmas(
-                df["displacement_stdev"],
-                other["displacement_stdev"],
-                df["displacement_mean"],
-                other["displacement_mean"],
-                df_n,
-                other_n,
-                ddof=1,
-            )
-        )
-        df["displacement_mean"] = (
-            df["displacement_mean"] * df_n + other["displacement_mean"] * other_n
-        ) / (df_n + other_n)
-        frames[0] = (df, df_n + other_n)
-    if frames:
-        return frames[0][0]
-    return None
+# def aggregate_displacement_history(
+#     summaries: list[SimulationTables],
+# ) -> pd.DataFrame | None:
+#     frames = []
+#     for s in summaries:
+#         frame = getattr(s, "_raw_displacement_history", None)
+#         if frame is not None:
+#             frames.append((frame, s.n_total_samples))
+#     while len(frames) > 1:
+#         df, df_n = frames[0]
+#         other, other_n = frames.pop(1)
+#         df["displacement_stdev"] = np.sqrt(
+#             combine_sigmas(
+#                 df["displacement_stdev"],
+#                 other["displacement_stdev"],
+#                 df["displacement_mean"],
+#                 other["displacement_mean"],
+#                 df_n,
+#                 other_n,
+#                 ddof=1,
+#             )
+#         )
+#         df["displacement_mean"] = (
+#             df["displacement_mean"] * df_n + other["displacement_mean"] * other_n
+#         ) / (df_n + other_n)
+#         frames[0] = (df, df_n + other_n)
+#     if frames:
+#         return frames[0][0]
+#     return None
 
 
 class SimTabDisplacementHistory(GenericSimulationTables):
@@ -78,7 +61,7 @@ class SimTabDisplacementHistory(GenericSimulationTables):
     """
 
     displacement_history: pd.DataFrame = SimulationTableItem(
-        aggregation_func=aggregate_displacement_history,
+        aggregation_func=aggregate_by_concat_dataframe("displacement_history"),
         extraction_func=extract_displacement_history,
         doc="Displacement cost history for each carrier.",
     )
@@ -88,9 +71,15 @@ class SimTabDisplacementHistory(GenericSimulationTables):
         self,
         by_carrier: bool | str = True,
         show_stdev: float | bool | None = None,
+        *,
         raw_df=False,
+        trial: int | None = None,
     ):
         df = self.displacement_history.reset_index()
+        if trial is not None:
+            df = df[df.trial == trial].drop(columns="trial")
+        else:
+            df = df.groupby(["carrier", "days_prior"]).mean().reset_index()
         color = None
         if isinstance(by_carrier, str):
             df = df[df.carrier == by_carrier]

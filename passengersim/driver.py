@@ -179,6 +179,12 @@ class Simulation(BaseSimulation):
         The key is the trial number, and the value is a dictionary with
         carrier names as keys and bid price traces as values."""
 
+        self.displacement_traces: dict[int, Any] = {}
+        """Displacement cost traces for each carrier.
+
+        The key is the trial number, and the value is a dictionary with
+        carrier names as keys and displacement cost traces as values."""
+
         self._initialize(config)
         if not config.db:
             self.cnx = database.Database()
@@ -779,8 +785,13 @@ class Simulation(BaseSimulation):
         self.bid_price_traces[self.sim.trial] = {
             carrier.name: carrier.raw_bid_price_trace() for carrier in self.sim.carriers
         }
+        self.displacement_traces[self.sim.trial] = {
+            carrier.name: carrier.raw_displacement_cost_trace()
+            for carrier in self.sim.carriers
+        }
         for carrier in self.sim.carriers:
             carrier.reset_bid_price_trace()
+            carrier.reset_displacement_cost_trace()
 
     def extract_segmentation_by_timeframe(
         self,

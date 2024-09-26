@@ -659,7 +659,7 @@ def path_forecasts(
 
 
 def demand_to_come(
-    cnx: Database, scenario: str, burn_samples: int = 100
+    cnx: Database, *, scenario: str = None, burn_samples: int = 100
 ) -> pd.DataFrame:
     """
     Demand by market and timeframe across each sample.
@@ -672,7 +672,7 @@ def demand_to_come(
     Parameters
     ----------
     cnx : Database
-    scenario : str
+    scenario : str, optional
     burn_samples : int, default 100
         The demand will be returned ignoring this many samples from the
         beginning of each trial.
@@ -692,12 +692,15 @@ def demand_to_come(
     FROM
         demand_detail
     WHERE
-        scenario = ?1
-        AND sample >= ?2
+        sample >= ?1
+        AND scenario = ?2
     """
-    dmd = cnx.dataframe(
-        qry, (scenario, burn_samples), dtype={"future_demand": np.int32}
-    )
+    if scenario is None:
+        qry = qry.replace("AND scenario = ?2", "")
+        params = (burn_samples,)
+    else:
+        params = (burn_samples, scenario)
+    dmd = cnx.dataframe(qry, params, dtype={"future_demand": np.int32})
     dhs = (
         dmd.set_index(
             ["iteration", "trial", "sample", "segment", "orig", "dest", "days_prior"]

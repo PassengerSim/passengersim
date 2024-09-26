@@ -11,7 +11,7 @@ from .generic import DatabaseTableItem, GenericSimulationTables
 from .tools import aggregate_by_averaging_dataframe
 
 if TYPE_CHECKING:
-    pass
+    import altair as alt
 
 
 def _fig_forecasts(
@@ -20,7 +20,7 @@ def _fig_forecasts(
     y="forecast_mean",
     color="booking_class:N",
     y_title="Avg Demand Forecast",
-):
+) -> alt.TopLevelMixin:
     import altair as alt
 
     encoding = dict(

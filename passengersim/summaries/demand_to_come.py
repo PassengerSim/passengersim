@@ -5,10 +5,11 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pandas as pd
 
+from passengersim.database import common_queries
 from passengersim.utils.nested_dict import from_nested_dict
 
-from .generic import GenericSimulationTables, SimulationTableItem
-from .tools import combine_sigmas
+from .generic import DatabaseTableItem, GenericSimulationTables, SimulationTableItem
+from .tools import aggregate_by_concat_dataframe, combine_sigmas
 
 if TYPE_CHECKING:
     from passengersim import Simulation
@@ -16,7 +17,7 @@ if TYPE_CHECKING:
     from . import SimulationTables
 
 
-def extract_demand_to_come(sim: Simulation) -> pd.DataFrame:
+def extract_demand_to_come_summary(sim: Simulation) -> pd.DataFrame:
     """Extract demand-to-come summary data from a Simulation."""
     eng = sim.sim
     raw = eng.summary_demand_to_come()
@@ -28,12 +29,12 @@ def extract_demand_to_come(sim: Simulation) -> pd.DataFrame:
     return df
 
 
-def aggregate_demand_to_come(
+def aggregate_demand_to_come_summary(
     summaries: list[SimulationTables],
 ) -> pd.DataFrame | None:
     frames = []
     for s in summaries:
-        frame = getattr(s, "_raw_demand_to_come", None)
+        frame = getattr(s, "_raw_demand_to_come_summary", None)
         if frame is not None:
             frames.append((frame, s.n_total_samples))
     while len(frames) > 1:
@@ -68,8 +69,14 @@ class SimTabDemandToCome(GenericSimulationTables):
     ideally) documentation for the data that is stored in each item.
     """
 
-    demand_to_come: pd.DataFrame = SimulationTableItem(
-        aggregation_func=aggregate_demand_to_come,
-        extraction_func=extract_demand_to_come,
+    demand_to_come_summary: pd.DataFrame = SimulationTableItem(
+        aggregation_func=aggregate_demand_to_come_summary,
+        extraction_func=extract_demand_to_come_summary,
         doc="Demand-to-come summary data.",
+    )
+
+    demand_to_come: pd.DataFrame = DatabaseTableItem(
+        aggregation_func=aggregate_by_concat_dataframe("demand_to_come"),
+        query_func=common_queries.demand_to_come,
+        doc="Demand-to-come data.",
     )

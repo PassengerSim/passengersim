@@ -482,17 +482,21 @@ class SummaryTables:
 
         if "demand_to_come" in additional and db.is_open:
             logger.info("loading demand_to_come")
-            self.demand_to_come = database.common_queries.demand_to_come(db, scenario)
+            self.demand_to_come = database.common_queries.demand_to_come(
+                db, scenario=scenario
+            )
 
         if "demand_to_come_summary" in additional and db.is_open:
             logger.info("loading demand_to_come_summary")
             self.demand_to_come_summary = (
-                database.common_queries.demand_to_come_summary(db, scenario)
+                database.common_queries.demand_to_come_summary(db, scenario=scenario)
             )
 
         if "carrier_history" in additional and db.is_open:
             logger.info("loading carrier_history")
-            self.carrier_history = database.common_queries.carrier_history(db, scenario)
+            self.carrier_history = database.common_queries.carrier_history(
+                db, scenario=scenario
+            )
 
         if "bid_price_history" in additional and db.is_open:
             logger.info("loading bid_price_history")

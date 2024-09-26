@@ -74,7 +74,7 @@ def test_table_basic(summary: SimulationTables):
 
 
 TABLES = [
-    "demand_to_come",
+    "demand_to_come_summary",
     "fare_class_mix",
     "legs",
     "legbuckets",

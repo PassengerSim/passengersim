@@ -8,6 +8,7 @@ import pickle
 import time
 import warnings
 from collections.abc import Callable, Collection
+from functools import partialmethod
 from typing import TYPE_CHECKING, Any, ClassVar, Self
 
 import pandas as pd
@@ -94,6 +95,14 @@ class DatabaseTableItem:
         self.name = name
         owner._std_agg[name] = self._aggregation_func
         owner._std_query[name] = self._query_func
+        setattr(owner, "_raw_" + name, property(self._get_raw))
+        setattr(
+            owner,
+            "_requery_" + name,
+            partialmethod(
+                lambda instance, *arg, **kwarg: self._requery(instance, *arg, **kwarg)
+            ),
+        )
 
     def __get__(self, instance, owner):
         if instance is None:
@@ -115,9 +124,15 @@ class DatabaseTableItem:
     def __doc__(self):
         return self._doc
 
-    def _get_raw(self, instance):
+    def _get_raw(self, instance: GenericSimulationTables):
         df = instance._data.get(self.name, None)
         return df
+
+    def _requery(
+        self, instance: GenericSimulationTables, cnx: Database = None, **kwargs
+    ):
+        instance.run_queries(cnx=cnx, items=[self.name], **kwargs)
+        return self._get_raw(instance)
 
 
 class GenericSimulationTables:
@@ -236,7 +251,8 @@ class GenericSimulationTables:
                 burn_samples = self.config.simulation_controls.burn_samples
             elif self.sim is not None:
                 burn_samples = self.sim.config.simulation_controls.burn_samples
-        burn_samples = burn_samples or 100
+        if burn_samples is None:
+            burn_samples = 100
         for name, query in self._std_query.items():
             if name in items:
                 self._data[name] = query(

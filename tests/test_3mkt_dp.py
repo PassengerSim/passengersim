@@ -35,6 +35,7 @@ def summary_mp(config: Config) -> SimulationTables:
 
 TABLES = [
     "demand_to_come",
+    "demand_to_come_summary",
     "fare_class_mix",
     "legs",
     "legbuckets",

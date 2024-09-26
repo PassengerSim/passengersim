@@ -35,6 +35,8 @@ def aggregate_demand_to_come_summary(
     frames = []
     for s in summaries:
         frame = getattr(s, "_raw_demand_to_come_summary", None)
+        if isinstance(frame, Exception):
+            raise frame
         if frame is not None:
             frames.append((frame, s.n_total_samples))
     while len(frames) > 1:
@@ -80,3 +82,28 @@ class SimTabDemandToCome(GenericSimulationTables):
         query_func=common_queries.demand_to_come,
         doc="Demand-to-come data.",
     )
+
+    def aggregate_demand_history(self, by_segment: bool = True) -> pd.Series:
+        """
+        Total demand by sample, aggregated over all markets.
+
+        Parameters
+        ----------
+        by_segment : bool, default True
+            Aggregate by segment.  If false, segments are also aggregated.
+
+        Returns
+        -------
+        pandas.Series
+            Total demand, indexed by trial, sample, and segment
+            (e.g. business/leisure).
+        """
+        groupbys = ["trial", "sample"]
+        if by_segment:
+            groupbys.append("segment")
+        df = self.demand_to_come
+        if isinstance(df, Exception):
+            raise df
+        if not isinstance(df, pd.DataFrame):
+            raise ValueError("demand_to_come is not a DataFrame")
+        return df.iloc[:, 0].groupby(groupbys, observed=False).sum()

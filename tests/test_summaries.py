@@ -5,6 +5,7 @@ from passengersim.config import Config
 from passengersim.summaries import SimulationTables
 
 DEFAULT_TOLERANCE = dict(rtol=1e-04, atol=1e-06)
+TABLE_TOLERANCE = {"local_and_flow_yields": dict(rtol=1e-02, atol=1e-06)}
 
 
 @pytest.fixture(scope="module")
@@ -15,7 +16,8 @@ def config() -> Config:
     cfg.simulation_controls.num_samples = 150
     cfg.simulation_controls.burn_samples = 100
     cfg.outputs.reports.clear()
-    cfg.db = None
+    cfg.outputs.reports.add("demand_to_come")
+    cfg.outputs.reports.add("local_and_flow_yields")
     return cfg
 
 
@@ -32,7 +34,10 @@ def summary2(config: Config) -> SimulationTables:
     sim1 = Simulation(config)
     sim1.run_trial(1)
     return SimulationTables.aggregate(
-        [SimulationTables.extract(sim0), SimulationTables.extract(sim1)]
+        [
+            SimulationTables.extract(sim0).run_queries(items=config.outputs.reports),
+            SimulationTables.extract(sim1).run_queries(items=config.outputs.reports),
+        ]
     )
 
 
@@ -74,6 +79,7 @@ def test_table_basic(summary: SimulationTables):
 
 
 TABLES = [
+    "demand_to_come",
     "demand_to_come_summary",
     "fare_class_mix",
     "legs",
@@ -84,6 +90,7 @@ TABLES = [
     "pathclasses",
     "bid_price_history",
     "displacement_history",
+    "local_and_flow_yields",
 ]
 
 
@@ -92,7 +99,9 @@ def test_table_presence_single_process(summary, dataframe_regression, table_name
     assert isinstance(summary, SimulationTables)
     df = getattr(summary, table_name)
     dataframe_regression.check(
-        df, basename=table_name, default_tolerance=DEFAULT_TOLERANCE
+        df,
+        basename=table_name,
+        default_tolerance=TABLE_TOLERANCE.get(table_name, DEFAULT_TOLERANCE),
     )
 
 
@@ -101,7 +110,9 @@ def test_table_presence_two_process(summary2, dataframe_regression, table_name: 
     assert isinstance(summary2, SimulationTables)
     df = getattr(summary2, table_name)
     dataframe_regression.check(
-        df, basename=table_name, default_tolerance=DEFAULT_TOLERANCE
+        df,
+        basename=table_name,
+        default_tolerance=TABLE_TOLERANCE.get(table_name, DEFAULT_TOLERANCE),
     )
 
 
@@ -112,5 +123,7 @@ def test_table_presence_multi_process(
     assert isinstance(summary_mp, SimulationTables)
     df = getattr(summary_mp, table_name)
     dataframe_regression.check(
-        df, basename=table_name, default_tolerance=DEFAULT_TOLERANCE
+        df,
+        basename=table_name,
+        default_tolerance=TABLE_TOLERANCE.get(table_name, DEFAULT_TOLERANCE),
     )

@@ -1054,7 +1054,7 @@ def displacement_history(
 
 
 def local_and_flow_yields(
-    cnx: Database, scenario: str, burn_samples: int = 100
+    cnx: Database, *, scenario: str = None, burn_samples: int = 100
 ) -> pd.DataFrame:
     """
     Compute yields for local (nonstop) and flow (connecting) passengers.
@@ -1066,7 +1066,7 @@ def local_and_flow_yields(
     Parameters
     ----------
     cnx : Database
-    scenario : str
+    scenario : str, optional
     burn_samples : int, default 100
         The yields will be computed ignoring this many samples from the
         beginning of each trial.
@@ -1089,8 +1089,8 @@ def local_and_flow_yields(
             LEFT JOIN path_defs USING (path_id)
         WHERE
             days_prior == 0
-            AND scenario == ?1
-            AND sample >= ?2
+            AND sample >= ?1
+            AND scenario == ?2
         GROUP BY
             path_id
     )
@@ -1130,13 +1130,12 @@ def local_and_flow_yields(
             GROUP BY leg2
         ) f2 ON f2.leg2 == leg_defs.leg_id
     """
-    df = cnx.dataframe(
-        qry,
-        (
-            scenario,
-            burn_samples,
-        ),
-    )
+    if scenario is None:
+        qry = qry.replace("AND scenario == ?2", "")
+        params = (burn_samples,)
+    else:
+        params = (burn_samples, scenario)
+    df = cnx.dataframe(qry, params)
     return df
 
 

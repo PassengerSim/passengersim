@@ -16,10 +16,12 @@ def aggregate_by_concat_dataframe(
 
     def concat_dataframe(
         summaries: list[SimulationTables],
-    ) -> pd.DataFrame | None:
+    ) -> pd.DataFrame | None | Exception:
         frames = []
         for s in summaries:
             frame = getattr(s, f"_raw_{name}", None)
+            if isinstance(frame, Exception):
+                return frame
             if frame is not None:
                 frames.append(frame)
         if frames:
@@ -37,10 +39,12 @@ def aggregate_by_summing_dataframe(
 
     def sum_dataframe(
         summaries: list[SimulationTables],
-    ) -> pd.DataFrame | None:
+    ) -> pd.DataFrame | None | Exception:
         frames = []
         for s in summaries:
             frame = getattr(s, f"_raw_{name}", None)
+            if isinstance(frame, Exception):
+                return frame
             if frame is not None:
                 if extra_idxs:
                     frame = frame.set_index(extra_idxs, append=True)
@@ -64,10 +68,12 @@ def aggregate_by_averaging_dataframe(
 
     def avg_dataframe(
         summaries: list[SimulationTables],
-    ) -> pd.DataFrame | None:
+    ) -> pd.DataFrame | None | Exception:
         frames = []
         for s in summaries:
             frame = getattr(s, f"_raw_{name}", None)
+            if isinstance(frame, Exception):
+                return frame
             if frame is not None:
                 if extra_idxs:
                     frame = frame.set_index(extra_idxs, append=True)

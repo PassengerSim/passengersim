@@ -1139,7 +1139,7 @@ def fig_demand_to_come(
                 else:
                     raise ValueError(f"which must be in [mean, std] not {which}")
         elif isinstance(s, SimTabDemandToCome):
-            result = s.demand_to_come
+            result = s.demand_to_come_summary
             if which == "mean":
                 return result["mean_future_demand"]
             elif which == "std":

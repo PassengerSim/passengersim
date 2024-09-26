@@ -22,6 +22,7 @@ from . import (
     forecasts,
     legbuckets,
     legs,
+    local_and_flow_yields,
     pathclasses,
     paths,
     segmentation_by_timeframe,

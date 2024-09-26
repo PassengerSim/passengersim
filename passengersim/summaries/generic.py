@@ -51,6 +51,8 @@ class SimulationTableItem:
             return self
         try:
             df = instance._data[self.name]
+            if isinstance(df, Exception):
+                raise df
             for field, func in self._computed_fields.items():
                 if field in df:
                     continue
@@ -113,7 +115,10 @@ class DatabaseTableItem:
             except Exception as e:
                 warnings.warn(f"Error querying {self.name}: {e}", stacklevel=2)
         try:
-            return instance._data[self.name]
+            df = instance._data[self.name]
+            if isinstance(df, Exception):
+                raise df
+            return df
         except KeyError:
             raise MissingDataError(self.name) from None
 
@@ -255,9 +260,21 @@ class GenericSimulationTables:
             burn_samples = 100
         for name, query in self._std_query.items():
             if name in items:
-                self._data[name] = query(
-                    cnx, scenario=scenario, burn_samples=burn_samples
-                )
+                if cnx is None:
+                    warnings.warn(
+                        f"no database connection available for {name}", stacklevel=2
+                    )
+                    self._data[name] = ValueError(
+                        f"no database connection available for {name}"
+                    )
+                else:
+                    try:
+                        self._data[name] = query(
+                            cnx, scenario=scenario, burn_samples=burn_samples
+                        )
+                    except Exception as e:
+                        warnings.warn(f"error in query for {name}: {e}", stacklevel=2)
+                        self._data[name] = e
         return self
 
     @classmethod
@@ -296,6 +313,14 @@ class GenericSimulationTables:
         if "_config_yaml" in state:
             state["config"] = Config.from_raw_yaml(state.pop("_config_yaml"))
         self.__dict__.update(state)
+        if "cnx" not in self.__dict__:
+            self.cnx = None
+        if "sim" not in self.__dict__:
+            self.sim = None
+        if "config" not in self.__dict__:
+            self.config = None
+        if "n_total_samples" not in self.__dict__:
+            self.n_total_samples = 0
 
     def to_pickle(
         self,

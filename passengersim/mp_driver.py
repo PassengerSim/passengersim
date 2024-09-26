@@ -7,7 +7,7 @@ import joblib
 from .config import Config
 from .core import SimulationEngine
 from .driver import BaseSimulation, Simulation
-from .summaries import SimulationTables
+from .summaries import GenericSimulationTables, SimulationTables
 from .summary import SummaryTables
 from .utils.caffeine import keep_awake
 
@@ -36,10 +36,15 @@ def _subprocess_run_trial(
 
     sim = Simulation(cfg, output_dir)
     summary = sim.run(single_trial=trial_id, summarizer=summarizer)
+    # Passing a database connection between processes is not allowed,
+    # so we need to delete it before returning the summary. But first
+    # we will run any queries that were requested as output reports
+    if isinstance(summary, GenericSimulationTables):
+        summary.run_queries(items=cfg.outputs.reports)
     try:
-        del summary.cnx
-    except AttributeError:
-        pass
+        summary.cnx = None
+    except AttributeError as err:
+        print(err)
     return summary
 
 
@@ -113,17 +118,3 @@ class MultiSimulation(BaseSimulation):
             if isinstance(s, SimulationEngine):
                 return s
         raise TypeError("No SimulationEngine found in MultiSimulation")
-
-
-# def spin(n):
-#     c = cfg.model_copy(deep=True)
-#     c.simulation_controls.random_seed = 42 + n
-#     c.simulation_controls.num_trials = 1
-#     c.simulation_controls.num_samples = 10
-#     c.simulation_controls.burn_samples = 5
-#     c.db.filename = c.db.filename.with_suffix(f".trial{n:02}" + c.db.filename.suffix)
-#     c.simulation_controls.show_progress_bar = False
-#     sim = pax.Simulation(c)
-#     summary = sim.run()
-#     del summary.cnx # cannot pickle DB connection
-#     return summary

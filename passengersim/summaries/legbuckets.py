@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from passengersim import Simulation
 
 
-def extract_legbuckets(sim: Simulation) -> pd.DataFrame:
+def extract_legbuckets(sim: Simulation) -> pd.DataFrame | None:
     """Extract leg-bucket-level summary data from a Simulation."""
     bkt_data = []
     for leg in sim.sim.legs:
@@ -25,6 +25,8 @@ def extract_legbuckets(sim: Simulation) -> pd.DataFrame:
                     "gt_revenue": bkt.gt_revenue,
                 }
             )
+    if len(bkt_data) == 0:
+        return None
     return pd.DataFrame(bkt_data).set_index(["leg_id", "booking_class"]).sort_index()
 
 

@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from passengersim import Simulation
 
 
-def extract_paths(sim: Simulation) -> pd.DataFrame:
+def extract_paths(sim: Simulation) -> pd.DataFrame | None:
     """Extract path-level summary data from a Simulation."""
     path_data = []
     for pth in sim.sim.paths:
@@ -31,6 +31,8 @@ def extract_paths(sim: Simulation) -> pd.DataFrame:
                 "path_quality_index": pth.path_quality_index,
             }
         )
+    if len(path_data) == 0:
+        return None
     return pd.DataFrame(path_data).set_index("path_id")
 
 

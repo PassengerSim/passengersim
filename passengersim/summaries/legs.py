@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from passengersim import Simulation
 
 
-def extract_legs(sim: Simulation) -> pd.DataFrame:
+def extract_legs(sim: Simulation) -> pd.DataFrame | None:
     """Extract leg-level summary data from a Simulation."""
     leg_data = []
     for leg in sim.sim.legs:
@@ -35,6 +35,8 @@ def extract_legs(sim: Simulation) -> pd.DataFrame:
                 "distance": leg.distance,
             }
         )
+    if len(leg_data) == 0:
+        return None
     return pd.DataFrame(leg_data).set_index("leg_id")
 
 

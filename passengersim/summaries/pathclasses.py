@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from passengersim import Simulation
 
 
-def extract_pathclasses(sim: Simulation) -> pd.DataFrame:
+def extract_pathclasses(sim: Simulation) -> pd.DataFrame | None:
     """Extract leg-level summary data from a Simulation."""
     pc_data = []
     for pth in sim.sim.paths:
@@ -31,6 +31,8 @@ def extract_pathclasses(sim: Simulation) -> pd.DataFrame:
                     "gt_revenue": pc.gt_revenue,
                 }
             )
+    if len(pc_data) == 0:
+        return None
     return pd.DataFrame(pc_data).set_index(["path_id", "booking_class"]).sort_index()
 
 

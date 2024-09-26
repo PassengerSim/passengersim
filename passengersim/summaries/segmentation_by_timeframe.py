@@ -13,8 +13,10 @@ if TYPE_CHECKING:
     from passengersim import Simulation
 
 
-def extract_segmentation_by_timeframe(sim: Simulation) -> pd.DataFrame:
+def extract_segmentation_by_timeframe(sim: Simulation) -> pd.DataFrame | None:
     """Extract segmentation-by-timeframe summary data from a Simulation."""
+    if not sim.segmentation_data_by_timeframe:
+        return None
     df = (
         pd.concat(sim.segmentation_data_by_timeframe, axis=0, names=["trial"])
         .reorder_levels(["trial", "carrier", "booking_class", "days_prior"])

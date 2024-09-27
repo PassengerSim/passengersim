@@ -11,14 +11,12 @@ class OutputConfig(PrettyModel, extra="forbid", validate_assignment=True):
     """Write excel outputs to this file after a run."""
 
     reports: set[str | tuple[str, ...]] = set()
-    # {
-    #     # "fare_class_mix",
-    #     # "load_factors",
-    #     # "bookings_by_timeframe",
-    #     # "total_demand",
-    #     # "load_factor_distribution",
-    # }
-    """Reports to include."""
+    """Reports to include.
+
+    Database queries reports can be included here.  This is important for
+    multiprocessing runs with in-memory databases, as database results will not
+    be available after the database connection is closed in each subprocess.
+    """
 
     # TODO what reports require what database items?
     # e.g. demand_to_come requires we store all `demand` not just demand_final

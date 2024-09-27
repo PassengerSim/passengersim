@@ -14,7 +14,17 @@ class DatabaseConfig(PrettyModel, extra="forbid", validate_assignment=True):
     Currently only `sqlite` is fully implemented."""
 
     filename: pathlib.Path | None = "passengersim-output.sqlite"
-    """Name of file for SQLite output."""
+    """Name of file for SQLite output.
+
+    When using the sqlite engine, an in-memory database can be created by
+    setting this to ':memory:'.  Note that in-memory databases are not
+    persistent and will be lost when the database connection is closed.  Also,
+    in-memory databases cannot be shared between multiple processes.  When
+    using multiprocessing, all database operations must be performed in the
+    same process that created the database connection. Be sure to run summary
+    queries before closing the database connection, by identifying all database
+    summary tables in the `outputs.reports` configuration option.
+    """
 
     fast: bool = False
     """Whether to use pre-compiled SQL write instructions."""

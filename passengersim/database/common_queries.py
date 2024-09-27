@@ -854,7 +854,7 @@ def carrier_history(
         sum(sold) as sold,
         sum(revenue) as revenue
     FROM leg_bucket_detail LEFT JOIN leg_defs USING (leg_id)
-    WHERE days_prior == @max_days_prior
+    WHERE days_prior == 0
       AND scenario == @scenario
       AND sample >= @burn_samples
     GROUP BY iteration, trial, sample, carrier

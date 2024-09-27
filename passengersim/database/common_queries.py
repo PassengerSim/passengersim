@@ -777,7 +777,7 @@ def demand_to_come_summary(
 
 
 def carrier_history(
-    cnx: Database, scenario: str, burn_samples: int = 100
+    cnx: Database, *, scenario: str = None, burn_samples: int = 100
 ) -> pd.DataFrame:
     """
     Sample-level details of carrier-level measures.
@@ -790,7 +790,7 @@ def carrier_history(
     Parameters
     ----------
     cnx : Database
-    scenario : str
+    scenario : str, optional
     burn_samples : int, default 100
         The history will be returned ignoring this many samples from the
         beginning of each trial.
@@ -812,38 +812,58 @@ def carrier_history(
         - `revenue`: Total revenue for this carrier in this sample.
     """
     # Provides content similar to PODS *.HST output file.
-    max_rrd = int(
-        cnx.dataframe(
-            """
-            SELECT max(days_prior) FROM leg_bucket_detail WHERE scenario == ?1
-            """,
-            (scenario,),
-        ).iloc[0, 0]
+    qry_params = {"burn_samples": burn_samples}
+    if scenario is not None:
+        qry_params["scenario"] = scenario
+        max_days_prior = int(
+            cnx.dataframe(
+                """
+                SELECT max(days_prior) FROM leg_bucket_detail WHERE scenario == ?1
+                """,
+                (scenario,),
+            ).iloc[0, 0]
+        )
+    else:
+        max_days_prior = int(
+            cnx.dataframe(
+                """
+                SELECT max(days_prior) FROM leg_bucket_detail
+                """,
+            ).iloc[0, 0]
+        )
+    qry_params["max_days_prior"] = max_days_prior
+    qry1 = """
+    SELECT
+        iteration, trial, sample, carrier,
+        sum(forecast_mean) as forecast_mean,
+        sqrt(sum(forecast_stdev*forecast_stdev)) as forecast_stdev
+    FROM leg_bucket_detail LEFT JOIN leg_defs USING (leg_id)
+    WHERE days_prior == @max_days_prior
+      AND scenario == @scenario
+      AND sample >= @burn_samples
+    GROUP BY iteration, trial, sample, carrier
+    """
+    if scenario is None:
+        qry1 = qry1.replace("AND scenario == @scenario", "")
+    bd1 = cnx.dataframe(qry1, qry_params).set_index(
+        ["iteration", "trial", "sample", "carrier"]
     )
-    bd1 = cnx.dataframe(
-        """
-        SELECT
-            iteration, trial, sample, carrier,
-            sum(forecast_mean) as forecast_mean,
-            sqrt(sum(forecast_stdev*forecast_stdev)) as forecast_stdev
-        FROM leg_bucket_detail LEFT JOIN leg_defs USING (leg_id)
-        WHERE days_prior == ?2 AND scenario == ?1 AND sample >= ?3
-        GROUP BY iteration, trial, sample, carrier
-        """,
-        (scenario, max_rrd, burn_samples),
-    ).set_index(["iteration", "trial", "sample", "carrier"])
-    bd2 = cnx.dataframe(
-        """
-        SELECT
-            iteration, trial, sample, carrier,
-            sum(sold) as sold,
-            sum(revenue) as revenue
-        FROM leg_bucket_detail LEFT JOIN leg_defs USING (leg_id)
-        WHERE days_prior == 0 AND scenario == ?1 AND sample >= ?2
-        GROUP BY iteration, trial, sample, carrier
-        """,
-        (scenario, burn_samples),
-    ).set_index(["iteration", "trial", "sample", "carrier"])
+    qry2 = """
+    SELECT
+        iteration, trial, sample, carrier,
+        sum(sold) as sold,
+        sum(revenue) as revenue
+    FROM leg_bucket_detail LEFT JOIN leg_defs USING (leg_id)
+    WHERE days_prior == @max_days_prior
+      AND scenario == @scenario
+      AND sample >= @burn_samples
+    GROUP BY iteration, trial, sample, carrier
+    """
+    if scenario is None:
+        qry2 = qry2.replace("AND scenario == @scenario", "")
+    bd2 = cnx.dataframe(qry2, qry_params).set_index(
+        ["iteration", "trial", "sample", "carrier"]
+    )
     return pd.concat([bd1, bd2], axis=1).unstack("carrier")
 
 

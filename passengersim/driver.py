@@ -6,6 +6,7 @@ import pathlib
 import sqlite3
 import sys  # noqa: F401
 import time
+import warnings
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import Mapping
@@ -1951,6 +1952,32 @@ class Simulation(BaseSimulation):
         | SimulationTablesT
         | None = SimulationTables,
     ) -> SummaryTables | SimulationTablesT:
+        """
+        Run the simulation and compute reports.
+
+        Parameters
+        ----------
+        log_reports : bool
+        single_trial : int, optional
+            Run only a single trial, with the given trial number (to get
+            the correct fixed random seed, for example).
+        summarizer : type[SimulationTables] | SimulationTables | None
+            Use this summarizer to compute the reports.  If None, the
+            reports are computed in the SummaryTables object; this option
+            is deprecated and will eventually be removed.
+
+        Returns
+        -------
+        SimulationTables or SummaryTables
+        """
+        if summarizer is None:
+            warnings.warn(
+                "Using SummaryTables to compute reports is deprecated, "
+                "prefer SimulationTables in new code.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         start_time = time.time()
         self.setup_scenario()
         if single_trial is not None:

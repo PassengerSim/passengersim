@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 import pandas as pd
@@ -317,6 +317,7 @@ class SimTabLegs(GenericSimulationTables):
         carrier: str | None = None,
         raw_df: bool = False,
         facet_columns: int | None = 2,
+        select_leg: Literal[True, "point", "brush"] | None = None,
     ) -> alt.Chart | pd.DataFrame:
         """
         Figure showing the relationship between leg load factor and local share.
@@ -384,4 +385,65 @@ class SimTabLegs(GenericSimulationTables):
                 color=color,
             )
         )
+        if select_leg:
+            if select_leg is True:
+                select_leg = "point"
+            if select_leg == "point":
+                selector = "point"
+                brush = alt.selection_point(name=selector)
+                chart_widget = alt.JupyterChart(chart.add_params(brush).interactive())
+            else:
+                selector = "brush"
+                brush = alt.selection_interval(name=selector)
+                chart_widget = alt.JupyterChart(chart.add_params(brush))
+
+            from ipywidgets import HTML, VBox
+
+            table_widget = HTML(value=self.legs.iloc[:0].to_html())
+            subchart_widget = alt.JupyterChart(alt.Chart().mark_point())
+
+            if select_leg == "point":
+
+                def on_select(change):
+                    sel = change.new.value
+                    subchart_widget.chart = self.fig_select_leg_analysis(
+                        self.legs.index[sel]
+                    )
+            elif select_leg == "brush":
+
+                def on_select(change):
+                    try:
+                        sel = change.new.value
+                        if sel is None or "avg_local" not in sel:
+                            filtered = df.iloc[:0]
+                        else:
+                            carrier_name = change.new.store[0]["unit"].split("_")[-1]
+                            sel_local = sel["avg_local"]
+                            sel_load = sel["avg_load_factor"]
+                            filter_query = (
+                                f"{sel_local[0]} <= `avg_local` <= {sel_local[1]} and "
+                                f"{sel_load[0]} <= `avg_load_factor` <= {sel_load[1]}"
+                            )
+                            filter_query += f" and `carrier` == '{carrier_name}'"
+                            filtered = df.query(filter_query)
+                        # table_widget.value = filtered.to_html()
+                        table_widget.value = f"<pre>{change.new}</pre>"
+                        subchart_widget.chart = self.fig_select_leg_analysis(
+                            filtered.index
+                        )
+                    except Exception as e:
+                        table_widget.value = f"<pre>{e}</pre>"
+                        subchart_widget.chart = alt.Chart().mark_point()
+
+            chart_widget.selections.observe(on_select, [selector])
+
+            return VBox(
+                [
+                    chart_widget,
+                    table_widget,
+                    subchart_widget,
+                ]
+            )
+
+            pass
         return chart.interactive()

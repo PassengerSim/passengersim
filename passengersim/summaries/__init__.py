@@ -25,6 +25,7 @@ from . import (
     legs,
     local_and_flow_yields,
     pathclasses,
+    pathlegs,
     paths,
     segmentation_by_timeframe,
 )

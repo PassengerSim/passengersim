@@ -91,6 +91,23 @@ def aggregate_by_averaging_dataframe(
     return avg_dataframe
 
 
+def aggregate_by_first_dataframe(
+    name: str,
+) -> Callable[[list[SimulationTables]], pd.DataFrame | None]:
+    """Create function to aggregate from summaries by taking the first."""
+
+    def first_dataframe(
+        summaries: list[SimulationTables],
+    ) -> pd.DataFrame | None | Exception:
+        for s in summaries:
+            frame = getattr(s, f"_raw_{name}", None)
+            if frame is not None:
+                return frame
+        return None
+
+    return first_dataframe
+
+
 def total_sum_of_squares(mu, sigma, n):
     return (mu**2 + (sigma**2) * ((n - 1) / (n))) * (n)
 

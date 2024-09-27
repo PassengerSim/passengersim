@@ -145,3 +145,6 @@ class SimTabSegByTimeframe(GenericSimulationTables):
         else:
             chart = chart.configure_title(fontSize=18)
         return chart
+
+    def fig_bookings_by_timeframe(self, *args, **kwargs):
+        return self.fig_segmentation_by_timeframe("bookings", *args, **kwargs)

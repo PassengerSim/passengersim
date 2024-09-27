@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from typing import TYPE_CHECKING
 
+import numpy as np
 import pandas as pd
 
 from passengersim.reporting import report_figure
+from passengersim.utils.nested_dict import from_nested_dict
 
 from .generic import GenericSimulationTables, SimulationTableItem
 from .tools import aggregate_by_summing_dataframe, break_on_integer
@@ -60,6 +63,48 @@ class SimTabLegs(GenericSimulationTables):
         },
         doc="Leg-level summary data.",
     )
+
+    @property
+    def local_fraction_by_place(self) -> pd.DataFrame:
+        """
+        The local share of passengers by carrier and place.
+
+        The index of this DataFrame contains all possible places, and the columns
+        contain the carriers.
+
+        For each carrier and place, this is the percentage of leg passengers
+        on legs arriving or departing from that place that are local passengers
+        (i.e. not connecting passengers).  Passengers are considered connecting
+        whether the connection is at this place, or at another place.
+
+        If a carrier does not operate any legs to or from a place, or if legs
+        are operated but no passengers are booked (which probably indicates a
+        config error), the local share is NaN.
+
+        Returns
+        -------
+        pd.DataFrame
+        """
+        if "local_fraction_by_place" not in self._data:
+            carriers = self.legs.carrier.unique()
+            result = defaultdict(dict)
+            for carrier in carriers:
+                places = set(self.legs.orig.unique()) | set(self.legs.dest.unique())
+                for place in places:
+                    temp_table = self.legs.loc[
+                        (self.legs.carrier == carrier)
+                        & ((self.legs.orig == place) | (self.legs.dest == place)),
+                        ["gt_sold", "gt_sold_local"],
+                    ].sum()
+                    if temp_table["gt_sold"] > 0:
+                        result[carrier][place] = float(
+                            temp_table["gt_sold_local"] / temp_table["gt_sold"]
+                        )
+                    else:
+                        result[carrier][place] = np.nan
+            result = from_nested_dict(result, dims=["carrier", "place"]).T
+            self._data["local_fraction_by_place"] = result
+        return self._data["local_fraction_by_place"]
 
     def _fig_leg_factor_distribution(
         self,
@@ -331,6 +376,7 @@ class SimTabLegs(GenericSimulationTables):
                     alt.Tooltip("flt_no", title="Flight No"),
                     alt.Tooltip("orig", title="Orig"),
                     alt.Tooltip("dest", title="Dest"),
+                    alt.Tooltip("capacity", title="Capacity", format=",.0f"),
                     alt.Tooltip("avg_local", title="Local Share", format=",.2f"),
                     alt.Tooltip("avg_load_factor", title="Load Factor", format=",.2f"),
                 ],

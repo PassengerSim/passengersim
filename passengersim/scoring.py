@@ -182,7 +182,7 @@ class CalibrationScore:
             )
         )
         run_lfs = (
-            run_summary.fig_load_factor_distribution(raw_df=True, breakpoints=bins)
+            run_summary.fig_leg_load_factor_distribution(raw_df=True, breakpoints=bins)
             .rename(columns={"Load Factor Range": "load_factor_range"})
             .set_index(["carrier", "load_factor_range"])
             .iloc[:, 0]

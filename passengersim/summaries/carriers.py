@@ -5,12 +5,15 @@ from typing import TYPE_CHECKING, Literal
 
 import pandas as pd
 
+from passengersim.database import common_queries
 from passengersim.reporting import report_figure
 
 from .generic import (
+    DatabaseTableItem,
     GenericSimulationTables,
     SimulationTableItem,
 )
+from .tools import aggregate_by_concat_dataframe
 
 if TYPE_CHECKING:
     from passengersim import Simulation
@@ -99,6 +102,12 @@ class SimTabCarriers(GenericSimulationTables):
             "sys_lf": "100.0 * rpm / asm",
         },
         doc="Carrier-level summary data.",
+    )
+
+    carrier_history: pd.DataFrame | None = DatabaseTableItem(
+        aggregation_func=aggregate_by_concat_dataframe("carrier_history"),
+        query_func=common_queries.carrier_history,
+        doc="Carrier-level summary data from each sample.",
     )
 
     def _fig_carrier_attribute(

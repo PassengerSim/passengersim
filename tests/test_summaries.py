@@ -17,6 +17,7 @@ def config() -> Config:
     cfg.simulation_controls.num_samples = 150
     cfg.simulation_controls.burn_samples = 100
     cfg.outputs.reports.clear()
+    cfg.outputs.reports.add("carrier_history")
     cfg.outputs.reports.add("demand_to_come")
     cfg.outputs.reports.add("local_and_flow_yields")
     return cfg
@@ -95,6 +96,7 @@ TABLES = [
     "legbuckets",
     "paths",
     "carriers",
+    "carrier_history",
     "segmentation_by_timeframe",
     "pathclasses",
     "bid_price_history",

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -317,7 +317,7 @@ class SimTabLegs(GenericSimulationTables):
         carrier: str | None = None,
         raw_df: bool = False,
         facet_columns: int | None = 2,
-        select_leg: Literal[True, "point", "brush"] | None = None,
+        select_leg: bool = False,
     ) -> alt.Chart | pd.DataFrame:
         """
         Figure showing the relationship between leg load factor and local share.
@@ -336,6 +336,10 @@ class SimTabLegs(GenericSimulationTables):
         facet_columns : int or None, default 2
             The number of columns to use for faceting the plot by carrier. If None,
             all facets will appear on one row.
+        select_leg : bool, default False
+            If True, return an interactive widget that allows the user to select
+            specific legs and view their path_legs. This feature is experimental
+            and may change without notice.
 
         Returns
         -------
@@ -370,7 +374,9 @@ class SimTabLegs(GenericSimulationTables):
             .encode(
                 x=alt.X("avg_local:Q", title="Leg Local Share"),
                 y=alt.Y("avg_load_factor:Q", title="Leg Load Factor"),
-                size=alt.Size("capacity:Q").scale(zero=False),
+                size=alt.Size("capacity:Q").scale(
+                    zero=True
+                ),  # set zero to False for more contrast
                 facet=alt.Facet("carrier:N", columns=facet_columns),
                 tooltip=[
                     "leg_id",
@@ -386,64 +392,62 @@ class SimTabLegs(GenericSimulationTables):
             )
         )
         if select_leg:
-            if select_leg is True:
-                select_leg = "point"
-            if select_leg == "point":
-                selector = "point"
-                brush = alt.selection_point(name=selector)
-                chart_widget = alt.JupyterChart(chart.add_params(brush).interactive())
-            else:
-                selector = "brush"
-                brush = alt.selection_interval(name=selector)
-                chart_widget = alt.JupyterChart(chart.add_params(brush))
+            point_sel = alt.selection_point(name="point")
+            brush_sel = alt.selection_interval(
+                name="brush",
+                on="[mousedown[event.shiftKey], mouseup] > mousemove",
+                translate="[mousedown[event.shiftKey], mouseup] > mousemove!",
+            )
+            zoom = alt.selection_interval(
+                name="zoom",
+                bind="scales",
+                on="[mousedown[!event.shiftKey], mouseup] > mousemove",
+                translate="[mousedown[!event.shiftKey], mouseup] > mousemove!",
+            )
 
-            from ipywidgets import HTML, VBox
+            chart_widget = alt.JupyterChart(
+                chart.add_params(point_sel).add_params(brush_sel).add_selection(zoom)
+            )
 
-            table_widget = HTML(value=self.legs.iloc[:0].to_html())
-            subchart_widget = alt.JupyterChart(alt.Chart().mark_point())
+            from ipywidgets import VBox
 
-            if select_leg == "point":
+            # table_widget = HTML(value=df.iloc[:0].to_html())
+            subchart_widget = alt.JupyterChart(self.fig_select_leg_analysis([]))
 
-                def on_select(change):
+            def on_select_point(change):
+                sel = change.new.value
+                subchart_widget.chart = self.fig_select_leg_analysis(df.index[sel])
+
+            def on_select_brush(change):
+                try:
                     sel = change.new.value
-                    subchart_widget.chart = self.fig_select_leg_analysis(
-                        self.legs.index[sel]
-                    )
-            elif select_leg == "brush":
-
-                def on_select(change):
-                    try:
-                        sel = change.new.value
-                        if sel is None or "avg_local" not in sel:
-                            filtered = df.iloc[:0]
-                        else:
-                            carrier_name = change.new.store[0]["unit"].split("_")[-1]
-                            sel_local = sel["avg_local"]
-                            sel_load = sel["avg_load_factor"]
-                            filter_query = (
-                                f"{sel_local[0]} <= `avg_local` <= {sel_local[1]} and "
-                                f"{sel_load[0]} <= `avg_load_factor` <= {sel_load[1]}"
-                            )
-                            filter_query += f" and `carrier` == '{carrier_name}'"
-                            filtered = df.query(filter_query)
-                        # table_widget.value = filtered.to_html()
-                        table_widget.value = f"<pre>{change.new}</pre>"
-                        subchart_widget.chart = self.fig_select_leg_analysis(
-                            filtered.index
+                    if sel is None or "avg_local" not in sel:
+                        filtered = df.iloc[:0]
+                    else:
+                        carrier_name = change.new.store[0]["unit"].split("_")[-1]
+                        sel_local = sel["avg_local"]
+                        sel_load = sel["avg_load_factor"]
+                        filter_query = (
+                            f"{sel_local[0]} <= `avg_local` <= {sel_local[1]} and "
+                            f"{sel_load[0]} <= `avg_load_factor` <= {sel_load[1]}"
                         )
-                    except Exception as e:
-                        table_widget.value = f"<pre>{e}</pre>"
-                        subchart_widget.chart = alt.Chart().mark_point()
+                        filter_query += f" and `carrier` == '{carrier_name}'"
+                        filtered = df.query(filter_query)
+                    # table_widget.value = filtered.to_html()
+                    # table_widget.value = f"<pre>{change.new}</pre>"
+                    subchart_widget.chart = self.fig_select_leg_analysis(filtered.index)
+                except Exception:
+                    # table_widget.value = f"<pre>{e}</pre>"
+                    subchart_widget.chart = alt.Chart().mark_point()
 
-            chart_widget.selections.observe(on_select, [selector])
-
+            chart_widget.selections.observe(on_select_point, ["point"])
+            chart_widget.selections.observe(on_select_brush, ["brush"])
             return VBox(
                 [
                     chart_widget,
-                    table_widget,
+                    # table_widget,
                     subchart_widget,
                 ]
             )
 
-            pass
         return chart.interactive()

@@ -100,6 +100,7 @@ TABLES = [
     "bid_price_history",
     "displacement_history",
     "local_and_flow_yields",
+    "local_fraction_by_place",
 ]
 
 

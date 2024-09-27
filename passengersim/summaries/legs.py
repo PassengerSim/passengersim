@@ -103,6 +103,7 @@ class SimTabLegs(GenericSimulationTables):
                     else:
                         result[carrier][place] = np.nan
             result = from_nested_dict(result, dims=["carrier", "place"]).T
+            result = result.sort_index().sort_index(axis=1)
             self._data["local_fraction_by_place"] = result
         return self._data["local_fraction_by_place"]
 

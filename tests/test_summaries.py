@@ -110,6 +110,8 @@ TABLES = [
 def test_table_presence_single_process(summary, dataframe_regression, table_name: str):
     assert isinstance(summary, SimulationTables)
     df = getattr(summary, table_name)
+    if df.columns.nlevels > 1:
+        df.columns = ["__".join(col).strip() for col in df.columns.values]
     dataframe_regression.check(
         df,
         basename=table_name,
@@ -121,6 +123,8 @@ def test_table_presence_single_process(summary, dataframe_regression, table_name
 def test_table_presence_two_process(summary2, dataframe_regression, table_name: str):
     assert isinstance(summary2, SimulationTables)
     df = getattr(summary2, table_name)
+    if df.columns.nlevels > 1:
+        df.columns = ["__".join(col).strip() for col in df.columns.values]
     dataframe_regression.check(
         df,
         basename=table_name,
@@ -134,6 +138,8 @@ def test_table_presence_multi_process(
 ):
     assert isinstance(summary_mp, SimulationTables)
     df = getattr(summary_mp, table_name)
+    if df.columns.nlevels > 1:
+        df.columns = ["__".join(col).strip() for col in df.columns.values]
     dataframe_regression.check(
         df,
         basename=table_name,

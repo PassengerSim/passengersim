@@ -1,6 +1,4 @@
-metric,,,,bookings,bookings,revenue,revenue
-segment,,,,business,leisure,business,leisure
-trial,carrier,booking_class,days_prior,,,,
+trial,carrier,booking_class,days_prior,bookings__business,bookings__leisure,revenue__business,revenue__leisure
 0,AL1,Y0,1,2.2999999999999998,0,1273,0
 0,AL1,Y0,3,8.7200000000000006,0.040000000000000001,5015,23
 0,AL1,Y0,5,4.5,0.02,2625,10

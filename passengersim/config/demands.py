@@ -45,6 +45,9 @@ class Demand(BaseModel, extra="forbid"):
     Each demand is attached to a booking curve that describes the temporal
     distribution of customer arrivals."""
 
+    group_sizes: list[float] | None = None
+    """Probability of each group size.  i.e. [0.5, 0.3, 0.2] will give 50% one pax, 30% 2 pax, etc"""
+
     @property
     def choice_model_(self):
         """Choice model, falling back to segment name if not set explicitly."""

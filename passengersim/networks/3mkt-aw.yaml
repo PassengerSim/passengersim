@@ -4,7 +4,7 @@
 
 scenario: AW_test
 simulation_controls:
-  num_trials: 5
+  num_trials: 15
   num_samples: 600
 #  random_seed: 42
   sys_k_factor: 0.1
@@ -15,7 +15,7 @@ simulation_controls:
   tf_z_factor: 2.0
   prorate_revenue: true
   max_connect_time: 120
-  disable_ap: true
+#  disable_ap: False
   demand_multiplier: 1.0
   capacity_multiplier: 1.0
   manual_paths: false
@@ -25,9 +25,9 @@ simulation_controls:
 #  capture_choice_set_obs: 10000
   # Mountain Standard Time (for me)
   controller_time_zone: 0  # -7
-  generate_3seg: True
+  generate_3seg: False
   debug_connections: False
-  show_progress_bar: True
+#  show_progress_bar: True
 
 db:
   write_items:
@@ -235,7 +235,7 @@ load_factor_curves:
       Y5: 0.5
 
 rm_systems:
-  fcfs:
+  rm_fcfs:
     availability_control: leg
     processes: {}
   rm_lf:
@@ -277,6 +277,7 @@ rm_systems:
           name: untruncation
           algorithm: em
           initialization_method: pods
+          minimum_mu: 0.0
           kind: leg
         - step_type: forecast
           name: forecast
@@ -424,6 +425,30 @@ rm_systems:
           name: optimization
           algorithm: emsrb
           kind: leg
+
+  rm_udp:
+    availability_control: bp
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: path
+          initialization_method: pods
+          minimum_mu: 0.0
+        - step_type: forecast
+          name: path_forecast
+          algorithm: additive_pickup
+          kind: path
+        - step_type: udp
+          name: optimization
+          arrivals_per_time_slice: 1.0
+          min_time_slices_per_dcp: 1
+        - step_type: aggregation  # not needed for algorithm, but gives leg forecast data for output
+          name: aggregate
+      DAILY:
+        - step_type: udpupdate
+          name: optimization
 
   rm_pro_bp:
     availability_control: bp
@@ -748,36 +773,36 @@ choice_models:
     emult: 1.6
     basefare_mult: 2.5
     path_quality:  [38.30,  0.10]
-    preferred_carrier:  [-12.29,  0.17]
+#    preferred_carrier:  [-12.29,  0.17]
     r1: 2.0
     r2: 0.35
     r3: 0.50
-    anc1_relevance: 0.8
-    anc2_relevance: 0.5
-    anc3_relevance: 0.8
-    todd_curve: business
+#    anc1_relevance: 0.8
+#    anc2_relevance: 0.5
+#    anc3_relevance: 0.8
+#    todd_curve: business
 
   leisure:
     kind: pods
     emult: 1.5
     basefare_mult: 1.0
     path_quality:  [2.02, 0.12]
-    preferred_carrier:  [-1.98, 0.11]
+#    preferred_carrier:  [-1.98, 0.11]
     r1: 0.70
     r2: 0.35
     r3: 0.35
-    anc1_relevance: 0.5
-    anc2_relevance: 0.8
-    anc3_relevance: 0.5
-    hhi: [0.0, 0.0001]
-    elapsed_time: [0, 0.7]
-    buffer_threshold: 25
-    buffer_time: [0, 0.1]
-    todd_curve: leisure
+#    anc1_relevance: 0.5
+#    anc2_relevance: 0.8
+#    anc3_relevance: 0.5
+#    hhi: [0.0, 0.0001]
+#    elapsed_time: [0, 0.7]
+#    buffer_threshold: 25
+#    buffer_time: [0, 0.1]
+#    todd_curve: leisure
 
 carriers:
   - name: AL1
-    rm_system: rm_leg
+    rm_system: rm_udp
     frat5: curve_G
     #    fare_adjustment_scale: 0.3
     #    load_factor_curve: lf_curve1
@@ -791,7 +816,7 @@ carriers:
       - (Y4, Y)
       - (Y5, Y)
   - name: AL2
-    rm_system: rm_test1
+    rm_system: rm_pro_bp
     frat5: curve_C
     fare_adjustment_scale: 0.5
     load_factor_curve: lf_curve1
@@ -968,7 +993,7 @@ demands:
     choice_model: business
     curve: c1
     distance: 864.0
-    todd_curve: Tues_SameTZ_LE600
+#    todd_curve: Tues_SameTZ_LE600
   - orig: BOS
     dest: ORD
     segment: leisure
@@ -977,6 +1002,7 @@ demands:
     choice_model: leisure
     curve: c2
     distance: 864.0
+    group_sizes: [0.4, 0.3, 0.2, 0.1]
   - orig: ORD
     dest: LAX
     segment: business
@@ -993,6 +1019,7 @@ demands:
     distance: 1745
     choice_model: leisure
     curve: c2
+    group_sizes: [0.4, 0.3, 0.2, 0.1]
   - orig: BOS
     dest: LAX
     segment: business
@@ -1009,6 +1036,7 @@ demands:
 #    distance: 2611
     choice_model: leisure
     curve: c2
+    group_sizes: [0.4, 0.3, 0.2, 0.1]
 
 fares:
   - carrier: AL1

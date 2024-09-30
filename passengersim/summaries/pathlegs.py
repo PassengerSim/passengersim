@@ -68,8 +68,9 @@ class SimTabPathLegs(GenericSimulationTables):
 
         Returns
         -------
-        pd.DataFrame
-            A DataFrame with columns "path_id" and "leg_id".
+        dict[str, pd.DataFrame]
+            Keys include "orig", "dest", and "booking_class".  Values
+            are DataFrames with columns "gt_sold" and "gt_revenue".
         """
         if isinstance(leg_id, int):
             path_ids = self.path_legs.path_id[self.path_legs.leg_id == leg_id]
@@ -87,6 +88,8 @@ class SimTabPathLegs(GenericSimulationTables):
         self,
         leg_id: int | ArrayLike[int],
         metric: Literal["bookings", "revenue"] = "bookings",
+        *,
+        raw_input: dict[str, pd.DataFrame] = None,
     ):
         """
         Select path_legs for a specific leg.
@@ -103,7 +106,10 @@ class SimTabPathLegs(GenericSimulationTables):
         pd.DataFrame
             A DataFrame with columns "path_id" and "leg_id".
         """
-        data = self.select_leg_analysis(leg_id)
+        if isinstance(raw_input, dict):
+            data = raw_input
+        else:
+            data = self.select_leg_analysis(leg_id)
 
         if isinstance(leg_id, int):
             leg_descrip = f"Leg Id {leg_id}"
@@ -132,12 +138,7 @@ class SimTabPathLegs(GenericSimulationTables):
                 .mark_bar()
                 .encode(
                     x=x.title(k.replace("_", " ").title()),
-                    color=alt.Color(
-                        k,
-                        # legend=alt.Legend(orient="bottom")
-                        # if k == "booking_class"
-                        # else None,
-                    ),
+                    color=alt.Color(k),
                     tooltip=[
                         alt.Tooltip(k, title=k.replace("_", " ").title()),
                         alt.Tooltip("gt_sold", title="Bookings", format=".4s"),
@@ -161,7 +162,7 @@ class SimTabPathLegs(GenericSimulationTables):
             alt.Chart(data["booking_class"].reset_index())
             .mark_bar()
             .encode(
-                x=x.title(k.replace("_", " ").title()),
+                x=x.title("Booking Class"),
                 color=alt.Color(
                     "booking_class",
                     # legend=alt.Legend(orient="bottom")

@@ -32,7 +32,7 @@ from . import (
 from .generic import GenericSimulationTables
 
 
-class SimulationTables(*GenericSimulationTables._subclasses, GenericSimulationTables):
+class SimulationTables(*GenericSimulationTables.subclasses()):
     """Container for summary tables and figures extracted from a Simulation.
 
     This class is a subclass of GenericSimulationTables, which is defined in
@@ -40,3 +40,5 @@ class SimulationTables(*GenericSimulationTables._subclasses, GenericSimulationTa
     SimulationTables class, and provides type hints and (optionally, but
     ideally) documentation for the data that is stored in each item.
     """
+
+    __final__ = True

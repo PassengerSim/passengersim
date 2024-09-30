@@ -80,6 +80,7 @@ class SimTabPathLegs(GenericSimulationTables):
         result = {}
         for k in ["orig", "dest", "booking_class"]:
             result[k] = df.groupby(k)[["gt_sold", "gt_revenue"]].sum()
+            result[k] = result[k].query("gt_sold > 0")
         return result
 
     def fig_select_leg_analysis(
@@ -123,7 +124,9 @@ class SimTabPathLegs(GenericSimulationTables):
             raise ValueError(f"Unknown metric: {metric}")
 
         charts = []
-        for k, df in data.items():
+        for k in ["orig", "dest"]:
+            df = data[k]
+            # for k, df in data.items():
             chart = (
                 alt.Chart(df.reset_index())
                 .mark_bar()
@@ -131,9 +134,9 @@ class SimTabPathLegs(GenericSimulationTables):
                     x=x.title(k.replace("_", " ").title()),
                     color=alt.Color(
                         k,
-                        legend=alt.Legend(orient="bottom")
-                        if k == "booking_class"
-                        else None,
+                        # legend=alt.Legend(orient="bottom")
+                        # if k == "booking_class"
+                        # else None,
                     ),
                     tooltip=[
                         alt.Tooltip(k, title=k.replace("_", " ").title()),
@@ -144,12 +147,45 @@ class SimTabPathLegs(GenericSimulationTables):
             )
             charts.append(chart)
 
-        return (
+        orig_dest_chart = (
             alt.vconcat(*charts)
-            .resolve_scale(color="independent")
-            .properties(
-                title={
-                    "text": [f"{metric.title()} on {leg_descrip}"],
-                }
+            # .resolve_scale(color="independent")
+            # .properties(
+            #     title={
+            #         "text": [f"{metric.title()} on {leg_descrip}"],
+            #     }
+            # )
+        )
+
+        booking_class_chart = (
+            alt.Chart(data["booking_class"].reset_index())
+            .mark_bar()
+            .encode(
+                x=x.title(k.replace("_", " ").title()),
+                color=alt.Color(
+                    "booking_class",
+                    # legend=alt.Legend(orient="bottom")
+                ),
+                tooltip=[
+                    alt.Tooltip("booking_class", title="Booking Class"),
+                    alt.Tooltip("gt_sold", title="Bookings", format=".4s"),
+                    alt.Tooltip("gt_revenue", title="Revenue", format=".4s"),
+                ],
             )
         )
+
+        try:
+            return (
+                alt.hconcat(orig_dest_chart, booking_class_chart)
+                .resolve_scale(color="independent")
+                .properties(
+                    title={
+                        "text": [f"{metric.title()} on {leg_descrip}"],
+                    }
+                )
+            )
+        except Exception as e:
+            import sys
+
+            print(e, file=sys.stderr)
+            return [orig_dest_chart, booking_class_chart]

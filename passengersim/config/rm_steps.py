@@ -22,6 +22,11 @@ class RmStepBase(BaseModel, extra="forbid"):
 
     __subclasses: ClassVar[set[type[RmStepBase]]] = set()
 
+    @classmethod
+    def _get_subclasses(cls) -> set[type[RmStepBase]]:
+        """Return a set of all concrete subclasses"""
+        return cls.__subclasses.copy()
+
     def __init_subclass__(cls, **kwargs):
         """Capture a list of all concrete subclasses, including nested levels"""
         super().__init_subclass__(**kwargs)
@@ -52,7 +57,7 @@ class RmStepBase(BaseModel, extra="forbid"):
 
     @classmethod
     def as_pydantic_field(cls):
-        """Pydantic field type as a union of all subclasses, discriminated on step_type."""
+        """Pydantic field as a union of all subclasses, discriminated on step_type."""
         if len(cls.__subclasses) > 1:
             return Annotated[
                 reduce(operator.__or__, cls.__subclasses),

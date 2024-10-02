@@ -28,6 +28,11 @@ class Demand(BaseModel, extra="forbid"):
     For many applications, segments include 'business' and 'leisure', but
     they are not limited to these two categories."""
 
+    @property
+    def identifier(self):
+        """Unique identifier for this demand."""
+        return f"{self.orig}~{self.dest}@{self.segment}"
+
     base_demand: float
     reference_fare: float
     distance: float | None = 0.0

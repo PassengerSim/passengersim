@@ -43,6 +43,9 @@ reporting = [
     "altair>=5.0",
     "xmle",
 ]
+compression = [
+    "lz4",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]  # list of folders that contain the packages (["."] by default)
@@ -77,3 +80,7 @@ convention = "numpy"
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["E402", "F401"]  # Ignore import violations in all `__init__.py` files
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "--durations=0 --durations-min=1.0"

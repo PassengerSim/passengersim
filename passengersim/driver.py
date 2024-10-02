@@ -11,7 +11,7 @@ from collections import defaultdict
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from math import sqrt
-from typing import Any
+from typing import Any, TypeVar
 
 import numpy as np
 import pandas as pd
@@ -34,13 +34,18 @@ from passengersim.core import (
     PathClass,
     SimulationEngine,
 )
+from passengersim.summaries import SimulationTables
+from passengersim.summaries.generic import GenericSimulationTables
 from passengersim.summary import SummaryTables
+from passengersim.utils.nested_dict import from_nested_dict  # noqa: F401
 from passengersim.utils.si import si_units  # noqa: F401
 
 from . import database
 from .progressbar import DummyProgressBar, ProgressBar
 
 logger = logging.getLogger("passengersim")
+
+SimulationTablesT = TypeVar("SimulationTablesT", bound=GenericSimulationTables)
 
 
 def memory_log(tag):
@@ -168,6 +173,18 @@ class Simulation(BaseSimulation):
         breakdown of bookings and revenue by timeframe, customer segment,
         carrier, and booking class.
         """
+
+        self.bid_price_traces: dict[int, Any] = {}
+        """Bid price traces for each carrier.
+
+        The key is the trial number, and the value is a dictionary with
+        carrier names as keys and bid price traces as values."""
+
+        self.displacement_traces: dict[int, Any] = {}
+        """Displacement cost traces for each carrier.
+
+        The key is the trial number, and the value is a dictionary with
+        carrier names as keys and displacement cost traces as values."""
 
         self._initialize(config)
         if not config.db:
@@ -660,6 +677,7 @@ class Simulation(BaseSimulation):
         if num_paths and self.cnx.is_open:
             database.tables.create_table_path_defs(self.cnx._connection, self.sim.paths)
         logger.debug(f"Connections done, num_paths = {num_paths}")
+        self.sim.initialize_pathclasses()
 
         # Airlines using Q-forecasting need to have pathclasses set up for all paths
         # so Q-demand can be forecasted by pathclass even in the absence of bookings
@@ -762,8 +780,21 @@ class Simulation(BaseSimulation):
     def end_trial(self):
         """End of trial processing."""
         self.extract_segmentation_by_timeframe()
+        self.extract_and_reset_bid_price_traces()
         if self.cnx.is_open:
             self.cnx.save_final(self.sim)
+
+    def extract_and_reset_bid_price_traces(self):
+        self.bid_price_traces[self.sim.trial] = {
+            carrier.name: carrier.raw_bid_price_trace() for carrier in self.sim.carriers
+        }
+        self.displacement_traces[self.sim.trial] = {
+            carrier.name: carrier.raw_displacement_cost_trace()
+            for carrier in self.sim.carriers
+        }
+        for carrier in self.sim.carriers:
+            carrier.reset_bid_price_trace()
+            carrier.reset_displacement_cost_trace()
 
     def extract_segmentation_by_timeframe(
         self,
@@ -852,8 +883,9 @@ class Simulation(BaseSimulation):
                     f"Trial={self.sim.trial}, "
                     f"Sample={self.sim.sample}{carrier_info}{d_info}"
                 )
-            if self.sim.trial > 0 or self.sim.sample > 0:
-                self.sim.reset_counters()
+            self.sim.reset_counters()
+            if self.sim.sample == 0:
+                self.sim.reset_trial_counters()
             self.generate_demands()
             # self.generate_demands_gamma()
 
@@ -1022,6 +1054,8 @@ class Simulation(BaseSimulation):
                     self.file_writer.save_details(self.sim, recording_day)
 
             # simulation statistics record
+            if event_type.lower() in {"dcp", "done"}:
+                self.sim.record_dcp_statistics(recording_day)
             self.sim.record_daily_statistics(recording_day)
 
         except Exception as e:
@@ -1243,6 +1277,8 @@ class Simulation(BaseSimulation):
         )
         fare_class_dist_df = self.compute_raw_fare_class_mix(sim, to_log, to_db)
         bid_price_history_df = self.compute_bid_price_history(sim, to_log, to_db)
+        displacement_df = self.compute_displacement_history(sim, to_log, to_db)
+        demand_to_come_df = self.compute_demand_to_come_summary(sim, to_log, to_db)
         local_fraction_dist_df = self.compute_leg_local_fraction_distribution(
             sim, to_log, to_db
         )
@@ -1268,6 +1304,8 @@ class Simulation(BaseSimulation):
             local_fraction_by_place=local_fraction_by_place,
             n_total_samples=num_samples,
             segmentation_by_timeframe=segmentation_df,
+            displacement_history=displacement_df,
+            demand_to_come_summary=demand_to_come_df,
         )
         summary.load_additional_tables(self.cnx, sim.name, sim.burn_samples, additional)
         summary.cnx = self.cnx
@@ -1305,7 +1343,7 @@ class Simulation(BaseSimulation):
         return dmd_df
 
     def compute_class_dist(
-            self, sim: SimulationEngine, to_log=True, to_db: database.Database | None = None
+        self, sim: SimulationEngine, to_log=True, to_db: database.Database | None = None
     ):
         # Get unique segments
         segs = set([dmd.segment for dmd in sim.demands])
@@ -1315,17 +1353,14 @@ class Simulation(BaseSimulation):
                 k = (f.booking_class, seg)
                 try:
                     dist[k] += f.get_sales_by_segment(seg)
-                except:
+                except Exception:
                     # If the segment isn't found, just ignore it.
                     # i.e. basic economy won't book Y0
                     pass
 
         class_dist_df = []
         for (cls, seg), sold in dist.items():
-            class_dist_df.append(
-                    dict(booking_class=cls,
-                        segment=seg,
-                        sold=sold))
+            class_dist_df.append(dict(booking_class=cls, segment=seg, sold=sold))
         class_dist_df = pd.DataFrame(class_dist_df)
         return class_dist_df
 
@@ -1735,7 +1770,7 @@ class Simulation(BaseSimulation):
         to_log: bool = True,
         to_db: database.Database | None = None,
     ) -> pd.DataFrame:
-        """Compute the bid price history for each leg."""
+        """Compute the average bid price history for each carrier."""
         result = {}
         for carrier in sim.carriers:
             bp = carrier.raw_bid_price_trace()
@@ -1763,6 +1798,54 @@ class Simulation(BaseSimulation):
         df = df.fillna(0)
         if to_db and to_db.is_open:
             to_db.save_dataframe("bid_price_history", df)
+        return df
+
+    @staticmethod
+    def compute_displacement_history(
+        sim: SimulationEngine,
+        to_log: bool = True,
+        to_db: database.Database | None = None,
+    ) -> pd.DataFrame:
+        """Compute the average displacement cost history for each carrier."""
+        result = {}
+        for carrier in sim.carriers:
+            bp = carrier.raw_displacement_cost_trace()
+            result[carrier.name] = (
+                pd.DataFrame.from_dict(bp, orient="index")
+                .sort_index(ascending=False)
+                .rename_axis(index="days_prior")
+            )
+        if result:
+            df = pd.concat(result, axis=0, names=["carrier"])
+        else:
+            df = pd.DataFrame(
+                columns=[
+                    "displacement_mean",
+                    "displacement_stdev",
+                ],
+                index=pd.MultiIndex(
+                    [[], []], [[], []], names=["carrier", "days_prior"]
+                ),
+            )
+        df = df.fillna(0)
+        if to_db and to_db.is_open:
+            to_db.save_dataframe("displacement_history", df)
+        return df
+
+    @staticmethod
+    def compute_demand_to_come_summary(
+        sim: SimulationEngine,
+        to_log: bool = True,
+        to_db: database.Database | None = None,
+    ) -> pd.DataFrame:
+        raw = sim.summary_demand_to_come()
+        df = (
+            from_nested_dict(raw, ["segment", "days_prior", "metric"])
+            .sort_index(ascending=[True, False])
+            .rename(
+                columns={"mean": "mean_future_demand", "stdev": "stdev_future_demand"}
+            )
+        )
         return df
 
     def compute_leg_local_fraction_distribution(
@@ -1862,8 +1945,14 @@ class Simulation(BaseSimulation):
         return self.sim.config
 
     def run(
-        self, log_reports: bool = False, single_trial: int | None = None
-    ) -> SummaryTables:
+        self,
+        log_reports: bool = False,
+        *,
+        single_trial: int | None = None,
+        summarizer: type[SimulationTablesT]
+        | SimulationTablesT
+        | None = SimulationTables,
+    ) -> SummaryTables | SimulationTablesT:
         start_time = time.time()
         self.setup_scenario()
         if single_trial is not None:
@@ -1873,14 +1962,25 @@ class Simulation(BaseSimulation):
         if self.choice_set_file is not None:
             self.choice_set_file.close()
         logger.info("Computing reports")
-        summary = self.compute_reports(
-            self.sim,
-            to_log=log_reports or self.sim.config.outputs.log_reports,
-            additional=self.sim.config.outputs.reports,
-        )
-        logger.info("Saving reports")
-        if self.sim.config.outputs.excel:
-            summary.to_xlsx(self.sim.config.outputs.excel)
+        if summarizer is None:
+            summary = self.compute_reports(
+                self.sim,
+                to_log=log_reports or self.sim.config.outputs.log_reports,
+                additional=self.sim.config.outputs.reports,
+            )
+            logger.info("Saving reports")
+            if self.sim.config.outputs.excel:
+                summary.to_xlsx(self.sim.config.outputs.excel)
+        else:
+            if isinstance(summarizer, GenericSimulationTables):
+                summary = summarizer._extract(self)
+            elif issubclass(summarizer, GenericSimulationTables):
+                summary = summarizer.extract(self)
+            else:
+                raise TypeError(
+                    "summarizer must be an instance or subclass of "
+                    "GenericSimulationTables"
+                )
         logger.info(
             f"Th' th' that's all folks !!!    "
             f"(Elapsed time = {round(time.time() - start_time, 2)})"
@@ -1890,7 +1990,28 @@ class Simulation(BaseSimulation):
     def run_trial(self, trial: int, log_reports: bool = False) -> SummaryTables:
         self.setup_scenario()
         self.sim.trial = trial
-        self._run_sim()
+
+        update_freq = self.update_frequency
+        logger.debug(
+            f"run_sim, num_trials = {self.sim.num_trials}, "
+            f"num_samples = {self.sim.num_samples}"
+        )
+        self.sim.update_db_write_flags()
+        n_samples_total = self.sim.num_samples
+        n_samples_done = 0
+        self.sample_done_callback(n_samples_done, n_samples_total)
+        if self.sim.config.simulation_controls.show_progress_bar:
+            progress = ProgressBar(total=n_samples_total)
+        else:
+            progress = DummyProgressBar()
+        with progress:
+            self._run_single_trial(
+                trial,
+                n_samples_done,
+                n_samples_total,
+                progress,
+                update_freq,
+            )
         summary = self.compute_reports(
             self.sim,
             to_log=log_reports or self.sim.config.outputs.log_reports,

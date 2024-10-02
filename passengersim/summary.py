@@ -449,70 +449,77 @@ class SummaryTables:
                 logger.info("loading load_factor_distribution")
                 self.load_factor_distribution = (
                     database.common_queries.load_factor_distribution(
-                        db, scenario, burn_samples=burn_samples, cutoffs=cutoffs
+                        db,
+                        scenario=scenario,
+                        burn_samples=burn_samples,
+                        cutoffs=cutoffs,
                     )
                 )
 
         if "bookings_by_timeframe" in additional and db.is_open:
             logger.info("loading bookings_by_timeframe")
             self.bookings_by_timeframe = database.common_queries.bookings_by_timeframe(
-                db, scenario, burn_samples=burn_samples
+                db, scenario=scenario, burn_samples=burn_samples
             )
 
         if "total_demand" in additional and db.is_open:
             logger.info("loading total_demand")
             self.total_demand = database.common_queries.total_demand(
-                db, scenario, burn_samples
+                db, scenario=scenario, burn_samples=burn_samples
             )
 
         if "leg_forecasts" in additional and db.is_open:
             logger.info("loading leg_forecasts")
             self.leg_forecasts = database.common_queries.leg_forecasts(
-                db, scenario, burn_samples
+                db, scenario=scenario, burn_samples=burn_samples
             )
 
         if "path_forecasts" in additional and db.is_open:
             logger.info("loading path_forecasts")
             self.path_forecasts = database.common_queries.path_forecasts(
-                db, scenario, burn_samples
+                db, scenario=scenario, burn_samples=burn_samples
             )
 
         if "demand_to_come" in additional and db.is_open:
             logger.info("loading demand_to_come")
-            self.demand_to_come = database.common_queries.demand_to_come(db, scenario, burn_samples)
+            self.demand_to_come = database.common_queries.demand_to_come(
+                db, scenario=scenario
+            )
 
         if "demand_to_come_summary" in additional and db.is_open:
             logger.info("loading demand_to_come_summary")
             self.demand_to_come_summary = (
-                database.common_queries.demand_to_come_summary(db, scenario, burn_samples)
+                database.common_queries.demand_to_come_summary(db, scenario=scenario)
             )
 
         if "carrier_history" in additional and db.is_open:
             logger.info("loading carrier_history")
-            self.carrier_history = database.common_queries.carrier_history(db, scenario, burn_samples)
+            self.carrier_history = database.common_queries.carrier_history(
+                db, scenario=scenario
+            )
 
         if "bid_price_history" in additional and db.is_open:
             logger.info("loading bid_price_history")
             self.bid_price_history = database.common_queries.bid_price_history(
-                db, scenario, burn_samples
+                db, scenario=scenario, burn_samples=burn_samples
             )
 
         if "displacement_history" in additional and db.is_open:
             logger.info("loading displacement_history")
             self.displacement_history = database.common_queries.displacement_history(
-                db, scenario, burn_samples
+                db, scenario=scenario, burn_samples=burn_samples
             )
 
         if "local_and_flow_yields" in additional and db.is_open:
             logger.info("loading local_and_flow_yields")
             self.local_and_flow_yields = database.common_queries.local_and_flow_yields(
-                db, scenario, burn_samples
+                db, scenario=scenario, burn_samples=burn_samples
             )
 
         if "leg_local_and_flow_by_class" in additional and db.is_open:
             logger.info("loading leg_local_and_flow_by_class")
             self.leg_carried = database.common_queries.leg_local_and_flow_by_class(
-                db, scenario, burn_samples
+                db, scenario=scenario, burn_samples=burn_samples
             )
 
     def __init__(
@@ -1405,6 +1412,7 @@ class SummaryTables:
             )
         )
 
+    @report_figure
     def fig_segmentation_by_timeframe(
         self,
         metric: Literal["bookings", "revenue"],

@@ -12,8 +12,8 @@ import sys
 import time
 import typing
 import warnings
-from datetime import datetime, timezone
-from typing import Any
+from datetime import datetime
+from typing import Any, ClassVar
 from urllib.request import urlopen
 
 import addicty
@@ -37,6 +37,7 @@ from .outputs import OutputConfig
 from .paths import Path
 from .places import Place, great_circle
 from .pretty import PrettyModel, repr_dict_with_indent
+from .rm_steps import RmStepBase
 from .rm_systems import RmSystem
 from .simulation_controls import SimulationSettings
 from .snapshot_filter import SnapshotFilter
@@ -83,7 +84,7 @@ class YamlConfig(PrettyModel):
         -------
         addicty.Dict
         """
-        if isinstance(filenames, str | pathlib.Path):
+        if isinstance(filenames, str | bytes | os.PathLike):
             filenames = [filenames]
         raw_config = addicty.Dict()
         for filename in filenames:
@@ -130,7 +131,7 @@ class YamlConfig(PrettyModel):
     def from_yaml(
         cls: type[TConfig],
         filenames: pathlib.Path | list[pathlib.Path],
-    ) -> Self:
+    ) -> TConfig:
         """
         Read from YAML.
 
@@ -434,6 +435,30 @@ class Config(YamlConfig, extra="forbid"):
     paths: list[Path] = []
     markets: list[Market] = []
 
+    @property
+    def markets_dict(self):
+        result = {}
+        for m in self.markets:
+            if isinstance(m, dict):
+                m = Market(**m)
+            ident = f"{m.orig}~{m.dest}"
+            if ident in result:
+                raise ValueError(f"Duplicate market {ident}")
+            result[ident] = m
+        return result
+
+    @field_validator("markets")
+    @classmethod
+    def _no_duplicate_markets(cls, v: list[Market]) -> list[Market]:
+        """Check for duplicate markets."""
+        seen = set()
+        for mkt in v:
+            ident = f"{mkt.orig}~{mkt.dest}"
+            if ident in seen:
+                raise ValueError(f"Duplicate market {ident}")
+            seen.add(ident)
+        return v
+
     snapshot_filters: list[SnapshotFilter] = []
 
     @field_validator("snapshot_filters", mode="before")
@@ -604,6 +629,8 @@ class Config(YamlConfig, extra="forbid"):
                 )
         return m
 
+    __rm_steps_loaded: ClassVar[set[type[RmStepBase]]] = RmStepBase._get_subclasses()
+
     @classmethod
     def model_validate(
         cls,
@@ -636,16 +663,38 @@ class Config(YamlConfig, extra="forbid"):
         Config
             The validated model instance.
         """
-        # reload these to refresh for any newly defined RmSteps
-        module_parent = ".".join(__name__.split(".")[:-1])
-        importlib.reload(sys.modules.get(f"{module_parent}.rm_systems"))
-        importlib.reload(sys.modules.get(__name__))
-        module = importlib.reload(sys.modules.get(module_parent))
-        reloaded_class = getattr(module, cls.__name__)
+        # detect if there are any new RmSteps and reload the Config class
+        # to ensure they are properly registered
+        reloaded_class = cls
+        for k in RmStepBase._get_subclasses():
+            if k not in cls.__rm_steps_loaded:
+                # reload these to refresh for any newly defined RmSteps
+                module_parent = ".".join(__name__.split(".")[:-1])
+                importlib.reload(sys.modules.get(f"{module_parent}.rm_systems"))
+                importlib.reload(sys.modules.get(__name__))
+                module = importlib.reload(sys.modules.get(module_parent))
+                reloaded_class = getattr(module, cls.__name__)
         # `__tracebackhide__` tells pytest and some other tools to omit this
         # function from tracebacks
         __tracebackhide__ = True
         return reloaded_class.__pydantic_validator__.validate_python(*args, **kwargs)
+
+    @classmethod
+    @property
+    def as_reloaded(cls) -> type[Config]:
+        """Get the Config class, as most recently reloaded."""
+        module_parent = ".".join(__name__.split(".")[:-1])
+        module = sys.modules.get(module_parent)
+        reloaded_class = getattr(module, cls.__name__)
+        return reloaded_class
+
+    @classmethod
+    def instance_check(cls, obj) -> bool:
+        """Check if an object is an instance of the Config class."""
+        # module_parent = ".".join(__name__.split(".")[:-1])
+        # module = sys.modules.get(module_parent)
+        # reloaded_class = getattr(module, cls.__name__)
+        return isinstance(obj, cls.as_reloaded)
 
     def add_output_prefix(
         self, prefix: pathlib.Path, spool_format: str = "%Y%m%d-%H%M"
@@ -702,7 +751,7 @@ class Config(YamlConfig, extra="forbid"):
                         # Alan's approach
                         # It was converted as a local time, so unpack it and
                         #   create a new datetime in the given TZ
-                        dt = datetime.fromtimestamp(t) #, tz=timezone.utc)
+                        dt = datetime.fromtimestamp(t)  # , tz=timezone.utc)
                         dt2 = datetime(
                             dt.year,
                             dt.month,
@@ -721,10 +770,14 @@ class Config(YamlConfig, extra="forbid"):
                 if leg.orig == "DFW" and leg.dest == "CLE":
                     pass
                 place_o = self.places.get(leg.orig, None)
-                leg.dep_time, leg.dep_time_offset = adjust_time_zone(leg.dep_time, place_o)
+                leg.dep_time, leg.dep_time_offset = adjust_time_zone(
+                    leg.dep_time, place_o
+                )
                 leg.orig_timezone = str(place_o.time_zone_info) if place_o else None
                 place_d = self.places.get(leg.dest, None)
-                leg.arr_time, leg.arr_time_offset = adjust_time_zone(leg.arr_time, place_d)
+                leg.arr_time, leg.arr_time_offset = adjust_time_zone(
+                    leg.arr_time, place_d
+                )
                 leg.dest_timezone = str(place_d.time_zone_info) if place_d else None
                 if place_o is None:
                     warnings.warn(f"No defined place for {leg.orig}", stacklevel=2)

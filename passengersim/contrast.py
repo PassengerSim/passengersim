@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 from .reporting import report_figure
+from .summaries.demand_to_come import SimTabDemandToCome
 from .summary import SummaryTables
 
 
@@ -1123,13 +1124,22 @@ def fig_demand_to_come(
         return s
 
     def get_values(s, which="mean"):
-        result = getattr(s, "demand_to_come_summary", None)
-        if result is None:
-            result = dtc_seg(s.demand_to_come).groupby("segment", observed=False)
-            result = result.mean() if which == "mean" else result.std()
-            result = result.stack()
-            return result
-        else:
+        if isinstance(s, SummaryTables):
+            result = getattr(s, "demand_to_come_summary", None)
+            if result is None:
+                result = dtc_seg(s.demand_to_come).groupby("segment", observed=False)
+                result = result.mean() if which == "mean" else result.std()
+                result = result.stack()
+                return result
+            else:
+                if which == "mean":
+                    return result["mean_future_demand"]
+                elif which == "std":
+                    return result["stdev_future_demand"]
+                else:
+                    raise ValueError(f"which must be in [mean, std] not {which}")
+        elif isinstance(s, SimTabDemandToCome):
+            result = s.demand_to_come_summary
             if which == "mean":
                 return result["mean_future_demand"]
             elif which == "std":

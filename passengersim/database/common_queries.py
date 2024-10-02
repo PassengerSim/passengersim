@@ -333,7 +333,7 @@ def bookings_by_timeframe(
 
 
 def leg_forecasts(
-    cnx: Database, scenario: str, burn_samples: int = 100
+    cnx: Database, *, scenario: str = None, burn_samples: int = 100
 ) -> pd.DataFrame:
     """
     Average forecasts of demand by leg, bucket, and days to departure.
@@ -376,18 +376,19 @@ def leg_forecasts(
     FROM
         leg_bucket_detail LEFT JOIN leg_defs USING (leg_id)
     WHERE
-        scenario = ?1
-        AND sample >= ?2
+        sample >= ?1
+        AND scenario = ?2
     GROUP BY
         carrier, leg_id, bucket_number, name, days_prior
     """
-    return cnx.dataframe(
-        qry,
-        (
-            scenario,
-            burn_samples,
-        ),
-    ).set_index(["carrier", "leg_id", "bucket_number", "booking_class", "days_prior"])
+    if scenario is None:
+        qry = qry.replace("AND scenario = ?2", "")
+        params = (burn_samples,)
+    else:
+        params = (burn_samples, scenario)
+    return cnx.dataframe(qry, params).set_index(
+        ["carrier", "leg_id", "bucket_number", "booking_class", "days_prior"]
+    )
 
 
 def _leg_bucket_trace(
@@ -601,7 +602,7 @@ def leg_sales_trace(
 
 
 def path_forecasts(
-    cnx: Database, scenario: str, burn_samples: int = 100
+    cnx: Database, *, scenario: str = None, burn_samples: int = 100
 ) -> pd.DataFrame:
     """
     Average forecasts of demand by path, class, and days to departure.
@@ -642,22 +643,23 @@ def path_forecasts(
     FROM
         path_class_detail
     WHERE
-        scenario = ?1
-        AND sample >= ?2
+        sample >= ?1
+        AND scenario = ?2
     GROUP BY
         path_id, booking_class, days_prior
     """
-    return cnx.dataframe(
-        qry,
-        (
-            scenario,
-            burn_samples,
-        ),
-    ).set_index(["path_id", "booking_class", "days_prior"])
+    if scenario is None:
+        qry = qry.replace("AND scenario = ?2", "")
+        params = (burn_samples,)
+    else:
+        params = (burn_samples, scenario)
+    return cnx.dataframe(qry, params).set_index(
+        ["path_id", "booking_class", "days_prior"]
+    )
 
 
 def demand_to_come(
-    cnx: Database, scenario: str, burn_samples: int = 100
+    cnx: Database, *, scenario: str = None, burn_samples: int = 100
 ) -> pd.DataFrame:
     """
     Demand by market and timeframe across each sample.
@@ -670,7 +672,7 @@ def demand_to_come(
     Parameters
     ----------
     cnx : Database
-    scenario : str
+    scenario : str, optional
     burn_samples : int, default 100
         The demand will be returned ignoring this many samples from the
         beginning of each trial.
@@ -690,12 +692,15 @@ def demand_to_come(
     FROM
         demand_detail
     WHERE
-        scenario = ?1
-        AND sample >= ?2
+        sample >= ?1
+        AND scenario = ?2
     """
-    dmd = cnx.dataframe(
-        qry, (scenario, burn_samples), dtype={"future_demand": np.int32}
-    )
+    if scenario is None:
+        qry = qry.replace("AND scenario = ?2", "")
+        params = (burn_samples,)
+    else:
+        params = (burn_samples, scenario)
+    dmd = cnx.dataframe(qry, params, dtype={"future_demand": np.int32})
     dhs = (
         dmd.set_index(
             ["iteration", "trial", "sample", "segment", "orig", "dest", "days_prior"]
@@ -772,7 +777,7 @@ def demand_to_come_summary(
 
 
 def carrier_history(
-    cnx: Database, scenario: str, burn_samples: int = 100
+    cnx: Database, *, scenario: str = None, burn_samples: int = 100
 ) -> pd.DataFrame:
     """
     Sample-level details of carrier-level measures.
@@ -785,7 +790,7 @@ def carrier_history(
     Parameters
     ----------
     cnx : Database
-    scenario : str
+    scenario : str, optional
     burn_samples : int, default 100
         The history will be returned ignoring this many samples from the
         beginning of each trial.
@@ -807,38 +812,58 @@ def carrier_history(
         - `revenue`: Total revenue for this carrier in this sample.
     """
     # Provides content similar to PODS *.HST output file.
-    max_rrd = int(
-        cnx.dataframe(
-            """
-            SELECT max(days_prior) FROM leg_bucket_detail WHERE scenario == ?1
-            """,
-            (scenario,),
-        ).iloc[0, 0]
+    qry_params = {"burn_samples": burn_samples}
+    if scenario is not None:
+        qry_params["scenario"] = scenario
+        max_days_prior = int(
+            cnx.dataframe(
+                """
+                SELECT max(days_prior) FROM leg_bucket_detail WHERE scenario == ?1
+                """,
+                (scenario,),
+            ).iloc[0, 0]
+        )
+    else:
+        max_days_prior = int(
+            cnx.dataframe(
+                """
+                SELECT max(days_prior) FROM leg_bucket_detail
+                """,
+            ).iloc[0, 0]
+        )
+    qry_params["max_days_prior"] = max_days_prior
+    qry1 = """
+    SELECT
+        iteration, trial, sample, carrier,
+        sum(forecast_mean) as forecast_mean,
+        sqrt(sum(forecast_stdev*forecast_stdev)) as forecast_stdev
+    FROM leg_bucket_detail LEFT JOIN leg_defs USING (leg_id)
+    WHERE days_prior == @max_days_prior
+      AND scenario == @scenario
+      AND sample >= @burn_samples
+    GROUP BY iteration, trial, sample, carrier
+    """
+    if scenario is None:
+        qry1 = qry1.replace("AND scenario == @scenario", "")
+    bd1 = cnx.dataframe(qry1, qry_params).set_index(
+        ["iteration", "trial", "sample", "carrier"]
     )
-    bd1 = cnx.dataframe(
-        """
-        SELECT
-            iteration, trial, sample, carrier,
-            sum(forecast_mean) as forecast_mean,
-            sqrt(sum(forecast_stdev*forecast_stdev)) as forecast_stdev
-        FROM leg_bucket_detail LEFT JOIN leg_defs USING (leg_id)
-        WHERE days_prior == ?2 AND scenario == ?1 AND sample >= ?3
-        GROUP BY iteration, trial, sample, carrier
-        """,
-        (scenario, max_rrd, burn_samples),
-    ).set_index(["iteration", "trial", "sample", "carrier"])
-    bd2 = cnx.dataframe(
-        """
-        SELECT
-            iteration, trial, sample, carrier,
-            sum(sold) as sold,
-            sum(revenue) as revenue
-        FROM leg_bucket_detail LEFT JOIN leg_defs USING (leg_id)
-        WHERE days_prior == 0 AND scenario == ?1 AND sample >= ?2
-        GROUP BY iteration, trial, sample, carrier
-        """,
-        (scenario, burn_samples),
-    ).set_index(["iteration", "trial", "sample", "carrier"])
+    qry2 = """
+    SELECT
+        iteration, trial, sample, carrier,
+        sum(sold) as sold,
+        sum(revenue) as revenue
+    FROM leg_bucket_detail LEFT JOIN leg_defs USING (leg_id)
+    WHERE days_prior == 0
+      AND scenario == @scenario
+      AND sample >= @burn_samples
+    GROUP BY iteration, trial, sample, carrier
+    """
+    if scenario is None:
+        qry2 = qry2.replace("AND scenario == @scenario", "")
+    bd2 = cnx.dataframe(qry2, qry_params).set_index(
+        ["iteration", "trial", "sample", "carrier"]
+    )
     return pd.concat([bd1, bd2], axis=1).unstack("carrier")
 
 
@@ -1049,7 +1074,7 @@ def displacement_history(
 
 
 def local_and_flow_yields(
-    cnx: Database, scenario: str, burn_samples: int = 100
+    cnx: Database, *, scenario: str = None, burn_samples: int = 100
 ) -> pd.DataFrame:
     """
     Compute yields for local (nonstop) and flow (connecting) passengers.
@@ -1061,7 +1086,7 @@ def local_and_flow_yields(
     Parameters
     ----------
     cnx : Database
-    scenario : str
+    scenario : str, optional
     burn_samples : int, default 100
         The yields will be computed ignoring this many samples from the
         beginning of each trial.
@@ -1084,8 +1109,8 @@ def local_and_flow_yields(
             LEFT JOIN path_defs USING (path_id)
         WHERE
             days_prior == 0
-            AND scenario == ?1
-            AND sample >= ?2
+            AND sample >= ?1
+            AND scenario == ?2
         GROUP BY
             path_id
     )
@@ -1125,13 +1150,12 @@ def local_and_flow_yields(
             GROUP BY leg2
         ) f2 ON f2.leg2 == leg_defs.leg_id
     """
-    df = cnx.dataframe(
-        qry,
-        (
-            scenario,
-            burn_samples,
-        ),
-    )
+    if scenario is None:
+        qry = qry.replace("AND scenario == ?2", "")
+        params = (burn_samples,)
+    else:
+        params = (burn_samples, scenario)
+    df = cnx.dataframe(qry, params)
     return df
 
 

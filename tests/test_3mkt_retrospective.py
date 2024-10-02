@@ -18,7 +18,7 @@ def stored_results(tmp_path_factory) -> Contrast:
     cfg.simulation_controls.num_samples = 400
     cfg.simulation_controls.show_progress_bar = False
     cfg.db.filename = retrospect.joinpath("untruncated.sqlite")
-    summary1 = Simulation(cfg).run()
+    summary1 = Simulation(cfg).run(summarizer=None)
     summary1.cnx.close()
 
     cfg = Config.from_yaml(demo_network("3MKT/05-emsrb"))
@@ -26,7 +26,7 @@ def stored_results(tmp_path_factory) -> Contrast:
     cfg.simulation_controls.num_samples = 400
     cfg.simulation_controls.show_progress_bar = False
     cfg.db.filename = retrospect.joinpath("simple.sqlite")
-    summary2 = Simulation(cfg).run()
+    summary2 = Simulation(cfg).run(summarizer=None)
     summary2.cnx.close()
 
     simple = SummaryTables.from_sqlite(

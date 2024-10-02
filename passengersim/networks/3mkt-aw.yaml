@@ -4,7 +4,7 @@
 
 scenario: AW_test
 simulation_controls:
-  num_trials: 15
+  num_trials: 2
   num_samples: 600
 #  random_seed: 42
   sys_k_factor: 0.1
@@ -42,7 +42,8 @@ db:
     - demand_final
   fast: true
   engine: sqlite
-  filename: "AW-3MKT.sqlite"
+#  filename: "AW-3MKT.sqlite"
+  filename: ":memory:"
 
 outputs:
   reports:

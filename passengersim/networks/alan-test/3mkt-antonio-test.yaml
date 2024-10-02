@@ -137,10 +137,16 @@ choice_models:
     kind: pods
     emult: 1.6
     basefare_mult: 2.5
+    r1: 2.0
+    r2: 0.35
+    r3: 0.50
   leisure:
     kind: pods
     emult: 1.6
     basefare_mult: 1.0
+    r1: 0.70
+    r2: 0.35
+    r3: 0.35
 
 carriers:
   - name: AL1

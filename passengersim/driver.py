@@ -499,6 +499,8 @@ class Simulation(BaseSimulation):
                 dmd.add_curve(curve)
             if dmd_config.todd_curve in self.todd_curves:
                 dmd.add_dwm(self.todd_curves[dmd_config.todd_curve])
+            if dmd_config.group_sizes is not None:
+                dmd.add_group_sizes(dmd_config.group_sizes)
             self.sim.add_demand(dmd)
             if self.debug:
                 print(f"Added demand: {dmd}, base_demand = {dmd.base_demand}")

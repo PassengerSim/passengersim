@@ -19,21 +19,26 @@ def extract_pathclasses(sim: Simulation) -> pd.DataFrame | None:
     pc_data = []
     for pth in sim.sim.paths:
         for pc in pth.pathclasses:
-            pc_data.append(
-                {
-                    "path_id": pth.path_id,
-                    "booking_class": pc.booking_class,
-                    "carrier": pth.carrier,
-                    "orig": pth.orig,
-                    "dest": pth.dest,
-                    "gt_sold": pc.gt_sold,
-                    "gt_sold_priceable": pc.gt_sold_priceable,
-                    "gt_revenue": pc.gt_revenue,
-                }
-            )
+            this_pc = {
+                "path_id": pth.path_id,
+                "booking_class": pc.booking_class,
+                "carrier": pth.carrier,
+                "orig": pth.orig,
+                "dest": pth.dest,
+                "gt_sold": pc.gt_sold,
+                "gt_sold_priceable": pc.gt_sold_priceable,
+                "gt_revenue": pc.gt_revenue,
+            }
+            gt_sold_by_segment = pc.gt_sold_by_segment
+            if gt_sold_by_segment:
+                for seg, sold in gt_sold_by_segment.items():
+                    this_pc[f"gt_sold_by_segment_{seg}"] = sold
+            pc_data.append(this_pc)
     if len(pc_data) == 0:
         return None
-    return pd.DataFrame(pc_data).set_index(["path_id", "booking_class"]).sort_index()
+    df = pd.DataFrame(pc_data).set_index(["path_id", "booking_class"]).sort_index()
+    df = df.fillna(0)
+    return df
 
 
 class SimTabPathClasses(GenericSimulationTables):

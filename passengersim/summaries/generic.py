@@ -455,3 +455,19 @@ class GenericSimulationTables:
             if result.__class__.__name__ != cls.__name__:
                 raise TypeError(f"Expected {cls}, got {type(result)}")
             return result
+
+    def to_xlsx(self, filename: str | pathlib.Path) -> None:
+        """Write simulation tables to excel.
+
+        Parameters
+        ----------
+        filename : Path-like
+            The excel file to write.
+        """
+        if isinstance(filename, str):
+            filename = pathlib.Path(filename)
+        filename.parent.mkdir(exist_ok=True, parents=True)
+        with pd.ExcelWriter(filename) as writer:
+            for k, v in self._data.items():
+                if isinstance(v, pd.DataFrame):
+                    v.to_excel(writer, sheet_name=k)

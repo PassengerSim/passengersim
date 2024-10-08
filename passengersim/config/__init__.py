@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .base import Config, OptionalPath
+from .blf_curves import BlfCurve
 from .booking_curves import BookingCurve
 from .carriers import Carrier
 from .choice_model import ChoiceModel

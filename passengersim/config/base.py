@@ -23,6 +23,7 @@ from pydantic import Field, field_validator, model_validator
 from passengersim.pseudonym import random_label
 
 from .booking_curves import BookingCurve
+from .blf_curves import BlfCurve
 from .carriers import Carrier
 from .choice_model import ChoiceModel
 from .database import DatabaseConfig
@@ -312,6 +313,9 @@ class Config(YamlConfig, extra="forbid"):
 
     See [RM Systems][rm-systems] for details.
     """
+
+    blf_curves: DictOfNamed[BlfCurve] = {}
+    """ Booked Load Factor curves"""
 
     frat5_curves: DictOfNamed[Frat5Curve] = {}
     """ FRAT5 curves are used to model sellup rates in Q-forecasting"""

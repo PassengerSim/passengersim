@@ -3,6 +3,7 @@
 #
 
 scenario: AW_test
+
 simulation_controls:
   num_trials: 2
   num_samples: 60
@@ -22,8 +23,8 @@ simulation_controls:
   manual_paths: false
 #  debug_orders: false
   timeframe_demand_allocation: pods
-#  capture_choice_set_file: choice-set.csv
-#  capture_choice_set_obs: 10000
+  capture_choice_set_file: choice-set.csv
+  capture_choice_set_obs: 10000
   # Mountain Standard Time (for me)
   controller_time_zone: 0  # -7
   generate_3seg: False
@@ -36,7 +37,7 @@ db:
     - fare
     - demand
     - bookings
-    - bucket
+#    - bucket
     - pathclass
     - leg_final
     - fare_final
@@ -48,13 +49,13 @@ db:
 
 outputs:
   reports:
-    - leg_forecasts
+#    - leg_forecasts
     - fare_class_mix
     - load_factors
     - bookings_by_timeframe
     - total_demand
     - demand_to_come
-    - carrier_history
+#    - carrier_history
 
 frat5_curves:
   - name: curve_A
@@ -806,10 +807,10 @@ carriers:
   - name: AL1
     rm_system: rm_udp
     frat5: curve_G
-    #    fare_adjustment_scale: 0.3
-    #    load_factor_curve: lf_curve1
+#    fare_adjustment_scale: 0.3
+#    load_factor_curve: lf_curve1
 #    continuous_pricing: CBC
-    cp_quantize: 5
+#    cp_quantize: 5
     classes:
       - (Y0, Y)
       - (Y1, Y)

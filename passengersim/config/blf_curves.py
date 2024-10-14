@@ -11,7 +11,6 @@ from .pretty import PrettyModel
 
 class BlfCurve(PrettyModel, extra="forbid"):
     """Define a Booked Load Factor Curve. Used for UserAction."""
-
     name: str = "???"
     type: str
     min_distance: int = 0
@@ -19,5 +18,5 @@ class BlfCurve(PrettyModel, extra="forbid"):
     min_duration: float = 0.0
     max_duration: float = 25.0
     k_factor: float = 3.0
-    load_factors: dict[int, float] | list[float] = None
+    curve: dict[int, float] | list[float] = None
 

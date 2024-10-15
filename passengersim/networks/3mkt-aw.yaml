@@ -6,8 +6,8 @@ scenario: AW_test
 
 simulation_controls:
   num_trials: 2
-  num_samples: 60
-  burn_samples: 20
+  num_samples: 200
+  burn_samples: 10
 #  random_seed: 42
   sys_k_factor: 0.1
   mkt_k_factor: 0.15
@@ -331,9 +331,13 @@ rm_systems:
           name: leg_optimization
           algorithm: emsrb
           kind: leg
-        - step_type: useradjustment
-          name: user_adjustment
-          algorithm: booked_lf
+        - step_type: emsr
+          name: estimate_bp
+          algorithm: emsrc
+          kind: leg
+#        - step_type: useradjustment
+#          name: user_adjustment
+#          algorithm: booked_lf
 
   rm_test_elasticity:
     availability_control: leg
@@ -805,11 +809,11 @@ choice_models:
 
 carriers:
   - name: AL1
-    rm_system: rm_udp
+    rm_system: rm_pro_bp
     frat5: curve_G
 #    fare_adjustment_scale: 0.3
 #    load_factor_curve: lf_curve1
-#    continuous_pricing: CBC
+    continuous_pricing: CBC
 #    cp_quantize: 5
     classes:
       - (Y0, Y)

@@ -310,6 +310,8 @@ class Simulation(BaseSimulation):
                 step_list = [s._factory() for s in process]
                 x.add_process(process_name, step_list)
 
+            # Copy in the BLF curves if needed?
+
             ### This needs ot be revisited, now that we have DCP and DAILY step lists
             availability_control = rm_system.availability_control
             processes = (

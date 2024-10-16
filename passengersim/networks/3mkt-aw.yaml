@@ -6,9 +6,9 @@ scenario: AW_test
 
 simulation_controls:
   num_trials: 2
-  num_samples: 200
-  burn_samples: 10
-#  random_seed: 42
+  num_samples: 600
+  burn_samples: 100
+  random_seed: 42
   sys_k_factor: 0.1
   mkt_k_factor: 0.15
 #  pax_type_k_factor: 0.2
@@ -37,7 +37,7 @@ db:
     - fare
     - demand
     - bookings
-#    - bucket
+    - bucket
     - pathclass
     - leg_final
     - fare_final
@@ -55,7 +55,7 @@ outputs:
     - bookings_by_timeframe
     - total_demand
     - demand_to_come
-#    - carrier_history
+    - carrier_history
 
 frat5_curves:
   - name: curve_A
@@ -284,7 +284,7 @@ rm_systems:
           kind: leg
         - step_type: forecast
           name: forecast
-          algorithm: additive_pickup
+          algorithm: exp_smoothing
           alpha: 0.15
           kind: leg
         - step_type: emsr

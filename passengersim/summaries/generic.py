@@ -433,11 +433,21 @@ class GenericSimulationTables:
                     else:
                         filename = files[-1]
 
-                with lz4.frame.open(filename, "rb") as f:
-                    result = pickle.load(f)
-                    if result.__class__.__name__ != cls.__name__:
-                        raise TypeError(f"Expected {cls}, got {type(result)}")
-                    return result
+                try:
+                    with lz4.frame.open(filename, "rb") as f:
+                        result = pickle.load(f)
+                        # if result.__class__.__name__ != cls.__name__:
+                        #     raise TypeError(f"Expected {cls}, got {type(result)}")
+                        return result
+                except RuntimeError as err:
+                    if "LZ4F_decompress failed" in str(err):
+                        # lz4 frame error, try uncompressed file
+                        with open(filename, "rb") as f:
+                            result = pickle.load(f)
+                            # if result.__class__.__name__ != cls.__name__:
+                            #     raise TypeError(f"Expected {cls}, got {type(result)}")
+                            return result
+                    raise
             except FileNotFoundError:
                 pass
 

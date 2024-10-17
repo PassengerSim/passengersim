@@ -11,7 +11,7 @@ simulation_controls:
   random_seed: 42
   sys_k_factor: 0.1
   mkt_k_factor: 0.15
-#  pax_type_k_factor: 0.2
+  pax_type_k_factor: 0.2
   simple_k_factor: 0.2
   tf_k_factor: 0.1
   tf_z_factor: 2.0

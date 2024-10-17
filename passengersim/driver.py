@@ -306,34 +306,12 @@ class Simulation(BaseSimulation):
 
         for rm_name, rm_system in config.rm_systems.items():
             x = self.rm_systems[rm_name] = Rm_System(rm_name)
+            x.availability_control = rm_system.availability_control
             for process_name, process in rm_system.processes.items():
                 step_list = [s._factory() for s in process]
+                for s in step_list:
+                    s.use_config(config)
                 x.add_process(process_name, step_list)
-
-            # Copy in the BLF curves if needed?
-
-            ### This needs ot be revisited, now that we have DCP and DAILY step lists
-            availability_control = rm_system.availability_control
-            processes = (
-                rm_system.processes["dcp"] if "dcp" in rm_system.processes else []
-            )
-            if len(processes) == 0:
-                _inferred_availability_control = "none"
-            # elif steps[-1].step_type in ("probp", "udp"):
-            #    _inferred_availability_control = "bp"
-            # else:
-            #    _inferred_availability_control = "vn"
-            if availability_control == "infer":
-                raise NotImplementedError("")
-            #   availability_control = _inferred_availability_control
-            # else:
-            #   if availability_control != _inferred_availability_control:
-            #     warnings.warn(
-            #         f"availability_control for this RmSystem should be "
-            #         f"{_inferred_availability_control} but it is set to "
-            #         f"{availability_control}"
-            #     )
-            x.availability_control = availability_control
 
     def _init_todd_curves(self, config):
         for todd_name, todd in config.todd_curves.items():

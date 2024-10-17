@@ -141,14 +141,35 @@ class DatabaseTableItem:
 
 
 class GenericSimulationTables:
-    _subclasses: ClassVar[set[type[GenericSimulationTables]]] = set()
+    __subclasses: ClassVar[set[type[GenericSimulationTables]]] = set()
+
+    @classmethod
+    def subclasses(cls) -> list[type[GenericSimulationTables]]:
+        """Return a list of all concrete subclasses.
+
+        User defined subclasses (those not in the passengersim package)
+        are at the front of the list, so they come first in MRO and
+        thus can override native subclasses.
+        """
+        subs = []
+        for sub in cls.__subclasses:
+            if getattr(sub, "__final__", False):
+                # do not include classes marked as final
+                continue
+            if sub.__module__.startswith("passengersim.summaries"):
+                # these are native subclasses
+                subs.append(sub)
+            else:
+                subs.insert(0, sub)
+        subs.append(GenericSimulationTables)
+        return subs
 
     def __init_subclass__(cls, **kwargs):
         """Capture a set of all concrete subclasses"""
         super().__init_subclass__(**kwargs)
         if inspect.isabstract(cls):
             return  # do not include intermediate abstract base classes
-        cls._subclasses.add(cls)
+        cls.__subclasses.add(cls)
 
     def __init__(
         self,

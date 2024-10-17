@@ -6,7 +6,7 @@ scenario: AW_test
 
 simulation_controls:
   num_trials: 2
-  num_samples: 600
+  num_samples: 200
   burn_samples: 100
   random_seed: 42
   sys_k_factor: 0.1

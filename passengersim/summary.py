@@ -495,7 +495,7 @@ class SummaryTables:
         if "carrier_history" in additional and db.is_open:
             logger.info("loading carrier_history")
             self.carrier_history = database.common_queries.carrier_history(
-                db, scenario=scenario
+                db, scenario=scenario, burn_samples=burn_samples
             )
 
         if "bid_price_history" in additional and db.is_open:

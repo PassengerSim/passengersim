@@ -371,6 +371,7 @@ def create_table_path_class_detail(cnx: Database, primary_key: bool = False):
         path_id			INT NOT NULL,
         booking_class   VARCHAR(10) NOT NULL,
         sold			INT,
+        sold_priceable  INT,
         revenue         FLOAT,
         forecast_mean   FLOAT,
         forecast_stdev  FLOAT,

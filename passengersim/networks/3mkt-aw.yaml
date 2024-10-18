@@ -3,13 +3,15 @@
 #
 
 scenario: AW_test
+
 simulation_controls:
   num_trials: 2
-  num_samples: 600
-#  random_seed: 42
+  num_samples: 200
+  burn_samples: 100
+  random_seed: 42
   sys_k_factor: 0.1
   mkt_k_factor: 0.15
-#  pax_type_k_factor: 0.2
+  pax_type_k_factor: 0.2
   simple_k_factor: 0.2
   tf_k_factor: 0.1
   tf_z_factor: 2.0
@@ -21,8 +23,8 @@ simulation_controls:
   manual_paths: false
 #  debug_orders: false
   timeframe_demand_allocation: pods
-#  capture_choice_set_file: choice-set.csv
-#  capture_choice_set_obs: 10000
+  capture_choice_set_file: choice-set.csv
+  capture_choice_set_obs: 10000
   # Mountain Standard Time (for me)
   controller_time_zone: 0  # -7
   generate_3seg: False
@@ -47,7 +49,7 @@ db:
 
 outputs:
   reports:
-    - leg_forecasts
+#    - leg_forecasts
     - fare_class_mix
     - load_factors
     - bookings_by_timeframe
@@ -282,7 +284,7 @@ rm_systems:
           kind: leg
         - step_type: forecast
           name: forecast
-          algorithm: additive_pickup
+          algorithm: exp_smoothing
           alpha: 0.15
           kind: leg
         - step_type: emsr
@@ -329,9 +331,13 @@ rm_systems:
           name: leg_optimization
           algorithm: emsrb
           kind: leg
-        - step_type: useradjustment
-          name: user_adjustment
-          algorithm: booked_lf
+        - step_type: emsr
+          name: estimate_bp
+          algorithm: emsrc
+          kind: leg
+#        - step_type: useradjustment
+#          name: user_adjustment
+#          algorithm: booked_lf
 
   rm_test_elasticity:
     availability_control: leg
@@ -803,12 +809,12 @@ choice_models:
 
 carriers:
   - name: AL1
-    rm_system: rm_udp
+    rm_system: rm_pro_bp
     frat5: curve_G
-    #    fare_adjustment_scale: 0.3
-    #    load_factor_curve: lf_curve1
-#    continuous_pricing: CBC
-    cp_quantize: 5
+#    fare_adjustment_scale: 0.3
+#    load_factor_curve: lf_curve1
+    continuous_pricing: CBC
+#    cp_quantize: 5
     classes:
       - (Y0, Y)
       - (Y1, Y)

@@ -70,6 +70,10 @@ class RmStepBase(BaseModel, extra="forbid"):
         """Generate a deep copy of this RmStep."""
         return self.model_copy(deep=True)
 
+    def use_config(self, config):
+        """Some RM Steps might want to check parts of the config."""
+        pass
+
 
 class DummyStep(RmStepBase):
     step_type: Literal["dummy"]

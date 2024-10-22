@@ -877,7 +877,8 @@ def fig_path_forecasts(
     path_names: dict | None = None,
     agg_booking_classes: bool = False,
     by_class: bool | str = True,
-    of: Literal["mu", "sigma", "closed"] = "mu",
+    of: Literal["mu", "sigma", "closed", "adj_price"]
+    | list[Literal["mu", "sigma", "closed", "adj_price"]] = "mu",
 ):
     if isinstance(of, list):
         if raw_df:
@@ -958,6 +959,9 @@ def fig_path_forecasts(
     elif of == "closed":
         y = "forecast_closed_in_tf"
         y_title = "Mean Time Frame Closed of Demand Forecast"
+    elif of == "adj_price":
+        y = "adjusted_price"
+        y_title = "Mean Adjusted Fare"
     else:
         raise NotImplementedError
 

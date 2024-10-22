@@ -86,6 +86,7 @@ class SimTabForecasts(GenericSimulationTables):
             y,
         ]
         df = self.path_forecasts.reset_index()[columns]
+        df = df.query("days_prior > 0")
         color = "booking_class:N"
         if isinstance(by_path_id, int) and by_path_id is not True:
             df = df[df.path_id == by_path_id]
@@ -134,6 +135,7 @@ class SimTabForecasts(GenericSimulationTables):
         if self.leg_forecasts is None:
             raise ValueError("the leg_forecasts table is not available")
         df = self.leg_forecasts.reset_index()[columns]
+        df = df.query("days_prior > 0")
         color = "booking_class:N"
         if isinstance(by_leg_id, int) and by_leg_id is not True:
             df = df[df.leg_id == by_leg_id]

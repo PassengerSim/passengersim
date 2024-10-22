@@ -14,9 +14,10 @@ class Frat5Curve(Named, extra="forbid"):
     curve: dict[int, float]
     """Define a Frat5 curve.
 
-
-    The values (cumulative fraction of customers arriving) should increase
-    monotonically as the keys (DCPs, e.g. days to departure) decrease.
+    To be consistent with the econometric interpretation of the Frat5 curve,
+    the values should increase as the keys (DCPs, e.g. days to departure) decrease.
+    This implies that average willingness to pay increases as the departure date
+    approaches.
 
     Example
     -------

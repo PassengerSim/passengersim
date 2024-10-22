@@ -29,7 +29,29 @@ class Dict(addicty.Dict):
                 cls, handler(dict[source_type.__args__])
             )
         else:
-            print(source_type)
+            return core_schema.no_info_after_validator_function(
+                cls, handler(source_type)
+            )
+
+
+class DictAttr(dict):
+    def __getattr__(self, item):
+        if item in self:
+            return self[item]
+        raise AttributeError(f"no key {item}")
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls: Any, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        if (
+            isinstance(source_type, types.GenericAlias)
+            and source_type.__origin__ is DictAttr
+        ):
+            return core_schema.no_info_after_validator_function(
+                cls, handler(dict[source_type.__args__])
+            )
+        else:
             return core_schema.no_info_after_validator_function(
                 cls, handler(source_type)
             )
@@ -70,14 +92,43 @@ def enforce_name(x: dict[str, T] | list[T]) -> dict[str, T]:
                 try:
                     v.name = k
                 except AttributeError:
-                    raise ValueError(f"cannot assign name {k!r} to {type(v)}")
+                    raise ValueError(f"cannot assign name {k!r} to {type(v)}") from None
         try:
             if v["name"] != k:
                 raise ValueError(f"explict name {v['name']!r} does not match key {k!r}")
         except TypeError:
             if v.name != k:
-                raise ValueError(f"explict name {v.name!r} does not match key {k!r}")
+                raise ValueError(
+                    f"explict name {v.name!r} does not match key {k!r}"
+                ) from None
     return x
 
 
-DictOfNamed = Annotated[Dict[str, T], BeforeValidator(enforce_name)]
+DictOfNamed = Annotated[DictAttr[str, T], BeforeValidator(enforce_name)]
+
+
+class ListOfNamed(list):
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls: Any, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        if (
+            isinstance(source_type, types.GenericAlias)
+            and source_type.__origin__ is ListOfNamed
+        ):
+            return core_schema.no_info_after_validator_function(
+                cls, handler(list[source_type.__args__])
+            )
+        else:
+            return core_schema.no_info_after_validator_function(
+                cls, handler(source_type)
+            )
+
+    def __getattr__(self, item):
+        for step in self:
+            if getattr(step, "step_type", None) == item:
+                return step
+        for step in self:
+            if getattr(step, "name", None) == item:
+                return step
+        raise AttributeError(f"no step with step_type or name {item}")

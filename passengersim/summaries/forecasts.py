@@ -67,7 +67,7 @@ class SimTabForecasts(GenericSimulationTables):
         by_path_id: bool | int = True,
         *,
         by_class: bool | str = True,
-        of: Literal["mu", "sigma", "closed"] = "mu",
+        of: Literal["mu", "sigma", "closed", "adj_price"] = "mu",
         raw_df=False,
     ):
         if self.path_forecasts is None:
@@ -76,6 +76,7 @@ class SimTabForecasts(GenericSimulationTables):
             "mu": "forecast_mean",
             "sigma": "forecast_stdev",
             "closed": "forecast_closed_in_tf",
+            "adj_price": "adjusted_price",
         }
         y = of_columns.get(of)
         columns = [

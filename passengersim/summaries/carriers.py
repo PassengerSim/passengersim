@@ -84,6 +84,18 @@ def aggregate_carriers(summaries: list[SimulationTables]) -> pd.DataFrame | None
     return None
 
 
+def extract_carrier_history2(sim: Simulation) -> pd.DataFrame | None:
+    """Extract carrier_history from the Carrier class."""
+    combined_data = []
+    for cxr in sim.sim.carriers:
+        hist = cxr.get_carrier_history()
+        combined_data += hist
+    if len(combined_data) == 0:
+        return None
+    df = pd.DataFrame.from_dict(combined_data)
+    return df.set_index(["carrier", "sample"])
+
+
 class SimTabCarriers(GenericSimulationTables):
     """Container for summary tables and figures extracted from a Simulation.
 
@@ -108,6 +120,12 @@ class SimTabCarriers(GenericSimulationTables):
         aggregation_func=aggregate_by_concat_dataframe("carrier_history"),
         query_func=common_queries.carrier_history,
         doc="Carrier-level summary data from each sample.",
+    )
+
+    carrier_history2: pd.DataFrame | None = SimulationTableItem(
+        aggregation_func=aggregate_by_concat_dataframe("carrier_history2"),
+        extraction_func=extract_carrier_history2,
+        doc="Carrier-level summary data from each sample, new version with counters in CoreCarrier.",
     )
 
     def _fig_carrier_attribute(

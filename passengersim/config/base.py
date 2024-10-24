@@ -22,8 +22,8 @@ from pydantic import Field, field_validator, model_validator
 
 from passengersim.pseudonym import random_label
 
-from .booking_curves import BookingCurve
 from .blf_curves import BlfCurve
+from .booking_curves import BookingCurve
 from .carriers import Carrier
 from .choice_model import ChoiceModel
 from .database import DatabaseConfig
@@ -523,6 +523,16 @@ class Config(YamlConfig, extra="forbid"):
             if carrier.rm_system not in m.rm_systems:
                 raise ValueError(
                     f"Carrier {carrier.name} has unknown RM system {carrier.rm_system}"
+                )
+        return m
+
+    @model_validator(mode="after")
+    def _legs_have_carriers(cls, m: Config):
+        """Check that all legs have a carrier that has been defined."""
+        for leg in m.legs:
+            if leg.carrier not in m.carriers:
+                raise ValueError(
+                    f"Carrier for leg {leg.carrier} {leg.fltno} is not defined"
                 )
         return m
 

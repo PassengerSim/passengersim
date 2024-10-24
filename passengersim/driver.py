@@ -548,7 +548,7 @@ class Simulation(BaseSimulation):
                         continue
                     if prev_fare is not None:
                         diff = prev_fare.price - fare.price
-                        prev_fare.price_lower_bound = fare.price - diff / 2.0
+                        prev_fare.price_lower_bound = max(fare.price - diff / 2.0, 0)
                         fare.price_upper_bound = fare.price + diff / 2.0
                         # This provides a price floor, but will be overwritten
                         # each time through the loop EXCEPT for the lowest fare

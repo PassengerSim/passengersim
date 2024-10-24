@@ -18,6 +18,7 @@ def config() -> Config:
     cfg.simulation_controls.num_samples = 150
     cfg.simulation_controls.burn_samples = 75
     cfg.outputs.reports.clear()
+    cfg.outputs.reports.add("*")
     return cfg
 
 

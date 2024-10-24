@@ -11,7 +11,7 @@ def info():
     print(
         f"""\
 :seat: [bold dark_goldenrod]PassengerSim[/bold dark_goldenrod]
-   [black not bold]Version {__version__}
+   [not bold]Version {__version__}
    Core Version {__core_version__}
    Copyright (c) 2024 PassengerSim LLC
    This in-development tool is not for public distribution.

@@ -16,6 +16,9 @@ class OutputConfig(PrettyModel, extra="forbid", validate_assignment=True):
     Database queries reports can be included here.  This is important for
     multiprocessing runs with in-memory databases, as database results will not
     be available after the database connection is closed in each subprocess.
+
+    If this is a set containing only "*", all reports will be included; this
+    may be computationally expensive.
     """
 
     # TODO what reports require what database items?

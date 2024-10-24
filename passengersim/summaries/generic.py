@@ -263,15 +263,36 @@ class GenericSimulationTables:
     def run_queries(
         self,
         cnx: Database = None,
-        items: Collection[str] = (),
+        items: Collection[str] | None = None,
         *,
         scenario: str = None,
-        burn_samples: int = 100,
+        burn_samples: int | None = None,
     ) -> Self:
-        """Query summary data from a Database."""
+        """Query summary data from a Database.
+
+        The requested items will be queried from the database and stored in this
+        summary object.  If the item is not available, an exception will be raised.
+
+        Parameters
+        ----------
+        cnx : Database, optional
+            Database connection to use for querying.
+        items : Collection[str], optional
+            The items to query.  If None, or if only "*" is given, then all
+            available items will be queried.
+        scenario : str, optional
+            The scenario to use for querying.
+        burn_samples : int, optional
+            The number of burn samples to use for querying. If explicitly `None`,
+            the burn_samples value from the configuration will be used if available,
+            otherwise the default value of 100 will be used.
+        """
         if cnx is None:
             cnx = self.cnx
-        items = set(items) or self._std_query.keys()
+        if items is None or len(items) == 1 and "*" in items:
+            items = self._std_query.keys()
+        else:
+            items = set(items)
         if burn_samples is None:
             if self.config is not None:
                 burn_samples = self.config.simulation_controls.burn_samples
@@ -433,11 +454,21 @@ class GenericSimulationTables:
                     else:
                         filename = files[-1]
 
-                with lz4.frame.open(filename, "rb") as f:
-                    result = pickle.load(f)
-                    if result.__class__.__name__ != cls.__name__:
-                        raise TypeError(f"Expected {cls}, got {type(result)}")
-                    return result
+                try:
+                    with lz4.frame.open(filename, "rb") as f:
+                        result = pickle.load(f)
+                        # if result.__class__.__name__ != cls.__name__:
+                        #     raise TypeError(f"Expected {cls}, got {type(result)}")
+                        return result
+                except RuntimeError as err:
+                    if "LZ4F_decompress failed" in str(err):
+                        # lz4 frame error, try uncompressed file
+                        with open(filename, "rb") as f:
+                            result = pickle.load(f)
+                            # if result.__class__.__name__ != cls.__name__:
+                            #     raise TypeError(f"Expected {cls}, got {type(result)}")
+                            return result
+                    raise
             except FileNotFoundError:
                 pass
 
@@ -455,3 +486,19 @@ class GenericSimulationTables:
             if result.__class__.__name__ != cls.__name__:
                 raise TypeError(f"Expected {cls}, got {type(result)}")
             return result
+
+    def to_xlsx(self, filename: str | pathlib.Path) -> None:
+        """Write simulation tables to excel.
+
+        Parameters
+        ----------
+        filename : Path-like
+            The excel file to write.
+        """
+        if isinstance(filename, str):
+            filename = pathlib.Path(filename)
+        filename.parent.mkdir(exist_ok=True, parents=True)
+        with pd.ExcelWriter(filename) as writer:
+            for k, v in self._data.items():
+                if isinstance(v, pd.DataFrame):
+                    v.to_excel(writer, sheet_name=k)

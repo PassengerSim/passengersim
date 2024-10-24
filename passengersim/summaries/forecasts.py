@@ -106,7 +106,8 @@ class SimTabForecasts(GenericSimulationTables):
         by_leg_id: bool | int = True,
         *,
         by_class: bool | str = True,
-        of: Literal["mu", "sigma"] | list[Literal["mu", "sigma"]] = "mu",
+        of: Literal["mu", "sigma", "closed"]
+        | list[Literal["mu", "sigma", "closed"]] = "mu",
         raw_df=False,
     ):
         if isinstance(of, list):
@@ -124,7 +125,17 @@ class SimTabForecasts(GenericSimulationTables):
                     of=of_,
                 )
             return fig
-        y = "forecast_mean" if of == "mu" else "forecast_stdev"
+        if of == "mu":
+            y = "forecast_mean"
+            y_title = "Mean Demand Forecast"
+        elif of == "sigma":
+            y = "forecast_stdev"
+            y_title = "Std Dev Demand Forecast"
+        elif of == "closed":
+            y = "forecast_closed_in_tf"
+            y_title = "Closed in Time Frame"
+        else:
+            raise ValueError(f"Unknown 'of' value: {of}")
         columns = [
             "carrier",
             "leg_id",
@@ -149,5 +160,5 @@ class SimTabForecasts(GenericSimulationTables):
             facet_on=None,
             y=y,
             color=color,
-            y_title="Mean Demand Forecast" if of == "mu" else "Std Dev Demand Forecast",
+            y_title=y_title,
         )

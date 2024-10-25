@@ -808,15 +808,12 @@ choice_models:
 #    todd_curve: leisure
 
 circuity_rules:
-
   - name: hawaii
-    carrier: AS
     orig_state: HA
     dest_state: HA
     connect_airport: HNL
     alpha: 0.0
     beta: 1000.0
-
   - name: default
     alpha: 0.0002
     beta: 2.0

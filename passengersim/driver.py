@@ -304,6 +304,8 @@ class Simulation(BaseSimulation):
 
     def _init_circuity(self, config):
         for rule in config.circuity_rules:
+            # Flatten the object into a dictionary,
+            # SimulationEngine will iterate over it
             self.sim.add_circuity_rule(dict(rule))
 
     def _init_rm_systems(self, config):

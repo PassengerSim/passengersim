@@ -26,6 +26,7 @@ from .booking_curves import BookingCurve
 from .blf_curves import BlfCurve
 from .carriers import Carrier
 from .choice_model import ChoiceModel
+from .circuity_rules import CircuityRule
 from .database import DatabaseConfig
 from .demands import Demand
 from .fares import Fare
@@ -33,7 +34,7 @@ from .frat5_curves import Frat5Curve
 from .legs import Leg
 from .load_factor_curves import LoadFactorCurve
 from .markets import Market
-from .named import DictOfNamed
+from .named import DictOfNamed, ListOfNamed
 from .outputs import OutputConfig
 from .paths import Path
 from .places import Place, great_circle
@@ -348,6 +349,9 @@ class Config(YamlConfig, extra="forbid"):
 
     places: DictOfNamed[Place] = {}
     """A list of places (airports, vertiports, other stations)."""
+
+    circuity_rules: ListOfNamed[CircuityRule] = []
+    """Specifies exceptions and the default rule"""
 
     classes: list[str] = []
     """A list of fare classes.

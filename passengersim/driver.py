@@ -235,6 +235,7 @@ class Simulation(BaseSimulation):
 
     def _initialize(self, config: Config):
         self._init_sim_and_parms(config)
+        self._init_circuity(config)
         self._init_rm_systems(config)
         self._init_todd_curves(config)
         self._init_choice_models(config)
@@ -300,6 +301,10 @@ class Simulation(BaseSimulation):
             for dcp_index, days_prior in enumerate(config.dcps):
                 self.sim.add_dcp(dcp_index, days_prior)
                 self.dcps.append(days_prior)
+
+    def _init_circuity(self, config):
+        for rule in config.circuity_rules:
+            self.sim.add_circuity_rule(dict(rule))
 
     def _init_rm_systems(self, config):
         self.rm_systems = {}

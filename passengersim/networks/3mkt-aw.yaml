@@ -807,6 +807,20 @@ choice_models:
 #    buffer_time: [0, 0.1]
 #    todd_curve: leisure
 
+circuity_rules:
+
+  - name: hawaii
+    carrier: AS
+    orig_state: HA
+    dest_state: HA
+    connect_airport: HNL
+    alpha: 0.0
+    beta: 1000.0
+
+  - name: default
+    alpha: 0.0002
+    beta: 2.0
+
 carriers:
   - name: AL1
     rm_system: rm_pro_bp

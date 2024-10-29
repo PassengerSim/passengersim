@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 from typing import Annotated, Literal
-from pydantic import Field
+from pydantic import Field, field_validator, model_validator
 from .named import Named
 
 class CircuityRule(Named, extra="forbid"):

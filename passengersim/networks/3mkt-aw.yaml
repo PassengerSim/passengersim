@@ -6,7 +6,7 @@ scenario: AW_test
 
 simulation_controls:
   num_trials: 2
-  num_samples: 200
+  num_samples: 500
   burn_samples: 100
   random_seed: 42
   sys_k_factor: 0.1
@@ -335,9 +335,18 @@ rm_systems:
           name: estimate_bp
           algorithm: emsrc
           kind: leg
-#        - step_type: useradjustment
-#          name: user_adjustment
-#          algorithm: booked_lf
+        - step_type: useradjustment
+          name: user_adjustment
+          algorithm: booked_lf
+      DEPARTURE:
+        - step_type: marketaction
+          name: fare_sale
+          start_sample: 250
+          end_sample: 350
+          orig_airport: BOS
+          dest_airport: LAX
+          fare_change_pct: -10.0
+          fare_classes: ["Y3", "Y4", "Y5"]
 
   rm_test_elasticity:
     availability_control: leg
@@ -918,6 +927,13 @@ places:
     lat: 41.9802
     lon: -87.9090
     time_zone: America/Chicago
+  HNL:
+    label: Honolulu
+    country: USA
+    lat: 21.32040435
+    lon: -157.9173135198164
+    state: HI
+    time_zone: Pacific/Honolulu
   LAX:
     label: Los Angeles International Airport
     lat: 33.9438

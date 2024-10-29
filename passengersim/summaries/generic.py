@@ -53,11 +53,12 @@ class SimulationTableItem:
             df = instance._data[self.name]
             if isinstance(df, Exception):
                 raise df
+            engine = "python" if len(df) < 10000 else "numexpr"
             for field, func in self._computed_fields.items():
                 if field in df:
                     continue
                 try:
-                    df[field] = df.eval(func)
+                    df[field] = df.eval(func, engine=engine)
                 except Exception as e:
                     warnings.warn(
                         f"Error computing {field} for {self.name}: {e}", stacklevel=2

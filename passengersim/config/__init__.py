@@ -7,6 +7,7 @@ from .blf_curves import BlfCurve
 from .booking_curves import BookingCurve
 from .carriers import Carrier
 from .choice_model import ChoiceModel
+from .circuity_rules import CircuityRule
 from .database import DatabaseConfig
 from .demands import Demand
 from .fares import Fare

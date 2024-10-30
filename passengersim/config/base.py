@@ -26,6 +26,7 @@ from .blf_curves import BlfCurve
 from .booking_curves import BookingCurve
 from .carriers import Carrier
 from .choice_model import ChoiceModel
+from .circuity_rules import CircuityRule
 from .database import DatabaseConfig
 from .demands import Demand
 from .fares import Fare
@@ -33,7 +34,7 @@ from .frat5_curves import Frat5Curve
 from .legs import Leg
 from .load_factor_curves import LoadFactorCurve
 from .markets import Market
-from .named import DictOfNamed
+from .named import DictOfNamed, ListOfNamed
 from .outputs import OutputConfig
 from .paths import Path
 from .places import Place, great_circle
@@ -348,6 +349,9 @@ class Config(YamlConfig, extra="forbid"):
 
     places: DictOfNamed[Place] = {}
     """A list of places (airports, vertiports, other stations)."""
+
+    circuity_rules: ListOfNamed[CircuityRule] = []
+    """Specifies exceptions and the default rule"""
 
     classes: list[str] = []
     """A list of fare classes.
@@ -799,6 +803,32 @@ class Config(YamlConfig, extra="forbid"):
                     warnings.warn(f"No defined place for {leg.dest}", stacklevel=2)
                 leg.time_adjusted = True
         return self
+
+    @model_validator(mode="after")
+    def _places_exist_for_circuity(cls, cfg: Config):
+        """Circuity rules can only refer to airports in the places data.
+           The core code will not crash if the places are missing, but the rules
+           may not work as expected and that'll be a PITA to debug !!!"""
+        for rule in cfg.circuity_rules:
+            if rule.carrier != "" and rule.carrier not in cfg.carriers:
+                raise ValueError(
+                    f"Circuity rule '{rule.name}' refers to a carrier that isn't specified in carriers"
+                )
+            if rule.orig_airport != "" and rule.orig_airport not in cfg.places:
+                raise ValueError(
+                    f"Circuity rule '{rule.name}' refers to an orig airport that isn't specified in places"
+                )
+            if rule.connect_airport != "" and rule.connect_airport not in cfg.places:
+                raise ValueError(
+                    f"Circuity rule '{rule.name}' refers to a connecting airport that isn't specified in places"
+                )
+            if rule.dest_airport != "" and rule.dest_airport not in cfg.places:
+                raise ValueError(
+                    f"Circuity rule '{rule.name}' refers to a dest airport that isn't specified in places"
+                )
+
+            # Now we check state codes
+        return cfg
 
     def __repr__(self):
         indent = 2

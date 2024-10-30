@@ -23,11 +23,11 @@ simulation_controls:
   manual_paths: false
 #  debug_orders: false
   timeframe_demand_allocation: pods
-  capture_choice_set_file: choice-set.csv
-  capture_choice_set_obs: 10000
+#  capture_choice_set_file: choice-set-junk3.csv
+#  capture_choice_set_obs: 10000
   # Mountain Standard Time (for me)
   controller_time_zone: 0  # -7
-  generate_3seg: False
+  generate_3seg: True
   debug_connections: False
 #  show_progress_bar: True
 
@@ -806,6 +806,17 @@ choice_models:
 #    buffer_threshold: 25
 #    buffer_time: [0, 0.1]
 #    todd_curve: leisure
+
+circuity_rules:
+  - name: hawaii
+    orig_state: HA
+    dest_state: HA
+    connect_airport: HNL
+    alpha: 0.0
+    beta: 1000.0
+  - name: default
+    alpha: 0.0002
+    beta: 2.0
 
 carriers:
   - name: AL1

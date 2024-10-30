@@ -830,6 +830,7 @@ circuity_rules:
 carriers:
   - name: AL1
     rm_system: rm_test1
+    truncation_rule: 1
     frat5: curve_G
 #    fare_adjustment_scale: 0.3
 #    load_factor_curve: lf_curve1
@@ -844,6 +845,7 @@ carriers:
       - (Y5, Y)
   - name: AL2
     rm_system: rm_pro_bp
+    truncation_rule: 1
     frat5: curve_C
     fare_adjustment_scale: 0.5
     load_factor_curve: lf_curve1

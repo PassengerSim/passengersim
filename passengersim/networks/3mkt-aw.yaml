@@ -6,7 +6,7 @@ scenario: AW_test
 
 simulation_controls:
   num_trials: 2
-  num_samples: 500
+  num_samples: 600
   burn_samples: 100
   random_seed: 42
   sys_k_factor: 0.1
@@ -21,7 +21,7 @@ simulation_controls:
   demand_multiplier: 1.0
   capacity_multiplier: 1.0
   manual_paths: false
-#  debug_orders: false
+  debug_offers: false
   timeframe_demand_allocation: pods
 #  capture_choice_set_file: choice-set-junk3.csv
 #  capture_choice_set_obs: 10000
@@ -793,6 +793,7 @@ choice_models:
     r1: 2.0
     r2: 0.35
     r3: 0.50
+#    hhi: [0.0, 0.0001]
 #    anc1_relevance: 0.8
 #    anc2_relevance: 0.5
 #    anc3_relevance: 0.8
@@ -810,7 +811,7 @@ choice_models:
 #    anc1_relevance: 0.5
 #    anc2_relevance: 0.8
 #    anc3_relevance: 0.5
-#    hhi: [0.0, 0.0001]
+    hhi: [0.0, 0.0001]
 #    elapsed_time: [0, 0.7]
 #    buffer_threshold: 25
 #    buffer_time: [0, 0.1]
@@ -829,12 +830,13 @@ circuity_rules:
 
 carriers:
   - name: AL1
-    rm_system: rm_test1
+    rm_system: rm_pro_bp
     truncation_rule: 1
     frat5: curve_G
 #    fare_adjustment_scale: 0.3
 #    load_factor_curve: lf_curve1
     continuous_pricing: CBC
+    cp_bounds: 0.95
 #    cp_quantize: 5
     classes:
       - (Y0, Y)

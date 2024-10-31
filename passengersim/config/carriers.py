@@ -18,8 +18,14 @@ class Carrier(Named, extra="forbid"):
     """Used to select continuous pricing"""
 
     cp_quantize: int | None = 0
-    """Cntrols quantization (rounding) for Continuous Pricing
+    """Controls quantization (rounding) for Continuous Pricing
        Example: If you set it to 5, the price will be rounded to the nearest $5"""
+
+    cp_bounds: float = 0.5
+    """Controls upper and lower bounds for continuous pricing.
+       Example:  Y1 fare = $400, Y2 fare = $300
+                 The difference is $100, and a 0.25 multiplier will set the lower bound
+                 for Y1 as $375 and the upper bound for Y2 as $325"""
 
     frat5: str | None = ""
     """Named FRAT5 curve.

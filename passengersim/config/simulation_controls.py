@@ -148,7 +148,9 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     """
     Remove all advance purchase settings used in the simulation.
 
-    This applies to all carriers and all fare products.
+    This applies to all carriers and all fare products.  If active, this filter
+    is applied to all Fare definitions at the time the Config is loaded into to a
+    Simulation object.
     """
 
     demand_multiplier: confloat(gt=0) = 1.0

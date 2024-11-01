@@ -455,6 +455,16 @@ class Config(YamlConfig, extra="forbid"):
             result[ident] = m
         return result
 
+    @model_validator(mode="after")
+    def _fare_ap_restrictions_must_match_dcps(cls, m: Config):
+        """AP restrictions on fare can only be invoked at the DCPs."""
+        for f in m.fares:
+            if f.advance_purchase != 0 and f.advance_purchase not in m.dcps:
+                raise ValueError(
+                    f"Advance purchase restriction not aligned with DCP for Fare {f}"
+                )
+        return m
+
     @field_validator("markets")
     @classmethod
     def _no_duplicate_markets(cls, v: list[Market]) -> list[Market]:
@@ -807,24 +817,28 @@ class Config(YamlConfig, extra="forbid"):
     @model_validator(mode="after")
     def _places_exist_for_circuity(cls, cfg: Config):
         """Circuity rules can only refer to airports in the places data.
-           The core code will not crash if the places are missing, but the rules
-           may not work as expected and that'll be a PITA to debug !!!"""
+        The core code will not crash if the places are missing, but the rules
+        may not work as expected and that'll be a PITA to debug !!!"""
         for rule in cfg.circuity_rules:
             if rule.carrier != "" and rule.carrier not in cfg.carriers:
                 raise ValueError(
-                    f"Circuity rule '{rule.name}' refers to a carrier that isn't specified in carriers"
+                    f"Circuity rule '{rule.name}' refers to a "
+                    f"carrier that isn't specified in carriers"
                 )
             if rule.orig_airport != "" and rule.orig_airport not in cfg.places:
                 raise ValueError(
-                    f"Circuity rule '{rule.name}' refers to an orig airport that isn't specified in places"
+                    f"Circuity rule '{rule.name}' refers to an "
+                    f"orig airport that isn't specified in places"
                 )
             if rule.connect_airport != "" and rule.connect_airport not in cfg.places:
                 raise ValueError(
-                    f"Circuity rule '{rule.name}' refers to a connecting airport that isn't specified in places"
+                    f"Circuity rule '{rule.name}' refers to a "
+                    f"connecting airport that isn't specified in places"
                 )
             if rule.dest_airport != "" and rule.dest_airport not in cfg.places:
                 raise ValueError(
-                    f"Circuity rule '{rule.name}' refers to a dest airport that isn't specified in places"
+                    f"Circuity rule '{rule.name}' refers to a "
+                    f"dest airport that isn't specified in places"
                 )
 
             # Now we check state codes

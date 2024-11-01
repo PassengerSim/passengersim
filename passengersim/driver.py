@@ -494,8 +494,10 @@ class Simulation(BaseSimulation):
         # Hold PyObjects for markets in a dictionary in order to avoid duplicates
         self._markets = {k: v for k, v in self.markets.items()}
 
-    def _init_fares(self, config):
+    def _init_fares(self, config: Config):
         # self.fares = []
+        disable_ap = config.simulation_controls.disable_ap
+
         for fare_config in config.fares:
             fare = passengersim.core.Fare(
                 self.carriers_dict[fare_config.carrier],
@@ -504,7 +506,8 @@ class Simulation(BaseSimulation):
                 fare_config.booking_class,
                 fare_config.price,
             )
-            fare.adv_purch = fare_config.advance_purchase
+            if not disable_ap:
+                fare.adv_purch = fare_config.advance_purchase
             for rest_code in fare_config.restrictions:
                 fare.add_restriction(rest_code)
             self.sim.add_fare(fare)

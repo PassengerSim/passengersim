@@ -57,7 +57,7 @@ class Demand(BaseModel, extra="forbid"):
     """Probability that the customer has a R/T itinerary with a Saturday night stay.
        Using this for choice modeling and CP experiments"""
 
-    prob_duration: list[float] = []
+    prob_num_days: list[float] = []
     """Probability of durations.
        [0.1, 0.3, 0.4, 0.2] will have durations of 1, 2, 3, 4 days
        and probability of each is specified explicitly

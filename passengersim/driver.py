@@ -488,6 +488,8 @@ class Simulation(BaseSimulation):
                 dmd.add_dwm(self.todd_curves[dmd_config.todd_curve])
             if dmd_config.group_sizes is not None:
                 dmd.add_group_sizes(dmd_config.group_sizes)
+            dmd.prob_saturday_night = dmd_config.prob_saturday_night
+            dmd.prob_num_days = dmd_config.prob_num_days
             self.sim.add_demand(dmd)
             if self.debug:
                 print(f"Added demand: {dmd}, base_demand = {dmd.base_demand}")

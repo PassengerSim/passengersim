@@ -6,7 +6,7 @@ scenario: AW_test
 
 simulation_controls:
   num_trials: 2
-  num_samples: 600
+  num_samples: 200
   burn_samples: 100
   random_seed: 42
   sys_k_factor: 0.1
@@ -830,13 +830,13 @@ circuity_rules:
 
 carriers:
   - name: AL1
-    rm_system: rm_pro_bp
+    rm_system: rm_leg
     truncation_rule: 1
     frat5: curve_G
 #    fare_adjustment_scale: 0.3
 #    load_factor_curve: lf_curve1
-    continuous_pricing: CBC
-    cp_bounds: 0.95
+#    continuous_pricing: CBC
+#    cp_bounds: 0.95
 #    cp_quantize: 5
     classes:
       - (Y0, Y)
@@ -846,7 +846,7 @@ carriers:
       - (Y4, Y)
       - (Y5, Y)
   - name: AL2
-    rm_system: rm_pro_bp
+    rm_system: rm_leg
     truncation_rule: 1
     frat5: curve_C
     fare_adjustment_scale: 0.5

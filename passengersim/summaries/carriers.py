@@ -93,7 +93,8 @@ def extract_carrier_history2(sim: Simulation) -> pd.DataFrame | None:
     if len(combined_data) == 0:
         return None
     df = pd.DataFrame.from_dict(combined_data)
-    return df.set_index(["carrier", "sample"])
+    df = df.set_index(["trial", "sample", "carrier"])
+    return df
 
 
 class SimTabCarriers(GenericSimulationTables):

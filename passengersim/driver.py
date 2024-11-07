@@ -1038,14 +1038,13 @@ class Simulation(BaseSimulation):
                     # if self.sim.sample == 101:
                     #     print("write_to_sqlite DAILY")
                     what_had_happened_was.append("write_to_sqlite daily")
-                    internal_log = self.sim.write_to_sqlite(
+                    _internal_log = self.sim.write_to_sqlite(
                         self.cnx._connection,
                         recording_day,
                         store_bid_prices=self.sim.config.db.store_leg_bid_prices,
                         intermediate_day=True,
                         store_displacements=self.sim.config.db.store_displacements,
                     )
-                    print(internal_log)
             elif event_type.lower() in {"dcp", "done"}:
                 if self.cnx.is_open:
                     self.cnx.save_details(self.sim, recording_day)

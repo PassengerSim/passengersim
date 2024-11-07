@@ -126,10 +126,34 @@ class MultiSimulation(BaseSimulation):
         return self.config.model_dump_json()
 
     def run(
-        self, *, summarizer=SimulationTables, output_dir: pathlib.Path | None = None
+        self,
+        *,
+        summarizer=SimulationTables,
+        output_dir: pathlib.Path | None = None,
+        max_processes: int | None = None,
     ):
+        """
+        Run the simulation using multiple processes.
+
+        Parameters
+        ----------
+        summarizer : SimulationTables
+        output_dir : pathlib.Path, optional
+            The directory to write output files to.  If not provided, a temporary
+            directory will be created.
+        max_processes : int, optional
+            Maximum number of processes to run simultaneously.  If not provided, the
+            number of processes will be equal to the number of CPUs on the system.
+
+        Returns
+        -------
+        SimulationTables or subclass
+        """
         progress_queue = multiprocessing.Queue()
         processes = []
+        n_processes_started = 0
+        if max_processes is None:
+            max_processes = multiprocessing.cpu_count()
 
         task_ids = list(range(self.config.simulation_controls.num_trials))
         num_samples = self.config.simulation_controls.num_samples
@@ -159,7 +183,12 @@ class MultiSimulation(BaseSimulation):
                         kwargs={"summarizer": summarizer},
                     )
                     processes.append(p)
-                    p.start()
+
+                while n_processes_started < max_processes and n_processes_started < len(
+                    processes
+                ):
+                    processes[n_processes_started].start()
+                    n_processes_started += 1
 
                 while any(p.is_alive() for p in processes):
                     try:
@@ -174,6 +203,9 @@ class MultiSimulation(BaseSimulation):
                             refresh=True,
                         )
                         results[task_id] = payload
+                        if n_processes_started < len(processes):
+                            processes[n_processes_started].start()
+                            n_processes_started += 1
                     elif message == "update":
                         progress.update(
                             task_progress_ids[task_id], advance=payload, refresh=True

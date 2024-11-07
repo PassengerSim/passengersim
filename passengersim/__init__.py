@@ -9,7 +9,7 @@ from ._version import __version__, __version_tuple__
 from .cli.info import info  # noqa: F401
 from .config import Config, OptionalPath
 from .driver import Simulation
-from .mp_driver import MultiSimulation
+from .mp_driver2 import MultiSimulation
 from .summary import SummaryTables
 
 __all__ = [

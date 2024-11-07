@@ -59,21 +59,6 @@ class MultiSimulation(BaseSimulation):
         self._simulators = {}
         # self._placeholder_sim = None
 
-    # def run_trial(self, trial_id: int):
-    #     cfg = self.config.model_copy(deep=True)
-    #     if str(cfg.db.filename) != ":memory:":
-    #         cfg.db.filename = cfg.db.filename.with_suffix(
-    #             f".trial{trial_id:02}" + cfg.db.filename.suffix
-    #         )
-    #     sim = Simulation(cfg, self.output_dir)
-    #     self._simulators[trial_id] = sim
-    #     summary = sim.run(single_trial=trial_id)
-    #     try:
-    #         del summary.cnx
-    #     except AttributeError:
-    #         pass
-    #     return summary
-
     def run(self, *, summarizer=SimulationTables):
         if self.config.raw_license_certificate is None:
             try:

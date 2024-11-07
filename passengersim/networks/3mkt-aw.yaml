@@ -21,7 +21,7 @@ simulation_controls:
   demand_multiplier: 1.0
   capacity_multiplier: 1.0
   manual_paths: false
-#  debug_orders: false
+  debug_offers: false
   timeframe_demand_allocation: pods
 #  capture_choice_set_file: choice-set-junk3.csv
 #  capture_choice_set_obs: 10000
@@ -335,9 +335,18 @@ rm_systems:
           name: estimate_bp
           algorithm: emsrc
           kind: leg
-#        - step_type: useradjustment
-#          name: user_adjustment
-#          algorithm: booked_lf
+        - step_type: useradjustment
+          name: user_adjustment
+          algorithm: booked_lf
+      DEPARTURE:
+        - step_type: marketaction
+          name: fare_sale
+          start_sample: 250
+          end_sample: 350
+          orig_airport: BOS
+          dest_airport: LAX
+          fare_change_pct: -10.0
+          fare_classes: ["Y3", "Y4", "Y5"]
 
   rm_test_elasticity:
     availability_control: leg
@@ -784,6 +793,7 @@ choice_models:
     r1: 2.0
     r2: 0.35
     r3: 0.50
+#    hhi: [0.0, 0.0001]
 #    anc1_relevance: 0.8
 #    anc2_relevance: 0.5
 #    anc3_relevance: 0.8
@@ -801,30 +811,32 @@ choice_models:
 #    anc1_relevance: 0.5
 #    anc2_relevance: 0.8
 #    anc3_relevance: 0.5
-#    hhi: [0.0, 0.0001]
+    hhi: [0.0, 0.0001]
 #    elapsed_time: [0, 0.7]
 #    buffer_threshold: 25
 #    buffer_time: [0, 0.1]
 #    todd_curve: leisure
 
-circuity_rules:
-  - name: hawaii
-    orig_state: HA
-    dest_state: HA
-    connect_airport: HNL
-    alpha: 0.0
-    beta: 1000.0
-  - name: default
-    alpha: 0.0002
-    beta: 2.0
+#circuity_rules:
+#  - name: hawaii
+#    orig_state: HA
+#    dest_state: HA
+#    connect_airport: HNL
+#    alpha: 0.0
+#    beta: 1000.0
+#  - name: default
+#    alpha: 0.0002
+#    beta: 2.0
 
 carriers:
   - name: AL1
-    rm_system: rm_pro_bp
+    rm_system: rm_leg
+    truncation_rule: 1
     frat5: curve_G
 #    fare_adjustment_scale: 0.3
 #    load_factor_curve: lf_curve1
-    continuous_pricing: CBC
+#    continuous_pricing: CBC
+#    cp_bounds: 0.95
 #    cp_quantize: 5
     classes:
       - (Y0, Y)
@@ -834,7 +846,8 @@ carriers:
       - (Y4, Y)
       - (Y5, Y)
   - name: AL2
-    rm_system: rm_pro_bp
+    rm_system: rm_leg
+    truncation_rule: 1
     frat5: curve_C
     fare_adjustment_scale: 0.5
     load_factor_curve: lf_curve1
@@ -918,6 +931,13 @@ places:
     lat: 41.9802
     lon: -87.9090
     time_zone: America/Chicago
+  HNL:
+    label: Honolulu
+    country: USA
+    lat: 21.32040435
+    lon: -157.9173135198164
+    state: HI
+    time_zone: Pacific/Honolulu
   LAX:
     label: Los Angeles International Airport
     lat: 33.9438

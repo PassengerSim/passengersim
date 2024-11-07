@@ -488,6 +488,8 @@ class Simulation(BaseSimulation):
                 dmd.add_dwm(self.todd_curves[dmd_config.todd_curve])
             if dmd_config.group_sizes is not None:
                 dmd.add_group_sizes(dmd_config.group_sizes)
+            dmd.prob_saturday_night = dmd_config.prob_saturday_night
+            dmd.prob_num_days = dmd_config.prob_num_days
             self.sim.add_demand(dmd)
             if self.debug:
                 print(f"Added demand: {dmd}, base_demand = {dmd.base_demand}")
@@ -552,17 +554,22 @@ class Simulation(BaseSimulation):
 
             # Now set upper and lower bounds, these are used in continuous pricing
             for cxr in self.sim.carriers:
+                cp_bounds = self.config.carriers[cxr.name].cp_bounds
                 prev_fare = None
-                for fare in dmd.fares:
+                for fare in tmp_fares:
                     if fare.carrier_name != cxr.name:
                         continue
                     if prev_fare is not None:
                         diff = prev_fare.price - fare.price
-                        prev_fare.price_lower_bound = max(fare.price - diff / 2.0, 0)
-                        fare.price_upper_bound = fare.price + diff / 2.0
+                        prev_fare.price_lower_bound = max(
+                            fare.price - diff * cp_bounds, 0
+                        )
+                        fare.price_upper_bound = fare.price + diff * cp_bounds
                         # This provides a price floor, but will be overwritten
                         # each time through the loop EXCEPT for the lowest fare
-                        fare.price_lower_bound = fare.price / 2.0
+                        fare.price_lower_bound = fare.price - diff * cp_bounds
+                    else:
+                        fare.price_upper_bound = fare.price
                     prev_fare = fare
 
         for leg in self.sim.legs:

@@ -370,7 +370,7 @@ class GenericSimulationTables:
         add_timestamp_ext: bool = True,
         *,
         preserve_meta_summaries: bool = False,
-        preserve_config: bool = False,
+        preserve_config: bool = True,
         mkdir: bool = False,
     ):
         """Save to a pickle file.

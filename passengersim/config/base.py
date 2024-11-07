@@ -865,3 +865,13 @@ class Config(YamlConfig, extra="forbid"):
                 val = "\n  " + "\n  ".join(val_lines)
             x.append(f"{i}{k}: {val}")
         return "passengersim.Config:\n" + "\n".join(x)
+
+    def __getstate__(self):
+        state = super().__getstate__()
+        # do not save a user's license certificate into the state
+        if "raw_license_certificate" in state:
+            del state["raw_license_certificate"]
+        if "__dict__" in state:
+            if "raw_license_certificate" in state["__dict__"]:
+                del state["__dict__"]["raw_license_certificate"]
+        return state

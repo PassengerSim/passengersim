@@ -216,12 +216,17 @@ class Database:
         if not sim.save_timeframe_details and dcp > 0:
             return
         if sim.config.db.fast and isinstance(self._connection, sqlite3.Connection):
-            sim.write_to_sqlite(
+            print(
+                f"Saving to sqlite3: "
+                f"{sim.sample=}, {sim.trial=}, {sim.iteration=}, {dcp=}"
+            )
+            internal_log = sim.write_to_sqlite(
                 self._connection,
                 dcp,
                 store_bid_prices=sim.config.db.store_leg_bid_prices,
                 store_displacements=sim.config.db.store_displacements,
             )
+            print(internal_log, end="")
         else:
             for leg in sim.legs:
                 if "leg" in sim.config.db.write_items:

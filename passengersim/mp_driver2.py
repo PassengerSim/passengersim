@@ -176,51 +176,63 @@ class MultiSimulation(BaseSimulation):
                     for task_id in task_ids
                 }
 
-                for task_id in task_ids:
-                    p = multiprocessing.Process(
-                        target=_subprocess_run_trial,
-                        args=(task_id, cfg_json, progress_queue, output_dir),
-                        kwargs={"summarizer": summarizer},
-                    )
-                    processes.append(p)
-
-                while n_processes_started < max_processes and n_processes_started < len(
-                    processes
-                ):
-                    processes[n_processes_started].start()
-                    n_processes_started += 1
-
-                while any(p.is_alive() for p in processes):
-                    try:
-                        task_id, message, payload = progress_queue.get(timeout=0.25)
-                    except multiprocessing.queues.Empty:
-                        continue
-                    if message == "done":
-                        progress.update(
-                            task_progress_ids[task_id],
-                            completed=num_samples,
-                            description=f"Finished Trial {task_id}",
-                            refresh=True,
+                try:
+                    for task_id in task_ids:
+                        p = multiprocessing.Process(
+                            target=_subprocess_run_trial,
+                            args=(task_id, cfg_json, progress_queue, output_dir),
+                            kwargs={"summarizer": summarizer},
                         )
-                        results[task_id] = payload
-                        if n_processes_started < len(processes):
-                            processes[n_processes_started].start()
-                            n_processes_started += 1
-                    elif message == "update":
-                        progress.update(
-                            task_progress_ids[task_id], advance=payload, refresh=True
-                        )
-                    elif message == "finalizing":
-                        progress.update(
-                            task_progress_ids[task_id],
-                            description=f"Finalizing Trial {task_id}",
-                            refresh=True,
-                        )
-                    else:
-                        print(f"Unknown message {message}")
+                        processes.append(p)
 
-                for p in processes:
-                    p.join()
+                    while (
+                        n_processes_started < max_processes
+                        and n_processes_started < len(processes)
+                    ):
+                        processes[n_processes_started].start()
+                        n_processes_started += 1
+
+                    while any(p.is_alive() for p in processes):
+                        try:
+                            task_id, message, payload = progress_queue.get(timeout=0.25)
+                        except multiprocessing.queues.Empty:
+                            continue
+                        if message == "done":
+                            progress.update(
+                                task_progress_ids[task_id],
+                                completed=num_samples,
+                                description=f"Finished Trial {task_id}",
+                                refresh=True,
+                            )
+                            results[task_id] = payload
+                            if n_processes_started < len(processes):
+                                processes[n_processes_started].start()
+                                n_processes_started += 1
+                        elif message == "update":
+                            progress.update(
+                                task_progress_ids[task_id],
+                                advance=payload,
+                                refresh=True,
+                            )
+                        elif message == "finalizing":
+                            progress.update(
+                                task_progress_ids[task_id],
+                                description=f"Finalizing Trial {task_id}",
+                                refresh=True,
+                            )
+                        else:
+                            print(f"Unknown message {message}")
+
+                    for p in processes:
+                        p.join()
+
+                except KeyboardInterrupt:
+                    # TODO: send a signal to running processes to terminate
+                    #       gracefully, and collect partial results (if any)
+                    # terminate all processes so they are not orphaned
+                    for p in processes:
+                        p.terminate()
+                    raise
 
         result = summarizer.aggregate([value for key, value in sorted(results.items())])
         result.config = self.config.model_copy(deep=True)

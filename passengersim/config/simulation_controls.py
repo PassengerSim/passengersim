@@ -29,7 +29,7 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     See [Counting Simulations][counting-simulations] for more details.
     """
 
-    burn_samples: conint(ge=1, le=10000) = 100
+    burn_samples: conint(ge=0, le=10000) = 100
     """The number of samples to burn when starting each trial.
 
     Burned samples are used to populate a stable history of data to support

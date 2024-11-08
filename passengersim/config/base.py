@@ -513,6 +513,14 @@ class Config(YamlConfig, extra="forbid"):
                 "burn_samples must be strictly less than samples. "
                 "It will default to 100 if you haven't set a value"
             )
+        if (
+            m.simulation_controls.burn_samples == 0
+            and m.simulation_controls.num_samples > 10
+        ):
+            raise ValueError(
+                "to ensure meaningful results, burn_samples may not "
+                "be zero when num_samples > 10."
+            )
         return m
 
     @model_validator(mode="after")

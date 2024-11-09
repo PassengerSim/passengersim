@@ -28,7 +28,7 @@ rm_systems:
         algorithm: em
         kind: path
         initialization_method: pods
-        minimum_mu: 0.0
+        minimum_mu: 0.01
       - step_type: forecast
         name: path_forecast
         algorithm: additive_pickup

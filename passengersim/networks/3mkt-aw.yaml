@@ -5,9 +5,9 @@
 scenario: AW_test
 
 simulation_controls:
-  num_trials: 2
-  num_samples: 200
-  burn_samples: 100
+  num_trials: 5
+  num_samples: 600
+  burn_samples: 50
   random_seed: 42
   sys_k_factor: 0.1
   mkt_k_factor: 0.15
@@ -280,7 +280,7 @@ rm_systems:
           name: untruncation
           algorithm: em
           initialization_method: pods
-          minimum_mu: 0.0
+          minimum_mu: 0.01
           kind: leg
         - step_type: forecast
           name: forecast
@@ -317,6 +317,7 @@ rm_systems:
         - step_type: untruncation
           name: untruncation
           algorithm: em
+          minimum_mu: 0.01
           initialization_method: pods
           kind: leg
         - step_type: forecast
@@ -355,6 +356,7 @@ rm_systems:
         - step_type: untruncation
           name: untruncation
           algorithm: em
+          minimum_mu: 0.01
           kind: leg
         - step_type: forecast
           name: forecast
@@ -378,6 +380,7 @@ rm_systems:
         - step_type: untruncation
           name: untruncation
           algorithm: em
+          minimum_mu: 0.01
           kind: leg
         - step_type: forecast
           name: forecast
@@ -451,7 +454,7 @@ rm_systems:
           algorithm: em
           kind: path
           initialization_method: pods
-          minimum_mu: 0.0
+          minimum_mu: 0.01
         - step_type: forecast
           name: path_forecast
           algorithm: additive_pickup
@@ -473,6 +476,7 @@ rm_systems:
         - step_type: untruncation
           name: untruncation
           algorithm: em
+          minimum_mu: 0.01
           initialization_method: pods
           kind: path
         - step_type: forecast
@@ -520,6 +524,7 @@ rm_systems:
         - step_type: untruncation
           name: untruncation
           algorithm: em
+          minimum_mu: 0.01
           kind: path
         - step_type: forecast
           name: path_forecast
@@ -543,6 +548,7 @@ rm_systems:
         - step_type: untruncation
           name: untruncation
           algorithm: em
+          minimum_mu: 0.01
           kind: path
         - step_type: forecast
           name: path_forecast
@@ -832,7 +838,7 @@ carriers:
   - name: AL1
     rm_system: rm_leg
     truncation_rule: 1
-    frat5: curve_G
+#    frat5: curve_G
 #    fare_adjustment_scale: 0.3
 #    load_factor_curve: lf_curve1
 #    continuous_pricing: CBC
@@ -848,9 +854,9 @@ carriers:
   - name: AL2
     rm_system: rm_leg
     truncation_rule: 1
-    frat5: curve_C
-    fare_adjustment_scale: 0.5
-    load_factor_curve: lf_curve1
+#    frat5: curve_C
+#    fare_adjustment_scale: 0.5
+#    load_factor_curve: lf_curve1
 #    continuous_pricing: BP
 #    ancillaries:
 #      ANC1: 75.0

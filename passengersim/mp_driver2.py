@@ -111,7 +111,10 @@ class MultiSimulation(BaseSimulation):
 
     def _dump_config(self) -> str:
         """
-        Dump the configuration to a JSON string.
+        Dump the configuration to a JSON string suitable for a subprocess.
+
+        License info is added to the config if available.  Output file
+        reporting is removed.
 
         Returns
         -------
@@ -123,7 +126,9 @@ class MultiSimulation(BaseSimulation):
             except ImportError:
                 raw_license_certificate = None
             self.config.raw_license_certificate = raw_license_certificate
-        return self.config.model_dump_json()
+        return self.config.model_dump_json(
+            exclude={"outputs": {"html", "pickle", "excel", "log_reports"}}
+        )
 
     def run(
         self,

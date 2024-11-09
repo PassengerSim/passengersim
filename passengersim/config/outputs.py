@@ -1,7 +1,6 @@
 import pathlib
-from typing import Any
 
-from pydantic import model_serializer
+from pydantic import field_serializer
 
 from .pretty import PrettyModel
 
@@ -43,6 +42,12 @@ class HtmlOutputConfig(PrettyModel, extra="forbid", validate_assignment=True):
 
     bid_price_history: bool = True
     """Include bid price history in the HTML report."""
+
+    displacement_history: bool = True
+    """Include displacement history in the HTML report."""
+
+    carrier_table: bool = True
+    """Include carrier table in the HTML report."""
 
     other: list[str | tuple[str, dict]] = []
 
@@ -86,11 +91,6 @@ class OutputConfig(PrettyModel, extra="forbid", validate_assignment=True):
     # TODO what reports require what database items?
     # e.g. demand_to_come requires we store all `demand` not just demand_final
 
-    @model_serializer
-    def ser_model(self) -> dict[str, Any]:
-        return {
-            "log_reports": self.log_reports,
-            "excel": self.excel,
-            "reports": list(self.reports),
-            "html": self.html.model_dump(),
-        }
+    @field_serializer("reports", when_used="json")
+    def serialize_reports(self, reports: set):
+        return list(reports)

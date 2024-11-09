@@ -63,6 +63,10 @@ def to_html(
         rpt.add_section("Carrier Yields")
         rpt << summary.fig_carrier_yields()
 
+    if cfg.outputs.html.carrier_table:
+        rpt.add_section("Carrier Data")
+        rpt << summary.carriers
+
     if cfg.outputs.html.fare_class_mix:
         rpt.add_section("Fare Class Mix")
         rpt << Elem.from_altair(summary.fig_fare_class_mix())
@@ -91,6 +95,16 @@ def to_html(
         if bph is not None and bph["bid_price_mean"].max() > 0:
             rpt.add_section("Bid Price History")
             rpt << summary.fig_bid_price_history()
+
+    # displacement history is suppressed unless there is some displacement data
+    if cfg.outputs.html.displacement_history:
+        try:
+            dh = summary.displacement_history
+        except AttributeError:
+            dh = None
+        if dh is not None and dh["displacement_mean"].max() > 0:
+            rpt.add_section("Displacement Cost History")
+            rpt << summary.fig_displacement_history()
 
     if cfg.outputs.html.configs:
         rpt.add_section("Run Configuration")

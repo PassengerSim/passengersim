@@ -503,3 +503,20 @@ class GenericSimulationTables:
             for k, v in self._data.items():
                 if isinstance(v, pd.DataFrame):
                     v.to_excel(writer, sheet_name=k)
+
+    def to_html(
+        self, filename: str | pathlib.Path, *, cfg: Config | None = None
+    ) -> None:
+        """Write simulation tables report summary to html.
+
+        Parameters
+        ----------
+        filename : Path-like, optional
+            The html file to write.
+        cfg : Config, optional
+            The configuration to use for the report.  If None, the configuration
+            from the simulation object will be used.
+        """
+        from passengersim.reporting.html import to_html
+
+        to_html(self, filename, cfg=cfg)

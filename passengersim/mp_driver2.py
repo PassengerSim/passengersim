@@ -236,4 +236,11 @@ class MultiSimulation(BaseSimulation):
 
         result = summarizer.aggregate([value for key, value in sorted(results.items())])
         result.config = self.config.model_copy(deep=True)
+
+        # write output files if designated
+        if self.config.outputs.html:
+            result.to_html(self.config.outputs.html.filename)
+        if self.config.outputs.pickle:
+            result.to_pickle(self.config.outputs.pickle)
+
         return result

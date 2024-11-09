@@ -1,6 +1,62 @@
 import pathlib
+from typing import Any
+
+from pydantic import model_serializer
 
 from .pretty import PrettyModel
+
+
+class HtmlOutputConfig(PrettyModel, extra="forbid", validate_assignment=True):
+    """Configuration for HTML outputs."""
+
+    filename: pathlib.Path | None = None
+    """Write HTML outputs to this file after a run.
+
+    If this is None, no HTML outputs will be written."""
+
+    title: str | None = None
+    """Title of the HTML report.
+
+    If this is None, the title will be the scenario name."""
+
+    carrier_revenues: bool = True
+    """Include carrier revenues in the HTML report."""
+
+    carrier_load_factors: bool = True
+    """Include carrier load factors in the HTML report."""
+
+    carrier_yields: bool = True
+    """Include carrier yields in the HTML report."""
+
+    fare_class_mix: bool = True
+    """Include fare class mix in the HTML report.
+
+    This figure is always by carrier."""
+
+    bookings_by_timeframe: bool | list[str] = True
+    """Include bookings by timeframe in the HTML report.
+
+    If this is a list of strings, include only the specified carriers."""
+
+    leg_load_factor_distribution: bool = True
+    """Include leg load factor distribution in the HTML report."""
+
+    bid_price_history: bool = True
+    """Include bid price history in the HTML report."""
+
+    other: list[str | tuple[str, dict]] = []
+
+    configs: list[str] = [
+        "carriers",
+        "rm_systems",
+        "simulation_controls",
+        "db",
+        "outputs",
+    ]
+    """Include these configuration items in the HTML report."""
+
+    def __bool__(self) -> bool:
+        return self.filename is not None
 
 
 class OutputConfig(PrettyModel, extra="forbid", validate_assignment=True):
@@ -21,5 +77,20 @@ class OutputConfig(PrettyModel, extra="forbid", validate_assignment=True):
     may be computationally expensive.
     """
 
+    html: HtmlOutputConfig = HtmlOutputConfig()
+    """Configuration for HTML outputs."""
+
+    pickle: pathlib.Path | None = None
+    """Write a pickle of the SimulationTables output to this file after a run."""
+
     # TODO what reports require what database items?
     # e.g. demand_to_come requires we store all `demand` not just demand_final
+
+    @model_serializer
+    def ser_model(self) -> dict[str, Any]:
+        return {
+            "log_reports": self.log_reports,
+            "excel": self.excel,
+            "reports": list(self.reports),
+            "html": self.html.model_dump(),
+        }

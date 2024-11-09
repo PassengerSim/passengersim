@@ -1,6 +1,17 @@
+import pathlib
+
 import xmle
+import yaml
 from altair import LayerChart
 from altair.utils.schemapi import UndefinedType
+
+
+# allow dumping pathlib.Path objects to YAML
+def represent_path(dumper, data):
+    return dumper.represent_scalar("tag:yaml.org,2002:str", str(data))
+
+
+yaml.add_multi_representer(pathlib.PurePath, represent_path, Dumper=yaml.SafeDumper)
 
 
 class Report(xmle.Reporter):
@@ -9,9 +20,10 @@ class Report(xmle.Reporter):
         self._numbered_figure = xmle.NumberedCaption("Figure", level=2, anchor=True)
         self._numbered_table = xmle.NumberedCaption("Table", level=2, anchor=True)
 
-    def add_section(self, title):
+    def add_section(self, title: str, level: int = 1):
         self.__ilshift__(None)  # clear prior seen_html
-        self.append(f"# {title}")
+        tag = "#" * max(level, 1)
+        self.append(f"{tag} {title}")
         return self
 
     def add_figure(self, title, fig=None):
@@ -59,3 +71,13 @@ class Elem(xmle.Elem):
         x << cls("div", {"id": f"vis_{unique_token}"})
         x << cls.from_string(template)
         return x
+
+    def append(self, arg):
+        if isinstance(arg, LayerChart):
+            arg = Elem.from_altair(arg)
+        return super().append(arg)
+
+    def __lshift__(self, other):
+        if isinstance(other, LayerChart):
+            other = Elem.from_altair(other)
+        return super().__lshift__(other)

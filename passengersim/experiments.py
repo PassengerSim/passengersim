@@ -3,6 +3,17 @@ import pathlib
 from collections.abc import Callable
 from typing import Literal
 
+from rich.console import Group
+from rich.live import Live
+from rich.panel import Panel
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    TextColumn,
+    TimeRemainingColumn,
+)
+
 from passengersim import contrast
 
 from . import MultiSimulation, Simulation
@@ -101,61 +112,111 @@ class Experiments:
                 raise ValueError("Duplicate experiment tag: " + e.tag)
             tags.add(e.tag)
 
-        for e in self.experiments:
-            if e.external:
-                # If an external file is provided, load it and skip the simulation.
-                # This is done without regard for the use_existing parameter, and
-                # the absence of the external file is always an error.
-                summary = SimulationTables.from_pickle(e.external)
-                print(f"Loaded {e.tag} from {e.external}")
-                results[e.tag] = summary
-                continue
+        rich_progress = Progress(
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            MofNCompleteColumn(),
+            TimeRemainingColumn(),
+            auto_refresh=False,
+            transient=True,
+        )
+        top_progress = Progress(
+            MofNCompleteColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            auto_refresh=False,
+            transient=True,
+        )
+        live_display = Live(
+            Panel(
+                Group(
+                    top_progress,
+                    rich_progress,
+                ),
+                title="Experiments",
+                border_style="blue",
+                expand=True,
+            ),
+            refresh_per_second=4,
+            transient=True,
+        )
 
-            # Create the modified config for this experiment
-            config = e.func(self.base_config)
-            config.outputs.html.title = e.title
+        with live_display:
+            top_task = top_progress.add_task(
+                "[blue]Experiments", total=len(self.experiments)
+            )
 
-            # Update the paths for the output files
-            if config.outputs.html.filename:
-                config.outputs.html.filename = self._rename_file(
-                    e.tag, config.outputs.html.filename
+            for e in self.experiments:
+                top_progress.update(
+                    top_task, advance=1, description=f"[bold blue]{e.tag}", refresh=True
                 )
-            if config.outputs.pickle:
-                config.outputs.pickle = self._rename_file(e.tag, config.outputs.pickle)
-            if config.outputs.excel:
-                config.outputs.excel = self._rename_file(e.tag, config.outputs.excel)
 
-            summary = None
+                if e.external:
+                    # If an external file is provided, load it and skip the simulation.
+                    # This is done without regard for the use_existing parameter, and
+                    # the absence of the external file is always an error.
+                    summary = SimulationTables.from_pickle(e.external)
+                    live_display.console.print(
+                        f"Loaded experiment {e.tag} from {e.external}"
+                    )
+                    results[e.tag] = summary
+                    continue
 
-            if use_existing:
-                # Check if the output pickle files already exist
-                try:
-                    summary = SimulationTables.from_pickle(config.outputs.pickle)
-                except FileNotFoundError:
-                    if use_existing == "raise":
-                        raise
-                    elif use_existing == "ignore":
-                        continue
-                else:
-                    # If we reach this point, we have successfully loaded the
-                    # output pickle file
-                    print(f"Loaded {e.tag} from {config.outputs.pickle}")
+                # Create the modified config for this experiment
+                config = e.func(self.base_config)
+                config.outputs.html.title = e.title
 
-            if summary is None:
-                # If we reach this point, we need to run the simulation
+                # Update the paths for the output files
+                if config.outputs.html.filename:
+                    config.outputs.html.filename = self._rename_file(
+                        e.tag, config.outputs.html.filename
+                    )
+                if config.outputs.pickle:
+                    config.outputs.pickle = self._rename_file(
+                        e.tag, config.outputs.pickle
+                    )
+                if config.outputs.excel:
+                    config.outputs.excel = self._rename_file(
+                        e.tag, config.outputs.excel
+                    )
 
-                # Initialize the simulation
-                if e.multi:
-                    sim = MultiSimulation(config)
-                else:
-                    sim = Simulation(config)
+                summary = None
 
-                # Run the simulation
-                summary = sim.run()
+                if use_existing:
+                    # Check if the output pickle files already exist
+                    try:
+                        summary = SimulationTables.from_pickle(config.outputs.pickle)
+                    except FileNotFoundError:
+                        if use_existing == "raise":
+                            raise
+                        elif use_existing == "ignore":
+                            continue
+                    else:
+                        # If we reach this point, we have successfully loaded the
+                        # output pickle file
+                        live_display.console.print(
+                            f"Loaded {e.tag} from {config.outputs.pickle}"
+                        )
 
-                # Clean up the simulation
-                del sim
+                if summary is None:
+                    # If we reach this point, we need to run the simulation
 
-            results[e.tag] = summary
+                    # Initialize the simulation
+                    if e.multi:
+                        sim = MultiSimulation(config)
+                        summary = sim.run(rich_progress=rich_progress)
+                        del sim
+                    else:
+                        sim = Simulation(config)
+                        summary = sim.run()
+                        del sim
+
+                results[e.tag] = summary
+
+            top_progress.update(
+                top_task,
+                description="[bold blue]Finished Experiments",
+                refresh=True,
+                visible=False,
+            )
 
         return results

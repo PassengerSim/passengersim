@@ -82,7 +82,12 @@ class Experiments:
         self.experiments.append(e)
         return e
 
-    def run(self, use_existing: Literal[True, False, "ignore", "raise"] = True):
+    def run(
+        self,
+        use_existing: Literal[True, False, "ignore", "raise"] = True,
+        *,
+        tag: str | None = None,
+    ):
         """
         Run the experiments.
 
@@ -95,10 +100,12 @@ class Experiments:
             from output pickle files if they exist, otherwise skip each
             experiment.  If "raise", raise an error if the output pickle files
             do not exist for any experiment.
+        tag : str, optional
+            If provided, only run the experiment with the given tag.
 
         Returns
         -------
-        contrast.Contrast
+        contrast.Contrast or SimulationTables
         """
 
         results = contrast.Contrast()
@@ -111,6 +118,15 @@ class Experiments:
             if e.tag in tags:
                 raise ValueError("Duplicate experiment tag: " + e.tag)
             tags.add(e.tag)
+
+        if isinstance(tag, str):
+            selected_experiments = [e for e in self.experiments if e.tag == tag]
+            if not selected_experiments:
+                raise ValueError(f"No experiment found with tag {tag}")
+        elif tag is None:
+            selected_experiments = self.experiments
+        else:
+            raise TypeError("tag must be a string or None")
 
         rich_progress = Progress(
             TextColumn("[progress.description]{task.description}"),
@@ -142,10 +158,10 @@ class Experiments:
 
         with live_display:
             top_task = top_progress.add_task(
-                "[blue]Experiments", total=len(self.experiments)
+                "[blue]Experiments", total=len(selected_experiments)
             )
 
-            for e in self.experiments:
+            for e in selected_experiments:
                 top_progress.update(
                     top_task, advance=1, description=f"[bold blue]{e.tag}", refresh=True
                 )
@@ -219,4 +235,6 @@ class Experiments:
                 visible=False,
             )
 
+        if len(selected_experiments) == 1:
+            return results[selected_experiments[0].tag]
         return results

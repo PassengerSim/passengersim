@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import glob
 import inspect
+import multiprocessing
 import os
 import pathlib
 import pickle
+import platform
 import time
 import warnings
 from collections.abc import Callable, Collection
+from datetime import datetime, timezone
 from functools import partialmethod
 from typing import TYPE_CHECKING, Any, ClassVar, Self
 
@@ -24,6 +27,29 @@ class MissingDataError(KeyError):
     """Exception raised when data is missing from a summary table."""
 
     pass
+
+
+def initialize_metadata() -> dict[str, Any]:
+    """Initialize metadata for the summary."""
+    from passengersim_core import __version__ as core_version
+
+    from passengersim import __version__ as version
+
+    metadata = {}
+    metadata["created"] = datetime.now(timezone.utc).isoformat()
+    metadata["platform.system"] = platform.system()
+    metadata["platform.release"] = platform.release()
+    metadata["platform.version"] = platform.version()
+    metadata["platform.machine"] = platform.machine()
+    metadata["platform.processor"] = platform.processor()
+    metadata["platform.architecture"] = platform.architecture()
+    metadata["platform.node"] = platform.node()
+    metadata["platform.platform"] = platform.platform()
+    metadata["platform.python_version"] = platform.python_version()
+    metadata["cpu_count"] = multiprocessing.cpu_count()
+    metadata["passengersim_version"] = version
+    metadata["passengersim_core_version"] = core_version
+    return metadata
 
 
 class SimulationTableItem:
@@ -209,6 +235,9 @@ class GenericSimulationTables:
         self.meta_summaries = []
         """Summaries that were aggregated to create this summary."""
 
+        self._metadata = initialize_metadata()
+        """Metadata for the summary."""
+
     __writable_attrs = {
         "_data",
         "config",
@@ -219,6 +248,7 @@ class GenericSimulationTables:
         "_preserve_meta_summaries",
         "_preserve_config",
         "_items",
+        "_metadata",
     }
 
     def __setattr__(self, item, value):
@@ -378,6 +408,8 @@ class GenericSimulationTables:
             self.config = None
         if "n_total_samples" not in self.__dict__:
             self.n_total_samples = 0
+        if "_metadata" not in self.__dict__:
+            self._metadata = {}
 
     def to_pickle(
         self,

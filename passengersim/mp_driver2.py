@@ -5,6 +5,7 @@ import pathlib
 import time
 import warnings
 from contextlib import nullcontext
+from datetime import datetime, timezone
 
 from rich.progress import (
     BarColumn,
@@ -160,6 +161,9 @@ class MultiSimulation(BaseSimulation):
         -------
         SimulationTables or subclass
         """
+        run_start = time.time()
+        run_start_str = datetime.fromtimestamp(run_start, timezone.utc).isoformat()
+
         progress_queue = multiprocessing.Queue()
         processes = []
         n_processes_started = 0
@@ -254,6 +258,12 @@ class MultiSimulation(BaseSimulation):
 
         result = summarizer.aggregate([value for key, value in sorted(results.items())])
         result.config = self.config.model_copy(deep=True)
+        result._metadata["created"] = run_start_str
+        run_finished = time.time()
+        result._metadata["runtime"] = run_finished - run_start
+        result._metadata["finished"] = datetime.fromtimestamp(
+            run_finished, timezone.utc
+        ).isoformat()
 
         # write output files if designated
         if self.config.outputs.html:

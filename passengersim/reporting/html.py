@@ -82,6 +82,10 @@ def to_html(
                 "bookings", by_carrier=c, by_class=True
             )
 
+    if cfg.outputs.html.carrier_revenue_distribution:
+        rpt.add_section("Carrier Revenue Distribution")
+        rpt << summary.fig_carrier_revenue_distribution()
+
     if cfg.outputs.html.leg_load_factor_distribution:
         rpt.add_section("Leg Load Factor Distribution")
         rpt << summary.fig_leg_load_factor_distribution()

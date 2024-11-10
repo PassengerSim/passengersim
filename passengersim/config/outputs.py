@@ -21,6 +21,9 @@ class HtmlOutputConfig(PrettyModel, extra="forbid", validate_assignment=True):
     carrier_revenues: bool = True
     """Include carrier revenues in the HTML report."""
 
+    carrier_revenue_distribution: bool = True
+    """Include carrier revenue distribution in the HTML report."""
+
     carrier_load_factors: bool = True
     """Include carrier load factors in the HTML report."""
 

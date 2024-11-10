@@ -59,8 +59,15 @@ class Experiments:
         else:
             return pathlib.Path(self.output_dir) / tag / pathlib.Path(filename).name
 
-    def __call__(self, title: str, tag: str | None = None, multiprocess: bool = True):
-        e = Experiment(title, tag, multiprocess)
+    def __call__(
+        self,
+        title: str,
+        tag: str | None = None,
+        multiprocess: bool = True,
+        *,
+        external: str | os.PathLike | None = None,
+    ):
+        e = Experiment(title, tag, multiprocess, external=external)
         self.experiments.append(e)
         return e
 
@@ -95,6 +102,15 @@ class Experiments:
             tags.add(e.tag)
 
         for e in self.experiments:
+            if e.external:
+                # If an external file is provided, load it and skip the simulation.
+                # This is done without regard for the use_existing parameter, and
+                # the absence of the external file is always an error.
+                summary = SimulationTables.from_pickle(e.external)
+                print(f"Loaded {e.tag} from {e.external}")
+                results[e.tag] = summary
+                continue
+
             # Create the modified config for this experiment
             config = e.func(self.base_config)
             config.outputs.html.title = e.title
@@ -110,13 +126,6 @@ class Experiments:
                 config.outputs.excel = self._rename_file(e.tag, config.outputs.excel)
 
             summary = None
-
-            if e.external:
-                # If an external file is provided, load it and skip the simulation.
-                # This is done without regard for the use_existing parameter, and
-                # the absence of the external file is always an error.
-                summary = SimulationTables.from_pickle(e.external)
-                print(f"Loaded {e.tag} from {e.external}")
 
             if use_existing:
                 # Check if the output pickle files already exist

@@ -1,3 +1,4 @@
+import os
 import pathlib
 from collections.abc import Callable
 from typing import Literal
@@ -10,10 +11,18 @@ from .summaries import SimulationTables
 
 
 class Experiment:
-    def __init__(self, title: str, tag: str | None = None, multiprocess: bool = True):
+    def __init__(
+        self,
+        title: str,
+        tag: str | None = None,
+        multiprocess: bool = True,
+        *,
+        external: str | os.PathLike | None = None,
+    ):
         self.title = title
         self.tag = tag
         self.multi = multiprocess
+        self.external = external
 
     def __call__(self, func: Callable[[Config], Config]):
         # decorate a function that takes a config and returns a modified config
@@ -76,9 +85,19 @@ class Experiments:
 
         results = contrast.Contrast()
 
+        # validate that all experiments have unique tags
+        tags = set()
+        for e in self.experiments:
+            if e.tag is None:
+                raise ValueError("Experiment missing tag: " + e.title)
+            if e.tag in tags:
+                raise ValueError("Duplicate experiment tag: " + e.tag)
+            tags.add(e.tag)
+
         for e in self.experiments:
             # Create the modified config for this experiment
             config = e.func(self.base_config)
+            config.outputs.html.title = e.title
 
             # Update the paths for the output files
             if config.outputs.html.filename:
@@ -91,6 +110,14 @@ class Experiments:
                 config.outputs.excel = self._rename_file(e.tag, config.outputs.excel)
 
             summary = None
+
+            if e.external:
+                # If an external file is provided, load it and skip the simulation.
+                # This is done without regard for the use_existing parameter, and
+                # the absence of the external file is always an error.
+                summary = SimulationTables.from_pickle(e.external)
+                print(f"Loaded {e.tag} from {e.external}")
+
             if use_existing:
                 # Check if the output pickle files already exist
                 try:

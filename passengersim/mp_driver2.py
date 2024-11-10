@@ -3,6 +3,7 @@ import multiprocessing
 import os
 import pathlib
 import time
+import warnings
 
 from rich.progress import (
     BarColumn,
@@ -244,8 +245,14 @@ class MultiSimulation(BaseSimulation):
 
         # write output files if designated
         if self.config.outputs.html:
-            result.to_html(self.config.outputs.html.filename)
+            try:
+                result.to_html(self.config.outputs.html.filename)
+            except Exception as err:
+                warnings.warn(f"Error writing HTML file: {err}", stacklevel=2)
         if self.config.outputs.pickle:
-            result.to_pickle(self.config.outputs.pickle)
+            try:
+                result.to_pickle(self.config.outputs.pickle)
+            except Exception as err:
+                warnings.warn(f"Error writing pickle file: {err}", stacklevel=2)
 
         return result

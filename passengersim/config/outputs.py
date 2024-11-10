@@ -91,6 +91,8 @@ class OutputConfig(PrettyModel, extra="forbid", validate_assignment=True):
     # TODO what reports require what database items?
     # e.g. demand_to_come requires we store all `demand` not just demand_final
 
-    @field_serializer("reports", when_used="json")
-    def serialize_reports(self, reports: set):
+    @field_serializer("reports", when_used="always")
+    def serialize_reports(
+        self, reports: set[str | tuple[str, ...]]
+    ) -> list[str | tuple[str, ...]]:
         return list(reports)

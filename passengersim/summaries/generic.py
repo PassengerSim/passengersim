@@ -13,9 +13,10 @@ from typing import TYPE_CHECKING, Any, ClassVar, Self
 
 import pandas as pd
 
+from passengersim.config import Config
+
 if TYPE_CHECKING:
     from passengersim import Simulation
-    from passengersim.config import Config
     from passengersim.database import Database
 
 
@@ -354,7 +355,20 @@ class GenericSimulationTables:
 
     def __setstate__(self, state):
         if "_config_yaml" in state:
-            state["config"] = Config.from_raw_yaml(state.pop("_config_yaml"))
+            content = state.pop("_config_yaml")
+            try:
+                state["config"] = Config.from_raw_yaml(content)
+            except Exception:
+                try:
+                    if isinstance(content, bytes):
+                        content_lines = content.decode("utf-8").split("\n")
+                    else:
+                        content_lines = content.split("\n")
+                    for i, line in enumerate(content_lines):
+                        print(f"{i+1:>4} | {line}")
+                except Exception:
+                    pass
+                raise
         self.__dict__.update(state)
         if "cnx" not in self.__dict__:
             self.cnx = None
@@ -457,7 +471,10 @@ class GenericSimulationTables:
 
                 try:
                     with lz4.frame.open(filename, "rb") as f:
-                        result = pickle.load(f)
+                        try:
+                            result = pickle.load(f)
+                        except Exception as e:
+                            raise RuntimeError(f"Error loading {filename}: {e}") from e
                         # if result.__class__.__name__ != cls.__name__:
                         #     raise TypeError(f"Expected {cls}, got {type(result)}")
                         return result

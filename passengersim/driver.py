@@ -2012,6 +2012,8 @@ class Simulation(BaseSimulation):
                 summary.to_html(self.config.outputs.html.filename)
             if self.config.outputs.pickle:
                 summary.to_pickle(self.config.outputs.pickle)
+            if self.config.outputs.excel:
+                summary.to_xlsx(self.config.outputs.excel)
 
         logger.info(
             f"Th' th' that's all folks !!!    "

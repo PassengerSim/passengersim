@@ -4,6 +4,16 @@ import xmle
 import yaml
 from altair import LayerChart
 from altair.utils.schemapi import UndefinedType
+from passengersim_core import __version__ as _passengersim_core_version
+
+from passengersim import __version__ as _passengersim_version
+
+if _passengersim_version == _passengersim_core_version:
+    version_tag = f"PassengerSim v{_passengersim_version}"
+else:
+    version_tag = (
+        f"PassengerSim v{_passengersim_version}<br/>Core v{_passengersim_core_version}"
+    )
 
 
 # allow dumping pathlib.Path objects to YAML
@@ -53,6 +63,25 @@ class Report(xmle.Reporter):
         self << self._numbered_table(title)
         self.__ilshift__(tbl)
         return tbl
+
+    def save(
+        self,
+        filename,
+        overwrite=False,
+        archive_dir="./archive/",
+        metadata=None,
+        **kwargs,
+    ):
+        branding = kwargs.pop("branding", version_tag)
+        return super().save(
+            filename=filename,
+            overwrite=overwrite,
+            archive_dir=archive_dir,
+            metadata=metadata,
+            branding=branding,
+            toc_color="goldenrod",
+            **kwargs,
+        )
 
 
 class Elem(xmle.Elem):

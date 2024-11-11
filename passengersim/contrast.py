@@ -45,6 +45,52 @@ class Contrast(dict):
         return sorted(x)
 
 
+class MultiContrast(dict):
+    def __getattr__(self, attr):
+        if attr.startswith("fig_"):
+            g = globals()
+            if attr in g:
+                alter_defaults = {}
+                if attr in [
+                    "fig_carrier_revenues",
+                    "fig_carrier_yields",
+                    "fig_carrier_total_bookings",
+                    "fig_carrier_load_factors",
+                ]:
+                    alter_defaults["width"] = 300
+
+                def fig_func(*args, **kwargs):
+                    figs = {}
+                    kwargs.update(alter_defaults)
+                    for k, v in self.items():
+                        if v is not None:
+                            figs[k] = partial(g[attr], v)(*args, **kwargs)
+                    return self._hconcat(figs)
+
+                return fig_func
+        raise AttributeError(attr)
+
+    def __dir__(self):
+        x = set(super().__dir__())
+        x |= {g for g in globals() if g.startswith("fig_")}
+        return sorted(x)
+
+    @staticmethod
+    def _hconcat(charts: dict[str, alt.Chart]) -> alt.HConcatChart:
+        if not charts:
+            raise ValueError("no charts to concatenate")
+        queue = []
+        for k, c in charts.items():
+            config = c._kwds.get("config", alt.Undefined)
+            c._kwds["config"] = alt.Undefined
+            title = c._kwds.get("title", "")
+            c._kwds["title"] = f"{k} {title}"
+            queue.append(c)
+        result = alt.hconcat(*queue)
+        result._kwds["config"] = config
+        return result
+
+
 def _assemble(summaries, base, **kwargs):
     summaries_ = {}
     last_exception = RuntimeError("no summaries loaded")
@@ -489,10 +535,12 @@ def _fig_carrier_measure(
     measure_name: str,
     measure_format: str = ".2f",
     orient: Literal["h", "v"] = "h",
+    *,
     title: str | None = None,
     ratio: str | bool = False,
     ratio_all: bool = False,
     ratio_label: bool = True,
+    width: int = 500,
 ):
     against = source_order[0]
     if ratio_all:
@@ -519,7 +567,7 @@ def _fig_carrier_measure(
         df["ratio_label"] = df["ratio_0"].apply(
             lambda x: (" " if np.isnan(x) else f"{x:+.1%}")
         )
-        domain_max = df[load_measure].max() * 1.07
+        domain_max = df[load_measure].max() * (1 + (0.07 * (500 / width)))
 
     facet_kwargs = {}
     if title is not None:
@@ -587,7 +635,7 @@ def _fig_carrier_measure(
         return (
             ((bars + text + text2) if ratio_label else (bars + text))
             .properties(
-                width=500,
+                width=width,
                 height=10 + 20 * len(source_order),
             )
             .facet(row=alt.Row("carrier:N", title="Carrier"), **facet_kwargs)
@@ -601,6 +649,8 @@ def fig_carrier_revenues(
     raw_df=False,
     orient: Literal["h", "v"] = "h",
     ratio: str | bool = "all",
+    *,
+    width: int = 500,
 ):
     """
     Generate a figure contrasting carrier revenues for one or more runs.
@@ -635,6 +685,7 @@ def fig_carrier_revenues(
         title="Carrier Revenues",
         ratio=ratio,
         ratio_all=(ratio == "all"),
+        width=width,
     )
 
 
@@ -644,6 +695,8 @@ def fig_carrier_yields(
     raw_df=False,
     orient: Literal["h", "v"] = "h",
     ratio: str | bool = "all",
+    *,
+    width: int = 500,
 ):
     """
     Generate a figure contrasting carrier yields for one or more runs.
@@ -679,6 +732,7 @@ def fig_carrier_yields(
         title="Carrier Yields",
         ratio=ratio,
         ratio_all=(ratio == "all"),
+        width=width,
     )
 
 
@@ -688,6 +742,8 @@ def fig_carrier_total_bookings(
     raw_df=False,
     orient: Literal["h", "v"] = "h",
     ratio: str | bool = "all",
+    *,
+    width: int = 500,
 ):
     """
     Generate a figure contrasting carrier total bookings for one or more runs.
@@ -724,6 +780,7 @@ def fig_carrier_total_bookings(
         title="Carrier Total Bookings",
         ratio=ratio,
         ratio_all=(ratio == "all"),
+        width=width,
     )
 
 
@@ -734,6 +791,8 @@ def fig_carrier_load_factors(
     load_measure: Literal["sys_lf", "avg_leg_lf"] = "sys_lf",
     orient: Literal["h", "v"] = "h",
     ratio: str | bool = "all",
+    *,
+    width: int = 500,
 ):
     """
     Generate a figure contrasting carrier load factors for one or more runs.
@@ -774,6 +833,7 @@ def fig_carrier_load_factors(
         title=f"Carrier {measure_name}s",
         ratio=ratio,
         ratio_all=(ratio == "all"),
+        width=width,
     )
 
 

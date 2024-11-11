@@ -281,14 +281,15 @@ class Experiments:
 
                 summary = None
 
-                if use_existing.get(e.tag, default_use_existing):
+                e_use_existing = use_existing.get(e.tag, default_use_existing)
+                if e_use_existing:
                     # Check if the output pickle files already exist
                     try:
                         summary = SimulationTables.from_pickle(config.outputs.pickle)
                     except FileNotFoundError:
-                        if use_existing == "raise":
+                        if e_use_existing == "raise":
                             raise
-                        elif use_existing == "ignore":
+                        elif e_use_existing == "ignore":
                             continue
                     else:
                         # If we reach this point, we have successfully loaded the
@@ -300,6 +301,11 @@ class Experiments:
                             summary, config, e.tag
                         )
                         live_display.console.print(msg)
+                        if summary is None:
+                            if e_use_existing == "raise":
+                                raise
+                            elif e_use_existing == "ignore":
+                                continue
 
                 if summary is None:
                     # If we reach this point, we need to run the simulation

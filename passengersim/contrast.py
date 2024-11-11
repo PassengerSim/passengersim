@@ -491,15 +491,35 @@ def _fig_carrier_measure(
     orient: Literal["h", "v"] = "h",
     title: str | None = None,
     ratio: str | bool = False,
+    ratio_all: bool = False,
+    ratio_label: bool = True,
 ):
     against = source_order[0]
-    if ratio:
+    if ratio_all:
+        queue = []
+        for n, a in enumerate(source_order):
+            df_ = df.set_index(["source", "carrier"])
+            ratios = df_.div(df_.query(f"source == '{a}'").droplevel("source")) - 1.0
+            ratios.iloc[:, 0] = ratios.iloc[:, 0].where(
+                ratios.index.get_level_values("source") != a, np.nan
+            )
+            ratios.columns = [f"ratio_{n}"]
+            queue.append(ratios)
+        for q in queue:
+            df = df.join(q, on=["source", "carrier"])
+    elif ratio:
         if isinstance(ratio, str):
             against = ratio
         df_ = df.set_index(["source", "carrier"])
         ratios = df_.div(df_.query(f"source == '{against}'").droplevel("source")) - 1.0
-        ratios.columns = ["ratio"]
+        ratios.columns = ["ratio_0"]
         df = df.join(ratios, on=["source", "carrier"])
+
+    if ratio_label:
+        df["ratio_label"] = df["ratio_0"].apply(
+            lambda x: (" " if np.isnan(x) else f"{x:+.1%}")
+        )
+        domain_max = df[load_measure].max() * 1.07
 
     facet_kwargs = {}
     if title is not None:
@@ -510,9 +530,14 @@ def _fig_carrier_measure(
         alt.Tooltip("carrier", title="Carrier"),
         alt.Tooltip(f"{load_measure}:Q", title=measure_name, format=measure_format),
     ]
-    if ratio:
+    if ratio_all:
+        for n, a in enumerate(source_order):
+            tooltips.append(
+                alt.Tooltip(f"ratio_{n}:Q", title=f"vs {a}", format=".3%"),
+            )
+    elif ratio:
         tooltips.append(
-            alt.Tooltip("ratio:Q", title=f"vs {against}", format=".3%"),
+            alt.Tooltip("ratio_0:Q", title=f"vs {against}", format=".3%"),
         )
     if orient == "v":
         bars = chart.mark_bar().encode(
@@ -549,8 +574,18 @@ def _fig_carrier_measure(
             x=alt.X(f"{load_measure}:Q", title=measure_name).stack("zero"),
             text=alt.Text(f"{load_measure}:Q", format=measure_format),
         )
+        if ratio_label:
+            text2 = chart.mark_text(dx=5, dy=0, baseline="middle", align="left").encode(
+                y=alt.Y("source:N", title=None, sort=source_order),
+                x=alt.X(f"{load_measure}:Q", title=measure_name)
+                .stack("zero")
+                .scale(domain=[0, domain_max]),
+                text=alt.Text("ratio_label"),
+            )
+        else:
+            text2 = None
         return (
-            (bars + text)
+            ((bars + text + text2) if ratio_label else (bars + text))
             .properties(
                 width=500,
                 height=10 + 20 * len(source_order),
@@ -565,7 +600,7 @@ def fig_carrier_revenues(
     summaries,
     raw_df=False,
     orient: Literal["h", "v"] = "h",
-    ratio: str | bool = True,
+    ratio: str | bool = "all",
 ):
     """
     Generate a figure contrasting carrier revenues for one or more runs.
@@ -576,6 +611,10 @@ def fig_carrier_revenues(
     raw_df : bool, default False
     orient : {'h', 'v'}, default 'h'
     ratio : bool or str, default True
+        Add tooltip(s) giving the percentage change of each carrier's revenue
+        to the revenue of the same carrier in the other summaries.  Can be
+        the key giving a specific summary to compare against, or 'all' to
+        compare against all other summaries.
 
     Returns
     -------
@@ -595,6 +634,7 @@ def fig_carrier_revenues(
         orient=orient,
         title="Carrier Revenues",
         ratio=ratio,
+        ratio_all=(ratio == "all"),
     )
 
 
@@ -603,7 +643,7 @@ def fig_carrier_yields(
     summaries,
     raw_df=False,
     orient: Literal["h", "v"] = "h",
-    ratio: str | bool = True,
+    ratio: str | bool = "all",
 ):
     """
     Generate a figure contrasting carrier yields for one or more runs.
@@ -614,6 +654,10 @@ def fig_carrier_yields(
     raw_df : bool, default False
     orient : {'h', 'v'}, default 'h'
     ratio : bool or str, default True
+        Add tooltip(s) giving the percentage change of each carrier's yield
+        to the yield of the same carrier in the other summaries.  Can be
+        the key giving a specific summary to compare against, or 'all' to
+        compare against all other summaries.
 
     Returns
     -------
@@ -634,6 +678,7 @@ def fig_carrier_yields(
         orient=orient,
         title="Carrier Yields",
         ratio=ratio,
+        ratio_all=(ratio == "all"),
     )
 
 
@@ -642,7 +687,7 @@ def fig_carrier_total_bookings(
     summaries,
     raw_df=False,
     orient: Literal["h", "v"] = "h",
-    ratio: str | bool = True,
+    ratio: str | bool = "all",
 ):
     """
     Generate a figure contrasting carrier total bookings for one or more runs.
@@ -652,7 +697,12 @@ def fig_carrier_total_bookings(
     summaries : dict[str, SummaryTables]
     raw_df : bool, default False
     orient : {'h', 'v'}, default 'h'
-    ratio : bool or str, default True
+    ratio : bool or str, default "all"
+        Add tooltip(s) giving the percentage change of each carrier's bookings
+        to the bookings of the same carrier in the other summaries.  Can be
+        the key giving a specific summary to compare against, or 'all' to
+        compare against all other summaries.
+
 
     Returns
     -------
@@ -673,6 +723,7 @@ def fig_carrier_total_bookings(
         orient=orient,
         title="Carrier Total Bookings",
         ratio=ratio,
+        ratio_all=(ratio == "all"),
     )
 
 
@@ -682,7 +733,7 @@ def fig_carrier_load_factors(
     raw_df: bool = False,
     load_measure: Literal["sys_lf", "avg_leg_lf"] = "sys_lf",
     orient: Literal["h", "v"] = "h",
-    ratio: str | bool = True,
+    ratio: str | bool = "all",
 ):
     """
     Generate a figure contrasting carrier load factors for one or more runs.
@@ -693,7 +744,12 @@ def fig_carrier_load_factors(
     raw_df : bool, default False
     load_measure : {'sys_lf', 'avg_leg_lf'}, default 'sys_lf'
     orient : {'h', 'v'}, default 'h'
-    ratio : bool or str, default True
+    ratio : bool or str, default "all"
+        Add tooltip(s) giving the percentage change of each carrier's load factor
+        to the load factor of the same carrier in the other summaries.  Can be
+        the key giving a specific summary to compare against, or 'all' to
+        compare against all other summaries.
+
 
     Returns
     -------
@@ -717,6 +773,7 @@ def fig_carrier_load_factors(
         orient=orient,
         title=f"Carrier {measure_name}s",
         ratio=ratio,
+        ratio_all=(ratio == "all"),
     )
 
 

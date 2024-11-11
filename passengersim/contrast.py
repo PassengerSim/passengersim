@@ -1044,7 +1044,26 @@ def fig_path_forecasts(
                 by_class=by_class,
                 of=of_,
             )
-        return fig
+        if by_path_id:
+            title = f"Path {by_path_id} Forecasts"
+        else:
+            title = "Path Forecasts"
+        try:
+            if by_path_id:
+                first_summary = next(iter(summaries.values()))
+                path_def = first_summary.paths.loc[by_path_id]
+                title += f" ({path_def['orig']}~{path_def['dest']})"
+                for leg_id in first_summary.path_legs.query(
+                    f"path_id == {by_path_id}"
+                ).leg_id:
+                    leg_def = first_summary.legs.loc[leg_id]
+                    title += (
+                        f", {leg_def['carrier']} {leg_def['flt_no']} "
+                        f"({leg_def['orig']}-{leg_def['dest']})"
+                    )
+        except Exception:
+            raise
+        return fig.properties(title=title).configure_title(fontSize=18)
     df = _assemble(
         summaries, "path_forecasts", by_path_id=by_path_id, of=of, by_class=by_class
     )

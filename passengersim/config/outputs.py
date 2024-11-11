@@ -98,4 +98,5 @@ class OutputConfig(PrettyModel, extra="forbid", validate_assignment=True):
     def serialize_reports(
         self, reports: set[str | tuple[str, ...]]
     ) -> list[str | tuple[str, ...]]:
-        return list(reports)
+        # return a sorted list, first simple strings then tuples
+        return sorted(reports, key=lambda x: (isinstance(x, tuple), x))

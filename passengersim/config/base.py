@@ -271,6 +271,42 @@ class YamlConfig(PrettyModel):
             return b
 
 
+def find_differences(left, right):
+    """Find the differences between two nested dictionaries."""
+    if isinstance(left, dict) and isinstance(right, dict):
+        diff = {}
+        for key in left.keys() | right.keys():
+            if key not in right:
+                diff[key] = "missing in right"
+            elif key not in left:
+                diff[key] = "missing in left"
+            else:
+                sub_diff = find_differences(left[key], right[key])
+                if sub_diff:
+                    diff[key] = sub_diff
+        return diff
+    if isinstance(left, list) and isinstance(right, list):
+        if len(left) != len(right):
+            return "different lengths"
+        diff = {}
+        for i, (left_item, right_item) in enumerate(zip(left, right)):
+            sub_diff = find_differences(left_item, right_item)
+            if sub_diff:
+                diff[i] = sub_diff
+        return diff
+    if isinstance(left, dict) and not isinstance(right, dict):
+        return "left is dict and right is not"
+    if isinstance(right, dict) and not isinstance(left, dict):
+        return "right is dict and left is not"
+    if isinstance(left, list) and not isinstance(right, list):
+        return "left is list and right is not"
+    if isinstance(right, list) and not isinstance(left, list):
+        return "right is list and left is not"
+    if left == right:
+        return {}
+    return f"{left} != {right}"
+
+
 class Config(YamlConfig, extra="forbid"):
     scenario: str = Field(default_factory=random_label)
     """Name for this scenario.
@@ -732,6 +768,24 @@ class Config(YamlConfig, extra="forbid"):
         # reloaded_class = getattr(module, cls.__name__)
         return isinstance(obj, cls.as_reloaded)
 
+    def find_differences(
+        self,
+        other: Config,
+        *,
+        include: IncEx = None,
+        exclude: IncEx = None,
+    ) -> dict:
+        """Find the differences between two Config objects."""
+        if exclude is None:
+            exclude = {
+                "raw_license_certificate": True,
+                "outputs": {"pickle", "excel", "html", "log_reports"},
+            }
+        return find_differences(
+            self.model_dump(include=include, exclude=exclude),
+            other.model_dump(include=include, exclude=exclude),
+        )
+
     def add_output_prefix(
         self, prefix: pathlib.Path, spool_format: str = "%Y%m%d-%H%M"
     ):
@@ -803,8 +857,8 @@ class Config(YamlConfig, extra="forbid"):
                 return t, 0
 
             if not leg.time_adjusted:
-                if leg.orig == "DFW" and leg.dest == "CLE":
-                    pass
+                # if leg.orig == "DFW" and leg.dest == "CLE":
+                #     pass
                 place_o = self.places.get(leg.orig, None)
                 leg.dep_time, leg.dep_time_offset = adjust_time_zone(
                     leg.dep_time, place_o

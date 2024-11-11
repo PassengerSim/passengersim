@@ -34,12 +34,24 @@ class Experiment:
         self.tag = tag
         self.multi = multiprocess
         self.external = external
+        self.func = None
 
-    def __call__(self, func: Callable[[Config], Config]):
-        # decorate a function that takes a config and returns a modified config
-        self.func = func
-        if self.tag is None:
-            self.tag = func.__name__
+    def __call__(self, func: Callable[[Config], Config] | Config):
+        if self.func is None:
+            # decorate a function that takes a config and returns a modified config
+            self.func = func
+            if self.tag is None:
+                self.tag = func.__name__
+            return self
+        else:
+            # if the function is already decorated, call it with the new function,
+            # while making a deep copy of the config to avoid modifying the original
+            if isinstance(func, Config):
+                return self.func(func.model_copy(deep=True))
+            else:
+                raise TypeError(
+                    "Experiment already decorated, expected base_config as input"
+                )
 
 
 class Experiments:
@@ -178,7 +190,7 @@ class Experiments:
                     continue
 
                 # Create the modified config for this experiment
-                config = e.func(self.base_config)
+                config = e.func(self.base_config.model_copy(deep=True))
                 config.outputs.html.title = e.title
 
                 # Update the paths for the output files
@@ -208,10 +220,20 @@ class Experiments:
                             continue
                     else:
                         # If we reach this point, we have successfully loaded the
-                        # output pickle file
-                        live_display.console.print(
-                            f"Loaded {e.tag} from {config.outputs.pickle}"
-                        )
+                        # output pickle file. But before we congratulate ourselves,
+                        # we need to make sure the run we loaded matches the config
+                        # we would otherwise run.
+                        check = config.find_differences(summary.config)
+                        if check:
+                            live_display.console.print(
+                                f"Loaded {e.tag} from {config.outputs.pickle}, "
+                                f"but the config has changed:\n{check}"
+                            )
+                            summary = None
+                        else:
+                            live_display.console.print(
+                                f"Loaded {e.tag} from {config.outputs.pickle}"
+                            )
 
                 if summary is None:
                     # If we reach this point, we need to run the simulation

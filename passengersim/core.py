@@ -26,6 +26,7 @@ except ImportError:
     ProBP = None
     SimulationEngine = None
     UserAction = None
+    __version__ = None
 else:
     from passengersim_core import (
         Airport,
@@ -50,6 +51,7 @@ else:
         ProBP,
         SimulationEngine,
         UserAction,
+        __version__,
     )
 
 __all__ = [
@@ -75,4 +77,5 @@ __all__ = [
     "ProBP",
     "SimulationEngine",
     "UserAction",
+    "__version__",
 ]

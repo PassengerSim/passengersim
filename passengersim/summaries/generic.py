@@ -36,19 +36,19 @@ def initialize_metadata() -> dict[str, Any]:
     from passengersim import __version__ as version
 
     metadata = {}
-    metadata["created"] = datetime.now(timezone.utc).isoformat()
-    metadata["platform.system"] = platform.system()
-    metadata["platform.release"] = platform.release()
-    metadata["platform.version"] = platform.version()
-    metadata["platform.machine"] = platform.machine()
-    metadata["platform.processor"] = platform.processor()
-    metadata["platform.architecture"] = platform.architecture()
-    metadata["platform.node"] = platform.node()
-    metadata["platform.platform"] = platform.platform()
-    metadata["platform.python_version"] = platform.python_version()
-    metadata["cpu_count"] = multiprocessing.cpu_count()
-    metadata["passengersim_version"] = version
-    metadata["passengersim_core_version"] = core_version
+    metadata["time.created"] = datetime.now(timezone.utc).isoformat()
+    metadata["machine.system"] = platform.system()
+    metadata["machine.release"] = platform.release()
+    metadata["machine.version"] = platform.version()
+    metadata["machine.machine"] = platform.machine()
+    metadata["machine.processor"] = platform.processor()
+    metadata["machine.architecture"] = platform.architecture()
+    metadata["machine.node"] = platform.node()
+    metadata["machine.platform"] = platform.platform()
+    metadata["machine.python_version"] = platform.python_version()
+    metadata["machine.cpu_count"] = multiprocessing.cpu_count()
+    metadata["version.passengersim"] = version
+    metadata["version.passengersim_core"] = core_version
     return metadata
 
 
@@ -569,3 +569,21 @@ class GenericSimulationTables:
         from passengersim.reporting.html import to_html
 
         to_html(self, filename, cfg=cfg)
+
+    def metadata(self, key: str):
+        """Return a metadata value."""
+        if key in self._metadata:
+            return self._metadata[key]
+        if "." in key:
+            # dotted keys are always exact matches
+            raise KeyError(key)
+        matches = {}
+        for k in self._metadata:
+            subkeys = k.split(".")
+            subkey = subkeys[0]
+            others = ".".join(subkeys[1:])
+            if subkey == key:
+                matches[others] = self._metadata[k]
+        if not matches:
+            raise KeyError(key)
+        return matches

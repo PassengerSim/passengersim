@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import os
 import pathlib
 from collections.abc import Callable
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from rich.console import Group
 from rich.live import Live
@@ -14,11 +16,16 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 
+from passengersim import __version__ as _passengersim_version
 from passengersim import contrast
+from passengersim.core import __version__ as _passengersim_core_version
 
 from . import MultiSimulation, Simulation
 from .config import Config
 from .summaries import SimulationTables
+
+if TYPE_CHECKING:
+    UseExistingT = Literal[True, False, "ignore", "raise"]
 
 
 class Experiment:
@@ -94,9 +101,67 @@ class Experiments:
         self.experiments.append(e)
         return e
 
+    @staticmethod
+    def _check_loaded_summary(
+        summary, config, tag
+    ) -> tuple[str, SimulationTables | None]:
+        msg = ""
+        check = config.find_differences(summary.config)
+        try:
+            versions = summary.metadata("version")
+        except KeyError:
+            msg = (
+                f"Loaded {tag} from {config.outputs.pickle}, "
+                f"but the PassengerSim version is unknown"
+            )
+            return msg, None
+
+        public_version = versions.get("passengersim", None)
+        core_version = versions.get("passengersim_core", None)
+
+        if public_version is None:
+            msg = (
+                f"Loaded {tag} from {config.outputs.pickle}, "
+                f"but the PassengerSim version is unknown"
+            )
+            return msg, None
+
+        if public_version != _passengersim_version:
+            msg = (
+                f"Loaded {tag} from {config.outputs.pickle}, "
+                f"but the PassengerSim version has changed: "
+                f"running {_passengersim_version}, found {public_version}"
+            )
+            return msg, None
+
+        if core_version is None:
+            msg = (
+                f"Loaded {tag} from {config.outputs.pickle}, "
+                f"but the PassengerSim.Core version is unknown"
+            )
+            return msg, None
+
+        if core_version != _passengersim_core_version:
+            msg = (
+                f"Loaded {tag} from {config.outputs.pickle}, "
+                f"but the PassengerSim.Core version has changed: "
+                f"running {_passengersim_core_version}, found {core_version}"
+            )
+            return msg, None
+
+        if check:
+            msg = (
+                f"Loaded {tag} from {config.outputs.pickle}, "
+                f"but the config has changed:\n{check}"
+            )
+            return msg, None
+
+        msg = f"Loaded {tag} from {config.outputs.pickle}"
+        return msg, summary
+
     def run(
         self,
-        use_existing: Literal[True, False, "ignore", "raise"] = True,
+        use_existing: UseExistingT | dict[str, UseExistingT] = True,
         *,
         tag: str | None = None,
     ):
@@ -105,7 +170,9 @@ class Experiments:
 
         Parameters
         ----------
-        use_existing : Literal[True, False, "ignore", "raise"]
+        use_existing : Literal[True, False, "ignore", "raise"] or dict
+            This can either be a single value for all experiments, or a dictionary
+            mapping tags to values.  For each value, the behavior is as follows:
             If True, load from existing output pickle files if they exist,
             otherwise run the simulation for each experiment.  If False, always
             run the simulation for each experiment. If "ignore", load results
@@ -168,6 +235,11 @@ class Experiments:
             transient=True,
         )
 
+        default_use_existing = True
+        if not isinstance(use_existing, dict):
+            default_use_existing = use_existing
+            use_existing = {}
+
         with live_display:
             top_task = top_progress.add_task(
                 "[blue]Experiments", total=len(selected_experiments)
@@ -209,7 +281,7 @@ class Experiments:
 
                 summary = None
 
-                if use_existing:
+                if use_existing.get(e.tag, default_use_existing):
                     # Check if the output pickle files already exist
                     try:
                         summary = SimulationTables.from_pickle(config.outputs.pickle)
@@ -222,18 +294,12 @@ class Experiments:
                         # If we reach this point, we have successfully loaded the
                         # output pickle file. But before we congratulate ourselves,
                         # we need to make sure the run we loaded matches the config
-                        # we would otherwise run.
-                        check = config.find_differences(summary.config)
-                        if check:
-                            live_display.console.print(
-                                f"Loaded {e.tag} from {config.outputs.pickle}, "
-                                f"but the config has changed:\n{check}"
-                            )
-                            summary = None
-                        else:
-                            live_display.console.print(
-                                f"Loaded {e.tag} from {config.outputs.pickle}"
-                            )
+                        # we would otherwise run, and the versions of PassengerSim
+                        # match between the run and the current environment.
+                        msg, summary = self._check_loaded_summary(
+                            summary, config, e.tag
+                        )
+                        live_display.console.print(msg)
 
                 if summary is None:
                     # If we reach this point, we need to run the simulation
@@ -257,6 +323,6 @@ class Experiments:
                 visible=False,
             )
 
-        if len(selected_experiments) == 1:
+        if tag is not None and len(selected_experiments) == 1:
             return results[selected_experiments[0].tag]
         return results

@@ -897,6 +897,10 @@ def _fig_forecasts(
 ):
     import altair as alt
 
+    selection = alt.selection_point(
+        name="pick_booking_class", fields=["booking_class"], bind="legend"
+    )
+
     encoding = dict(
         x=alt.X(f"days_prior:{rrd_ntype}")
         .scale(reverse=True)
@@ -905,11 +909,13 @@ def _fig_forecasts(
         color="booking_class:N",
         strokeDash=alt.StrokeDash("source:N", title="Source"),
         strokeWidth=alt.StrokeWidth("source:N", title="Source"),
+        opacity=alt.condition(selection, alt.value(1.0), alt.value(0.05)),
     )
+
     if color:
         encoding["color"] = color
     if not facet_on:
-        return alt.Chart(df).mark_line().encode(**encoding)
+        return alt.Chart(df).mark_line().encode(**encoding).add_params(selection)
     else:
         return (
             alt.Chart(df)
@@ -919,6 +925,7 @@ def _fig_forecasts(
                 facet=f"{facet_on}:N",
                 columns=3,
             )
+            .add_params(selection)
         )
 
 
@@ -949,7 +956,16 @@ def fig_leg_forecasts(
                 of=of_,
                 agg_booking_classes=agg_booking_classes,
             )
-        return fig
+        title = f"Leg Forecasts {by_leg_id}"
+        try:
+            if by_leg_id:
+                first_summary = next(iter(summaries.values()))
+                leg_def = first_summary.legs.loc[by_leg_id]
+                title += f": {leg_def['carrier']} {leg_def['flt_no']}"
+                title += f" ({leg_def['orig']}-{leg_def['dest']})"
+        except Exception:
+            raise
+        return fig.properties(title=title).configure_title(fontSize=18)
     df = _assemble(
         summaries, "leg_forecasts", by_leg_id=by_leg_id, by_class=by_class, of=of
     )
@@ -986,6 +1002,9 @@ def fig_leg_forecasts(
     )
 
 
+ForecastOfT = Literal["mu", "sigma", "closed", "adj_price"]
+
+
 @report_figure
 def fig_path_forecasts(
     summaries,
@@ -994,8 +1013,7 @@ def fig_path_forecasts(
     path_names: dict | None = None,
     agg_booking_classes: bool = False,
     by_class: bool | str = True,
-    of: Literal["mu", "sigma", "closed", "adj_price"]
-    | list[Literal["mu", "sigma", "closed", "adj_price"]] = "mu",
+    of: ForecastOfT | list[ForecastOfT] = "mu",
 ):
     if isinstance(of, list):
         if raw_df:

@@ -103,8 +103,26 @@ class Experiments:
 
     @staticmethod
     def _check_loaded_summary(
-        summary, config, tag
+        summary: SimulationTables, config: Config, tag: str, check_versions: bool = True
     ) -> tuple[str, SimulationTables | None]:
+        """
+        Check if the loaded summary matches the config and PassengerSim versions.
+
+        Parameters
+        ----------
+        summary : SimulationTables
+        config : Config
+        tag : str
+        check_versions : bool, optional
+            If True, check the PassengerSim versions in the loaded summary.
+
+        Returns
+        -------
+        str
+            A message about the loaded summary
+        SimulationTables
+            The loaded summary if it matches the config, otherwise None
+        """
         msg = ""
         check = config.find_differences(summary.config)
         try:
@@ -119,14 +137,14 @@ class Experiments:
         public_version = versions.get("passengersim", None)
         core_version = versions.get("passengersim_core", None)
 
-        if public_version is None:
+        if check_versions and public_version is None:
             msg = (
                 f"Loaded {tag} from {config.outputs.pickle}, "
                 f"but the PassengerSim version is unknown"
             )
             return msg, None
 
-        if public_version != _passengersim_version:
+        if check_versions and public_version != _passengersim_version:
             msg = (
                 f"Loaded {tag} from {config.outputs.pickle}, "
                 f"but the PassengerSim version has changed: "
@@ -134,14 +152,14 @@ class Experiments:
             )
             return msg, None
 
-        if core_version is None:
+        if check_versions and core_version is None:
             msg = (
                 f"Loaded {tag} from {config.outputs.pickle}, "
                 f"but the PassengerSim.Core version is unknown"
             )
             return msg, None
 
-        if core_version != _passengersim_core_version:
+        if check_versions and core_version != _passengersim_core_version:
             msg = (
                 f"Loaded {tag} from {config.outputs.pickle}, "
                 f"but the PassengerSim.Core version has changed: "
@@ -164,6 +182,7 @@ class Experiments:
         use_existing: UseExistingT | dict[str, UseExistingT] = True,
         *,
         tag: str | None = None,
+        check_versions: bool = True,
     ):
         """
         Run the experiments.
@@ -181,6 +200,10 @@ class Experiments:
             do not exist for any experiment.
         tag : str, optional
             If provided, only run the experiment with the given tag.
+        check_versions : bool, optional
+            If True, check the PassengerSim versions in the loaded summary (if
+            any), and re-run the simulation if they do not match the current
+            environment. If False, do not check the PassengerSim versions.
 
         Returns
         -------
@@ -298,7 +321,7 @@ class Experiments:
                         # we would otherwise run, and the versions of PassengerSim
                         # match between the run and the current environment.
                         msg, summary = self._check_loaded_summary(
-                            summary, config, e.tag
+                            summary, config, e.tag, check_versions=check_versions
                         )
                         live_display.console.print(msg)
                         if summary is None:

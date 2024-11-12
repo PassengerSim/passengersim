@@ -21,7 +21,7 @@ class HtmlOutputConfig(PrettyModel, extra="forbid", validate_assignment=True):
     carrier_revenues: bool = True
     """Include carrier revenues in the HTML report."""
 
-    carrier_revenue_distribution: bool = True
+    carrier_revenue_distribution: bool = False
     """Include carrier revenue distribution in the HTML report."""
 
     carrier_load_factors: bool = True
@@ -62,6 +62,9 @@ class HtmlOutputConfig(PrettyModel, extra="forbid", validate_assignment=True):
         "outputs",
     ]
     """Include these configuration items in the HTML report."""
+
+    metadata: bool = True
+    """Include simulation run metadata in the HTML report."""
 
     def __bool__(self) -> bool:
         return self.filename is not None

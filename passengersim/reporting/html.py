@@ -4,6 +4,7 @@ import pathlib
 import time
 from typing import TYPE_CHECKING
 
+import pandas as pd
 import yaml
 
 from passengersim.config import Config
@@ -124,6 +125,16 @@ def to_html(
             rpt.add_section(item, level=2)
             out = yaml.safe_dump(cfg_data[item])
             rpt << Elem.from_string(f"<pre>{out}</pre>")
+
+    if cfg.outputs.html.metadata:
+        rpt.add_section("Run Metadata")
+        (
+            rpt
+            << pd.Series(summary._metadata, name="value")
+            .rename_axis(index="key")
+            .to_frame()
+            .reset_index()
+        )
 
     if cfg.outputs.html.other:
         raise NotImplementedError("Other HTML sections not yet implemented")

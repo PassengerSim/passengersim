@@ -258,10 +258,10 @@ class MultiSimulation(BaseSimulation):
 
         result = summarizer.aggregate([value for key, value in sorted(results.items())])
         result.config = self.config.model_copy(deep=True)
-        result._metadata["created"] = run_start_str
+        result._metadata["time.started"] = run_start_str
         run_finished = time.time()
-        result._metadata["runtime"] = run_finished - run_start
-        result._metadata["finished"] = datetime.fromtimestamp(
+        result._metadata["time.runtime"] = run_finished - run_start
+        result._metadata["time.finished"] = datetime.fromtimestamp(
             run_finished, timezone.utc
         ).isoformat()
 

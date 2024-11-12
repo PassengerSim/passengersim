@@ -81,11 +81,16 @@ class MultiContrast(dict):
             raise ValueError("no charts to concatenate")
         queue = []
         for k, c in charts.items():
+            if c is None:
+                warnings.warn(f"no data found for {k!r}", stacklevel=2)
+                continue
             config = c._kwds.get("config", alt.Undefined)
             c._kwds["config"] = alt.Undefined
             title = c._kwds.get("title", "")
             c._kwds["title"] = f"{k} {title}"
             queue.append(c)
+        if not queue:
+            raise ValueError("no charts to concatenate")
         result = alt.hconcat(*queue)
         result._kwds["config"] = config
         return result

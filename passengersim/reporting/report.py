@@ -8,12 +8,13 @@ from passengersim_core import __version__ as _passengersim_core_version
 
 from passengersim import __version__ as _passengersim_version
 
+version_tag_0 = f"PassengerSim v{_passengersim_version}"
 if _passengersim_version == _passengersim_core_version:
-    version_tag = f"PassengerSim v{_passengersim_version}"
+    version_tag_1 = None
+    version_tag = version_tag_0
 else:
-    version_tag = (
-        f"PassengerSim v{_passengersim_version}<br/>Core v{_passengersim_core_version}"
-    )
+    version_tag_1 = f"Core v{_passengersim_core_version}"
+    version_tag = version_tag_0 + f"\n{version_tag_1}"
 
 
 # allow dumping pathlib.Path objects to YAML
@@ -72,14 +73,73 @@ class Report(xmle.Reporter):
         metadata=None,
         **kwargs,
     ):
-        branding = kwargs.pop("branding", version_tag)
+        _branding = kwargs.pop("branding", version_tag)
+
+        logo_in_sig = Elem("span", {"class": "xmle_name_signature"}, text=version_tag_0)
+        if version_tag_1:
+            logo_in_sig << Elem("br", tail=version_tag_1)
+
+        import xmle
+
+        xmle.xhtml.logo_in_signature = lambda *x: logo_in_sig
+
+        extra_css = """
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,300;0,400;0,700;1,400&display=swap');
+
+        body {
+          font-family: "Roboto", Arial, Helvetica, sans-serif;
+          font-weight: 400;
+          font-style: normal;
+        }
+
+        div.xmle_title {
+          font-size: 200%;
+          font-family: "Roboto", Arial, Helvetica, sans-serif;
+          font-weight: 300;
+          font-style: normal;
+          color: goldenrod;
+        }
+
+        .table_of_contents {
+          font-size: 85%;
+          font-family: "Roboto", Arial, Helvetica, sans-serif;
+          font-weight: 400;
+          font-style: normal;
+        }
+
+        table.dataframe {
+          font-family: Arial, Helvetica, sans-serif;
+          border-collapse: collapse;
+        }
+
+        table.dataframe td, table.dataframe th {
+          border: 1px solid #ddd;
+          padding: 2px;
+        }
+
+        table.dataframe tr:nth-child(even){background-color: #f2f2f2;}
+
+        table.dataframe tr:hover {background-color: #ddd;}
+
+        table.dataframe thead th {
+          padding-top: 6px;
+          padding-bottom: 6px;
+          text-align: left;
+          background-color: goldenrod;
+          color: white;
+        }
+
+        """
+
         return super().save(
             filename=filename,
             overwrite=overwrite,
             archive_dir=archive_dir,
             metadata=metadata,
-            branding=branding,
+            # branding=branding,
             toc_color="goldenrod",
+            extra_css=extra_css,
+            toc_font="font-family: Roboto, Arial, Helvetica, sans-serif;",
             **kwargs,
         )
 

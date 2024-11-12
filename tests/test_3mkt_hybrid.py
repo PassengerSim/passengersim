@@ -44,19 +44,31 @@ def summary_mp(
 
 
 @pytest.fixture(
-    scope="module", params=[("ki", None), ("mr", None), ("ki", "em"), ("mr", "em")]
+    scope="module",
+    params=[
+        ("ki", None, 1.0),
+        ("mr", None, 1.0),
+        ("ki", "em", 1.0),
+        ("mr", "em", 1.0),
+        ("ki", "em", 0.5),
+        ("mr", "em", 0.5),
+    ],
 )
 def summary_fare_adjustment(
     config: Config, request: pytest.FixtureRequest
 ) -> (str, SimulationTables):
     fare_adj = request.param[0]
     detruncation = request.param[1]
+    fare_adj_scale = request.param[2]
     config.rm_systems.rm_hybrid.processes.dcp.forecast.fare_adjustment = fare_adj
+    config.rm_systems.rm_hybrid.processes.dcp.forecast.fare_adjustment_scale = (
+        fare_adj_scale
+    )
     config.rm_systems.rm_hybrid.processes.dcp.forecast.detruncation_algorithm = (
         detruncation
     )
     sim = Simulation(config)
-    return fare_adj, detruncation, sim.run(summarizer=SimulationTables)
+    return fare_adj, detruncation, fare_adj_scale, sim.run(summarizer=SimulationTables)
 
 
 TABLES = [
@@ -115,13 +127,13 @@ def test_3mkt_hybrid_table_multi_process(
 def test_3mkt_hybrid_fareadj_table_single_process(
     summary_fare_adjustment, dataframe_regression, table_name: str
 ):
-    fare_adj, detruncation, run_summary = summary_fare_adjustment
+    fare_adj, detruncation, fare_adj_scale, run_summary = summary_fare_adjustment
     assert isinstance(run_summary, SimulationTables)
     df = getattr(run_summary, table_name)
     if table_name in TABLE_NOT_SENSITIVE_TO_RM:
         basename = table_name
     else:
-        basename = f"{fare_adj}-{detruncation}-{table_name}"
+        basename = f"{fare_adj}-{fare_adj_scale}-{detruncation}-{table_name}"
     dataframe_regression.check(
         df, basename=basename, default_tolerance=DEFAULT_TOLERANCE
     )

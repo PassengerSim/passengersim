@@ -567,6 +567,11 @@ def _fig_carrier_measure(
         df["ratio_label"] = df["ratio_0"].apply(
             lambda x: (" " if np.isnan(x) else f"{x:+.1%}")
         )
+        for n in range(len(source_order)):
+            df[f"ratio_label_{n}"] = df[f"ratio_{n}"].apply(
+                lambda x: (" " if np.isnan(x) else f"{x:+.1%}")
+            )
+
         domain_max = df[load_measure].max() * (1 + (0.07 * (500 / width)))
 
     facet_kwargs = {}
@@ -623,13 +628,31 @@ def _fig_carrier_measure(
             text=alt.Text(f"{load_measure}:Q", format=measure_format),
         )
         if ratio_label:
-            text2 = chart.mark_text(dx=5, dy=0, baseline="middle", align="left").encode(
-                y=alt.Y("source:N", title=None, sort=source_order),
-                x=alt.X(f"{load_measure}:Q", title=measure_name)
-                .stack("zero")
-                .scale(domain=[0, domain_max]),
-                text=alt.Text("ratio_label"),
+            radio_buttons = alt.binding_radio(
+                options=[str(n) for n in range(len(source_order))],
+                name="Reference Source: ",
+                labels=source_order,
             )
+            radio_param = alt.param(
+                value="0",
+                bind=radio_buttons,
+                name="ref_source",
+            )
+            text2 = (
+                chart.mark_text(dx=5, dy=0, baseline="middle", align="left")
+                .encode(
+                    y=alt.Y("source:N", title=None, sort=source_order),
+                    x=alt.X(f"{load_measure}:Q", title=measure_name)
+                    .stack("zero")
+                    .scale(domain=[0, domain_max]),
+                    text=alt.Text("reference_source:N"),
+                )
+                .transform_calculate(
+                    reference_source=f'datum["ratio_label_" + {radio_param.name}]'
+                )
+                .add_params(radio_param)
+            )
+
         else:
             text2 = None
         return (

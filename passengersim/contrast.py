@@ -1165,10 +1165,12 @@ def fig_path_forecasts(
 @report_figure
 def fig_bid_price_history(
     summaries,
+    *,
     by_carrier: bool | str = True,
     show_stdev: float | bool | None = None,
     cap: Literal["some", "zero", None] = None,
-    raw_df=False,
+    raw_df: bool = False,
+    title: str | None = "Bid Price History",
 ):
     if cap is None:
         bp_mean = "bid_price_mean"
@@ -1226,16 +1228,24 @@ def fig_bid_price_history(
         bottom_line = bound_line.encode(y=alt.Y("bid_price_upper:Q", title="Bid Price"))
         fig = fig + bound + top_line + bottom_line
     if not isinstance(by_carrier, str):
-        return fig.properties(height=125, width=225).facet(facet="carrier:N", columns=2)
+        fig = fig.properties(height=125, width=225).facet(facet="carrier:N", columns=2)
+        if title:
+            fig = fig.properties(title=title)
+    else:
+        if title:
+            title = f"{title} ({by_carrier})"
+            fig = fig.properties(title=title)
     return fig
 
 
 @report_figure
 def fig_displacement_history(
     summaries,
+    *,
     by_carrier: bool | str = True,
     show_stdev: float | bool | None = None,
-    raw_df=False,
+    raw_df: bool = False,
+    title: str | None = "Displacement Cost History",
 ):
     if not isinstance(by_carrier, str) and show_stdev:
         raise NotImplementedError(
@@ -1287,7 +1297,13 @@ def fig_displacement_history(
         )
         fig = fig + bound + top_line + bottom_line
     if not isinstance(by_carrier, str):
-        return fig.properties(height=125, width=225).facet(facet="carrier:N", columns=2)
+        fig = fig.properties(height=125, width=225).facet(facet="carrier:N", columns=2)
+        if title:
+            fig = fig.properties(title=title)
+    else:
+        if title:
+            title = f"{title} ({by_carrier})"
+            fig = fig.properties(title=title)
     return fig
 
 

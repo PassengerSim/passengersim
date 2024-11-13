@@ -29,6 +29,7 @@ simulation_controls:
   controller_time_zone: 0  # -7
   generate_3seg: True
   debug_connections: False
+  debug_choice: True
 #  show_progress_bar: True
 
 db:
@@ -794,7 +795,7 @@ choice_models:
     kind: pods
     emult: 1.6
     basefare_mult: 2.5
-    path_quality:  [38.30,  0.10]
+    path_quality: [38.30,  0.10]
 #    preferred_carrier:  [-12.29,  0.17]
     r1: 2.0
     r2: 0.35

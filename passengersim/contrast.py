@@ -253,7 +253,6 @@ def fig_bookings_by_timeframe(
                 row=alt.Row("paxtype:N", title="Passenger Type"),
                 title=title,
             )
-            .configure_title(fontSize=18)
         )
     elif by_carrier is True:
         return (
@@ -283,7 +282,6 @@ def fig_bookings_by_timeframe(
                 row=alt.Row("paxtype:N", title="Passenger Type"),
                 title=title,
             )
-            .configure_title(fontSize=18)
         )
     else:
         return (
@@ -319,7 +317,6 @@ def fig_bookings_by_timeframe(
                 titleFontSize=12,
                 labelFontSize=15,
             )
-            .configure_title(fontSize=18)
         )
 
 
@@ -463,7 +460,6 @@ def fig_segmentation_by_timeframe(
                 row=alt.Row("segment:N", title="Passenger Type"),
                 title=title,
             )
-            .configure_title(fontSize=18)
         )
     elif by_carrier is True:
         return (
@@ -493,7 +489,6 @@ def fig_segmentation_by_timeframe(
                 row=alt.Row("segment:N", title="Passenger Type"),
                 title=title,
             )
-            .configure_title(fontSize=18)
         )
     else:
         return (
@@ -529,7 +524,6 @@ def fig_segmentation_by_timeframe(
                 titleFontSize=12,
                 labelFontSize=15,
             )
-            .configure_title(fontSize=18)
         )
 
 
@@ -616,7 +610,6 @@ def _fig_carrier_measure(
                 height=300,
             )
             .facet(column=alt.Column("carrier:N", title="Carrier"), **facet_kwargs)
-            .configure_title(fontSize=18)
         )
     else:
         bars = chart.mark_bar().encode(
@@ -667,7 +660,6 @@ def _fig_carrier_measure(
                 height=10 + 20 * len(source_order),
             )
             .facet(row=alt.Row("carrier:N", title="Carrier"), **facet_kwargs)
-            .configure_title(fontSize=18)
         )
 
 
@@ -911,7 +903,6 @@ def fig_fare_class_mix(summaries, raw_df=False, label_threshold=0.06):
             column=alt.Column("carrier:N", title="Carrier"),
             title="Carrier Fare Class Mix",
         )
-        .configure_title(fontSize=18)
     )
 
 
@@ -993,7 +984,7 @@ def fig_leg_forecasts(
                 title += f" ({leg_def['orig']}-{leg_def['dest']})"
         except Exception:
             raise
-        return fig.properties(title=title).configure_title(fontSize=18)
+        return fig.properties(title=title)
     df = _assemble(
         summaries, "leg_forecasts", by_leg_id=by_leg_id, by_class=by_class, of=of
     )
@@ -1091,7 +1082,7 @@ def fig_path_forecasts(
                     )
         except Exception:
             raise
-        return fig.properties(title=title).configure_title(fontSize=18)
+        return fig.properties(title=title)
     df = _assemble(
         summaries, "path_forecasts", by_path_id=by_path_id, of=of, by_class=by_class
     )
@@ -1310,8 +1301,10 @@ def fig_displacement_history(
 @report_figure
 def fig_demand_to_come(
     summaries: Contrast,
-    func: Literal["mean", "std"] = "mean",
+    func: Literal["mean", "std"] | list[Literal["mean", "std"]] = "mean",
+    *,
     raw_df=False,
+    title: str | None = "Demand to Come",
 ):
     def dtc_seg(s):
         if s is None:
@@ -1349,6 +1342,16 @@ def fig_demand_to_come(
             else:
                 raise ValueError(f"which must be in [mean, std] not {which}")
 
+    if isinstance(func, list):
+        if raw_df:
+            raise NotImplementedError
+        fig = fig_demand_to_come(summaries, func[0], raw_df=raw_df, title=None)
+        for f in func[1:]:
+            fig |= fig_demand_to_come(summaries, f, raw_df=raw_df, title=None)
+        if title:
+            fig = fig.properties(title=title)
+        return fig
+
     if func == "mean":
         y_title = "Mean Demand to Come"
         demand_to_come_by_segment = summaries.apply(
@@ -1367,7 +1370,7 @@ def fig_demand_to_come(
         raise ValueError(f"func must be in [mean, std] not {func}")
     if raw_df:
         return df
-    return (
+    fig = (
         alt.Chart(df)
         .mark_line()
         .encode(
@@ -1378,4 +1381,7 @@ def fig_demand_to_come(
             color="segment:N",
             strokeDash="source:N",
         )
-    )  # .properties(width=500, height=400)
+    )
+    if title:
+        fig = fig.properties(title=title)
+    return fig

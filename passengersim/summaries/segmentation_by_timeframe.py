@@ -141,9 +141,7 @@ class SimTabSegByTimeframe(GenericSimulationTables):
             chart = chart.facet(
                 row=alt.Row("segment:N", title="Passenger Type"),
                 title=title,
-            ).configure_title(fontSize=18)
-        else:
-            chart = chart.configure_title(fontSize=18)
+            )
         return chart
 
     def fig_bookings_by_timeframe(self, *args, **kwargs):

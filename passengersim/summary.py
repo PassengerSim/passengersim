@@ -1279,7 +1279,6 @@ class SummaryTables:
                     row=alt.Row("paxtype:N", title="Passenger Type"),
                     title=title,
                 )
-                .configure_title(fontSize=18)
             )
         else:
             chart = (
@@ -1513,9 +1512,7 @@ class SummaryTables:
             chart = chart.facet(
                 row=alt.Row("segment:N", title="Passenger Type"),
                 title=title,
-            ).configure_title(fontSize=18)
-        else:
-            chart = chart.configure_title(fontSize=18)
+            )
         return chart
 
     def _fig_carrier_load_factors(

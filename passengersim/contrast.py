@@ -779,13 +779,20 @@ def fig_carrier_total_bookings(
         the key giving a specific summary to compare against, or 'all' to
         compare against all other summaries.
 
-
     Returns
     -------
     alt.Chart or pd.DataFrame
     """
 
     df = _assemble(summaries, "carrier_total_bookings")
+    # correct for variable name differences; the "avg_sold" column
+    # is called "sold" in some older summaries
+    if "sold" in df.columns:
+        if "avg_sold" in df.columns:
+            df["avg_sold"] = df["avg_sold"].fillna(df["sold"])
+            df = df.drop(columns="sold")
+        else:
+            df = df.rename(columns={"sold": "avg_sold"})
     source_order = list(summaries.keys())
     if raw_df:
         df.attrs["title"] = "Carrier Total Bookings"
@@ -793,7 +800,7 @@ def fig_carrier_total_bookings(
     return _fig_carrier_measure(
         df,
         source_order,
-        load_measure="sold",
+        load_measure="avg_sold",
         measure_name="Bookings",
         measure_format=".4s",
         orient=orient,

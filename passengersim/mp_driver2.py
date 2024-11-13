@@ -253,7 +253,10 @@ class MultiSimulation(BaseSimulation):
                     #       gracefully, and collect partial results (if any)
                     # terminate all processes so they are not orphaned
                     for p in processes:
-                        p.terminate()
+                        try:
+                            p.terminate()
+                        except AttributeError:
+                            pass
                     raise
 
         result = summarizer.aggregate([value for key, value in sorted(results.items())])

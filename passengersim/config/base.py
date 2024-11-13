@@ -18,7 +18,7 @@ from urllib.request import urlopen
 
 import addicty
 import yaml
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, field_serializer, field_validator, model_validator
 
 from passengersim.pseudonym import random_label
 
@@ -338,6 +338,16 @@ class Config(YamlConfig, extra="forbid"):
                 db = DatabaseConfig(filename=None, write_items=set())
             data["db"] = db
         return data
+
+    @field_serializer("db")
+    @classmethod
+    def _db_to_none(cls, v: DatabaseConfig | None) -> DatabaseConfig | None:
+        """Serialize the database to None if it is a null database."""
+        if v is None:
+            return None
+        if v.filename is None and not v.write_items:
+            return None
+        return v
 
     outputs: OutputConfig = OutputConfig()
     """

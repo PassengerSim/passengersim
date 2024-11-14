@@ -253,7 +253,6 @@ def fig_bookings_by_timeframe(
                 row=alt.Row("paxtype:N", title="Passenger Type"),
                 title=title,
             )
-            .configure_title(fontSize=18)
         )
     elif by_carrier is True:
         return (
@@ -283,7 +282,6 @@ def fig_bookings_by_timeframe(
                 row=alt.Row("paxtype:N", title="Passenger Type"),
                 title=title,
             )
-            .configure_title(fontSize=18)
         )
     else:
         return (
@@ -319,7 +317,6 @@ def fig_bookings_by_timeframe(
                 titleFontSize=12,
                 labelFontSize=15,
             )
-            .configure_title(fontSize=18)
         )
 
 
@@ -463,7 +460,6 @@ def fig_segmentation_by_timeframe(
                 row=alt.Row("segment:N", title="Passenger Type"),
                 title=title,
             )
-            .configure_title(fontSize=18)
         )
     elif by_carrier is True:
         return (
@@ -493,7 +489,6 @@ def fig_segmentation_by_timeframe(
                 row=alt.Row("segment:N", title="Passenger Type"),
                 title=title,
             )
-            .configure_title(fontSize=18)
         )
     else:
         return (
@@ -529,7 +524,6 @@ def fig_segmentation_by_timeframe(
                 titleFontSize=12,
                 labelFontSize=15,
             )
-            .configure_title(fontSize=18)
         )
 
 
@@ -616,7 +610,6 @@ def _fig_carrier_measure(
                 height=300,
             )
             .facet(column=alt.Column("carrier:N", title="Carrier"), **facet_kwargs)
-            .configure_title(fontSize=18)
         )
     else:
         bars = chart.mark_bar().encode(
@@ -667,7 +660,6 @@ def _fig_carrier_measure(
                 height=10 + 20 * len(source_order),
             )
             .facet(row=alt.Row("carrier:N", title="Carrier"), **facet_kwargs)
-            .configure_title(fontSize=18)
         )
 
 
@@ -787,13 +779,20 @@ def fig_carrier_total_bookings(
         the key giving a specific summary to compare against, or 'all' to
         compare against all other summaries.
 
-
     Returns
     -------
     alt.Chart or pd.DataFrame
     """
 
     df = _assemble(summaries, "carrier_total_bookings")
+    # correct for variable name differences; the "avg_sold" column
+    # is called "sold" in some older summaries
+    if "sold" in df.columns:
+        if "avg_sold" in df.columns:
+            df["avg_sold"] = df["avg_sold"].fillna(df["sold"])
+            df = df.drop(columns="sold")
+        else:
+            df = df.rename(columns={"sold": "avg_sold"})
     source_order = list(summaries.keys())
     if raw_df:
         df.attrs["title"] = "Carrier Total Bookings"
@@ -801,7 +800,7 @@ def fig_carrier_total_bookings(
     return _fig_carrier_measure(
         df,
         source_order,
-        load_measure="sold",
+        load_measure="avg_sold",
         measure_name="Bookings",
         measure_format=".4s",
         orient=orient,
@@ -911,7 +910,6 @@ def fig_fare_class_mix(summaries, raw_df=False, label_threshold=0.06):
             column=alt.Column("carrier:N", title="Carrier"),
             title="Carrier Fare Class Mix",
         )
-        .configure_title(fontSize=18)
     )
 
 
@@ -993,7 +991,7 @@ def fig_leg_forecasts(
                 title += f" ({leg_def['orig']}-{leg_def['dest']})"
         except Exception:
             raise
-        return fig.properties(title=title).configure_title(fontSize=18)
+        return fig.properties(title=title)
     df = _assemble(
         summaries, "leg_forecasts", by_leg_id=by_leg_id, by_class=by_class, of=of
     )
@@ -1091,7 +1089,7 @@ def fig_path_forecasts(
                     )
         except Exception:
             raise
-        return fig.properties(title=title).configure_title(fontSize=18)
+        return fig.properties(title=title)
     df = _assemble(
         summaries, "path_forecasts", by_path_id=by_path_id, of=of, by_class=by_class
     )
@@ -1165,11 +1163,11 @@ def fig_path_forecasts(
 @report_figure
 def fig_bid_price_history(
     summaries,
+    *,
     by_carrier: bool | str = True,
     show_stdev: float | bool | None = None,
     cap: Literal["some", "zero", None] = None,
-    raw_df=False,
-    *,
+    raw_df: bool = False,
     title: str | None = "Bid Price History",
 ):
     if cap is None:
@@ -1230,22 +1228,22 @@ def fig_bid_price_history(
     if not isinstance(by_carrier, str):
         fig = fig.properties(height=125, width=225).facet(facet="carrier:N", columns=2)
         if title:
-            fig = fig.properties(title=title).configure_title(fontSize=18)
+            fig = fig.properties(title=title)
     else:
         if title:
             title = f"{title} ({by_carrier})"
-            fig = fig.properties(title=title).configure_title(fontSize=18)
+            fig = fig.properties(title=title)
     return fig
 
 
 @report_figure
 def fig_displacement_history(
     summaries,
+    *,
     by_carrier: bool | str = True,
     show_stdev: float | bool | None = None,
-    raw_df=False,
-    *,
-    title: str | None = "Displacement History",
+    raw_df: bool = False,
+    title: str | None = "Displacement Cost History",
 ):
     if not isinstance(by_carrier, str) and show_stdev:
         raise NotImplementedError(
@@ -1299,18 +1297,21 @@ def fig_displacement_history(
     if not isinstance(by_carrier, str):
         fig = fig.properties(height=125, width=225).facet(facet="carrier:N", columns=2)
         if title:
-            fig = fig.properties(title=title).configure_title(fontSize=18)
+            fig = fig.properties(title=title)
     else:
         if title:
-            fig = fig.properties(title=title).configure_title(fontSize=18)
+            title = f"{title} ({by_carrier})"
+            fig = fig.properties(title=title)
     return fig
 
 
 @report_figure
 def fig_demand_to_come(
     summaries: Contrast,
-    func: Literal["mean", "std"] = "mean",
+    func: Literal["mean", "std"] | list[Literal["mean", "std"]] = "mean",
+    *,
     raw_df=False,
+    title: str | None = "Demand to Come",
 ):
     def dtc_seg(s):
         if s is None:
@@ -1348,6 +1349,16 @@ def fig_demand_to_come(
             else:
                 raise ValueError(f"which must be in [mean, std] not {which}")
 
+    if isinstance(func, list):
+        if raw_df:
+            raise NotImplementedError
+        fig = fig_demand_to_come(summaries, func[0], raw_df=raw_df, title=None)
+        for f in func[1:]:
+            fig |= fig_demand_to_come(summaries, f, raw_df=raw_df, title=None)
+        if title:
+            fig = fig.properties(title=title)
+        return fig
+
     if func == "mean":
         y_title = "Mean Demand to Come"
         demand_to_come_by_segment = summaries.apply(
@@ -1366,7 +1377,7 @@ def fig_demand_to_come(
         raise ValueError(f"func must be in [mean, std] not {func}")
     if raw_df:
         return df
-    return (
+    fig = (
         alt.Chart(df)
         .mark_line()
         .encode(
@@ -1377,4 +1388,7 @@ def fig_demand_to_come(
             color="segment:N",
             strokeDash="source:N",
         )
-    )  # .properties(width=500, height=400)
+    )
+    if title:
+        fig = fig.properties(title=title)
+    return fig

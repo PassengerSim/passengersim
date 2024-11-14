@@ -7,6 +7,7 @@ from altair.utils.schemapi import UndefinedType
 from passengersim_core import __version__ as _passengersim_core_version
 
 from passengersim import __version__ as _passengersim_version
+from passengersim.utils.filenaming import filename_with_timestamp
 
 version_tag_0 = f"PassengerSim v{_passengersim_version}"
 if _passengersim_version == _passengersim_core_version:
@@ -71,6 +72,7 @@ class Report(xmle.Reporter):
         overwrite=False,
         archive_dir="./archive/",
         metadata=None,
+        timestamp: bool | float | bool = True,
         **kwargs,
     ):
         _branding = kwargs.pop("branding", version_tag)
@@ -130,7 +132,8 @@ class Report(xmle.Reporter):
         }
 
         """
-
+        if timestamp:
+            filename = str(filename_with_timestamp(filename))
         return super().save(
             filename=filename,
             overwrite=overwrite,

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import pathlib
-import time
 from typing import TYPE_CHECKING
 
 import pandas as pd
 import yaml
 
 from passengersim.config import Config
+from passengersim.utils.filenaming import filename_with_timestamp
 
 from .report import Elem, Report
 
@@ -133,11 +133,6 @@ def to_html(
     if cfg.outputs.html.other:
         raise NotImplementedError("Other HTML sections not yet implemented")
 
-    filename = pathlib.Path(filename)
-    timestamp = time.strftime("%Y%m%d-%H%M%S")
-    filename = filename.with_suffix(f".{timestamp}.html")
-
-    if make_dirs:
-        filename.parent.mkdir(parents=True, exist_ok=True)
+    filename = filename_with_timestamp(filename, suffix=".html", make_dirs=make_dirs)
 
     rpt.save(str(filename))

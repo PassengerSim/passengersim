@@ -14,6 +14,7 @@ import pandas as pd
 from . import database
 from .config import Config
 from .reporting import report_figure
+from .utils.filenaming import filename_with_timestamp
 
 if TYPE_CHECKING:
     from .driver import Simulation
@@ -108,12 +109,9 @@ class SummaryTables:
             Add a timestamp extension to the filename.
         """
         import pickle
-        import time
 
         if add_timestamp_ext:
-            filename = pathlib.Path(filename)
-            timestamp = time.strftime("%Y%m%d-%H%M%S")
-            filename = filename.with_suffix(f".{timestamp}.pkl")
+            filename = filename_with_timestamp(filename, suffix=".pkl")
 
         with open(filename, "wb") as f:
             self._preserve_meta_trials = preserve_meta_trials
@@ -1279,7 +1277,6 @@ class SummaryTables:
                     row=alt.Row("paxtype:N", title="Passenger Type"),
                     title=title,
                 )
-                .configure_title(fontSize=18)
             )
         else:
             chart = (
@@ -1513,9 +1510,7 @@ class SummaryTables:
             chart = chart.facet(
                 row=alt.Row("segment:N", title="Passenger Type"),
                 title=title,
-            ).configure_title(fontSize=18)
-        else:
-            chart = chart.configure_title(fontSize=18)
+            )
         return chart
 
     def _fig_carrier_load_factors(

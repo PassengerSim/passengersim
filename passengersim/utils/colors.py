@@ -23,7 +23,7 @@ def atl_at_gt_theme():
                 "continuousWidth": 400,
             },  # from the default theme
             "range": {"category": atl_at_gt},
-            "title": {"font": font},
+            "title": {"font": font, "fontSize": 18, "anchor": "start", "offset": 8},
             "axis": {"labelFont": font, "titleFont": font},
             "header": {"labelFont": font, "titleFont": font},
             "legend": {"labelFont": font, "titleFont": font},

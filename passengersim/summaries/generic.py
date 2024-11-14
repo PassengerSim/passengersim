@@ -7,7 +7,6 @@ import os
 import pathlib
 import pickle
 import platform
-import time
 import warnings
 from collections.abc import Callable, Collection
 from datetime import datetime, timezone
@@ -17,6 +16,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Literal, Self
 import pandas as pd
 
 from passengersim.config import Config
+from passengersim.utils.filenaming import filename_with_timestamp
 
 if TYPE_CHECKING:
     from passengersim import Simulation
@@ -445,9 +445,7 @@ class GenericSimulationTables:
             inclusion in Git.
         """
         if add_timestamp_ext:
-            filename = pathlib.Path(filename)
-            timestamp = time.strftime("%Y%m%d-%H%M%S")
-            filename = filename.with_suffix(f".{timestamp}.pkl")
+            filename = filename_with_timestamp(filename, suffix=".pkl")
         else:
             filename = pathlib.Path(filename)
         if make_dirs:

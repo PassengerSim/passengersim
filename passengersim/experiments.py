@@ -188,7 +188,14 @@ class Experiments:
             warnings.warn(msg, stacklevel=2)
             return msg, summary
 
-        msg = f"Loaded {tag} from {config.outputs.pickle}"
+        if check:
+            msg = (
+                f"Loaded {tag} from {config.outputs.pickle}, "
+                f"although the config has changed:\n{check}"
+            )
+        else:
+            msg = f"Loaded {tag} from {config.outputs.pickle}"
+
         return msg, summary
 
     def run(
@@ -220,9 +227,9 @@ class Experiments:
             any), and re-run the simulation if they do not match the current
             environment. If False, do not check the PassengerSim versions.
         check_content : bool, default True
-            If True, check the content of the loaded summary (if any), and re-run
-            the simulation if the config has changed. If False, do not check the
-            content of the loaded summary.
+            If True, check the content of the loaded summary (if any), and
+            re-run the simulation if the config has changed. If False, do not
+            check the content of the loaded summary.
 
         Returns
         -------

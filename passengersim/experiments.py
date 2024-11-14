@@ -71,7 +71,7 @@ class Experiments:
     ):
         self.experiments: list[Experiment] = []
         self.base_config = config
-        self.output_dir = output_dir
+        self.output_dir = output_dir if output_dir is None else pathlib.Path(output_dir)
         # ensure the base config has pickle output
         if pickle and self.base_config.outputs.pickle is None:
             if pickle is True:

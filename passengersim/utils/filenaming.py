@@ -7,7 +7,7 @@ import time
 def filename_with_timestamp(
     filename: str | os.PathLike,
     *,
-    timestamp: float | time.struct_time | datetime.datetime | None,
+    timestamp: float | time.struct_time | datetime.datetime | None = None,
     suffix: str | None = None,
     make_dirs: bool = False,
 ) -> pathlib.Path:
@@ -36,7 +36,7 @@ def filename_with_timestamp(
     pathlib.Path
         The new filename with the timestamp added.
     """
-    if timestamp is None:
+    if timestamp is None or timestamp is True:
         timestamp = time.strftime("%Y%m%d-%H%M%S")
     elif isinstance(timestamp, float):
         timestamp = datetime.datetime.fromtimestamp(timestamp).strftime("%Y%m%d-%H%M%S")

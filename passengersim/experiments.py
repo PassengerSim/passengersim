@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import pathlib
-import warnings
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Literal
 
@@ -180,13 +179,6 @@ class Experiments:
                 f"but the config has changed:\n{check}"
             )
             return msg, None
-        elif check:
-            msg = (
-                f"Loaded {tag} from {config.outputs.pickle}, "
-                f"but the config has changed:\n{check}"
-            )
-            warnings.warn(msg, stacklevel=2)
-            return msg, summary
 
         if check:
             msg = (

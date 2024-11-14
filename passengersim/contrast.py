@@ -45,6 +45,57 @@ class Contrast(dict):
         return sorted(x)
 
 
+class MultiContrast(dict):
+    def __getattr__(self, attr):
+        if attr.startswith("fig_"):
+            g = globals()
+            if attr in g:
+                alter_defaults = {}
+                if attr in [
+                    "fig_carrier_revenues",
+                    "fig_carrier_yields",
+                    "fig_carrier_total_bookings",
+                    "fig_carrier_load_factors",
+                ]:
+                    alter_defaults["width"] = 300
+
+                def fig_func(*args, **kwargs):
+                    figs = {}
+                    kwargs.update(alter_defaults)
+                    for k, v in self.items():
+                        if v is not None:
+                            figs[k] = partial(g[attr], v)(*args, **kwargs)
+                    return self._hconcat(figs)
+
+                return fig_func
+        raise AttributeError(attr)
+
+    def __dir__(self):
+        x = set(super().__dir__())
+        x |= {g for g in globals() if g.startswith("fig_")}
+        return sorted(x)
+
+    @staticmethod
+    def _hconcat(charts: dict[str, alt.Chart]) -> alt.HConcatChart:
+        if not charts:
+            raise ValueError("no charts to concatenate")
+        queue = []
+        for k, c in charts.items():
+            if c is None:
+                warnings.warn(f"no data found for {k!r}", stacklevel=2)
+                continue
+            config = c._kwds.get("config", alt.Undefined)
+            c._kwds["config"] = alt.Undefined
+            title = c._kwds.get("title", "")
+            c._kwds["title"] = f"{k} {title}"
+            queue.append(c)
+        if not queue:
+            raise ValueError("no charts to concatenate")
+        result = alt.hconcat(*queue)
+        result._kwds["config"] = config
+        return result
+
+
 def _assemble(summaries, base, **kwargs):
     summaries_ = {}
     last_exception = RuntimeError("no summaries loaded")
@@ -489,17 +540,44 @@ def _fig_carrier_measure(
     measure_name: str,
     measure_format: str = ".2f",
     orient: Literal["h", "v"] = "h",
+    *,
     title: str | None = None,
     ratio: str | bool = False,
+    ratio_all: bool = False,
+    ratio_label: bool = True,
+    width: int = 500,
 ):
     against = source_order[0]
-    if ratio:
+    if ratio_all:
+        queue = []
+        for n, a in enumerate(source_order):
+            df_ = df.set_index(["source", "carrier"])
+            ratios = df_.div(df_.query(f"source == '{a}'").droplevel("source")) - 1.0
+            ratios.iloc[:, 0] = ratios.iloc[:, 0].where(
+                ratios.index.get_level_values("source") != a, np.nan
+            )
+            ratios.columns = [f"ratio_{n}"]
+            queue.append(ratios)
+        for q in queue:
+            df = df.join(q, on=["source", "carrier"])
+    elif ratio:
         if isinstance(ratio, str):
             against = ratio
         df_ = df.set_index(["source", "carrier"])
         ratios = df_.div(df_.query(f"source == '{against}'").droplevel("source")) - 1.0
-        ratios.columns = ["ratio"]
+        ratios.columns = ["ratio_0"]
         df = df.join(ratios, on=["source", "carrier"])
+
+    if ratio_label:
+        df["ratio_label"] = df["ratio_0"].apply(
+            lambda x: (" " if np.isnan(x) else f"{x:+.1%}")
+        )
+        for n in range(len(source_order)):
+            df[f"ratio_label_{n}"] = df[f"ratio_{n}"].apply(
+                lambda x: (" " if np.isnan(x) else f"{x:+.1%}")
+            )
+
+        domain_max = df[load_measure].max() * (1 + (0.07 * (500 / width)))
 
     facet_kwargs = {}
     if title is not None:
@@ -510,9 +588,14 @@ def _fig_carrier_measure(
         alt.Tooltip("carrier", title="Carrier"),
         alt.Tooltip(f"{load_measure}:Q", title=measure_name, format=measure_format),
     ]
-    if ratio:
+    if ratio_all:
+        for n, a in enumerate(source_order):
+            tooltips.append(
+                alt.Tooltip(f"ratio_{n}:Q", title=f"vs {a}", format=".3%"),
+            )
+    elif ratio:
         tooltips.append(
-            alt.Tooltip("ratio:Q", title=f"vs {against}", format=".3%"),
+            alt.Tooltip("ratio_0:Q", title=f"vs {against}", format=".3%"),
         )
     if orient == "v":
         bars = chart.mark_bar().encode(
@@ -549,10 +632,38 @@ def _fig_carrier_measure(
             x=alt.X(f"{load_measure}:Q", title=measure_name).stack("zero"),
             text=alt.Text(f"{load_measure}:Q", format=measure_format),
         )
+        if ratio_label:
+            radio_buttons = alt.binding_radio(
+                options=[str(n) for n in range(len(source_order))],
+                name="Reference Source: ",
+                labels=source_order,
+            )
+            radio_param = alt.param(
+                value="0",
+                bind=radio_buttons,
+                name="ref_source",
+            )
+            text2 = (
+                chart.mark_text(dx=5, dy=0, baseline="middle", align="left")
+                .encode(
+                    y=alt.Y("source:N", title=None, sort=source_order),
+                    x=alt.X(f"{load_measure}:Q", title=measure_name)
+                    .stack("zero")
+                    .scale(domain=[0, domain_max]),
+                    text=alt.Text("reference_source:N"),
+                )
+                .transform_calculate(
+                    reference_source=f'datum["ratio_label_" + {radio_param.name}]'
+                )
+                .add_params(radio_param)
+            )
+
+        else:
+            text2 = None
         return (
-            (bars + text)
+            ((bars + text + text2) if ratio_label else (bars + text))
             .properties(
-                width=500,
+                width=width,
                 height=10 + 20 * len(source_order),
             )
             .facet(row=alt.Row("carrier:N", title="Carrier"), **facet_kwargs)
@@ -565,7 +676,9 @@ def fig_carrier_revenues(
     summaries,
     raw_df=False,
     orient: Literal["h", "v"] = "h",
-    ratio: str | bool = True,
+    ratio: str | bool = "all",
+    *,
+    width: int = 500,
 ):
     """
     Generate a figure contrasting carrier revenues for one or more runs.
@@ -576,6 +689,10 @@ def fig_carrier_revenues(
     raw_df : bool, default False
     orient : {'h', 'v'}, default 'h'
     ratio : bool or str, default True
+        Add tooltip(s) giving the percentage change of each carrier's revenue
+        to the revenue of the same carrier in the other summaries.  Can be
+        the key giving a specific summary to compare against, or 'all' to
+        compare against all other summaries.
 
     Returns
     -------
@@ -595,6 +712,8 @@ def fig_carrier_revenues(
         orient=orient,
         title="Carrier Revenues",
         ratio=ratio,
+        ratio_all=(ratio == "all"),
+        width=width,
     )
 
 
@@ -603,7 +722,9 @@ def fig_carrier_yields(
     summaries,
     raw_df=False,
     orient: Literal["h", "v"] = "h",
-    ratio: str | bool = True,
+    ratio: str | bool = "all",
+    *,
+    width: int = 500,
 ):
     """
     Generate a figure contrasting carrier yields for one or more runs.
@@ -614,6 +735,10 @@ def fig_carrier_yields(
     raw_df : bool, default False
     orient : {'h', 'v'}, default 'h'
     ratio : bool or str, default True
+        Add tooltip(s) giving the percentage change of each carrier's yield
+        to the yield of the same carrier in the other summaries.  Can be
+        the key giving a specific summary to compare against, or 'all' to
+        compare against all other summaries.
 
     Returns
     -------
@@ -634,6 +759,8 @@ def fig_carrier_yields(
         orient=orient,
         title="Carrier Yields",
         ratio=ratio,
+        ratio_all=(ratio == "all"),
+        width=width,
     )
 
 
@@ -642,7 +769,9 @@ def fig_carrier_total_bookings(
     summaries,
     raw_df=False,
     orient: Literal["h", "v"] = "h",
-    ratio: str | bool = True,
+    ratio: str | bool = "all",
+    *,
+    width: int = 500,
 ):
     """
     Generate a figure contrasting carrier total bookings for one or more runs.
@@ -652,7 +781,12 @@ def fig_carrier_total_bookings(
     summaries : dict[str, SummaryTables]
     raw_df : bool, default False
     orient : {'h', 'v'}, default 'h'
-    ratio : bool or str, default True
+    ratio : bool or str, default "all"
+        Add tooltip(s) giving the percentage change of each carrier's bookings
+        to the bookings of the same carrier in the other summaries.  Can be
+        the key giving a specific summary to compare against, or 'all' to
+        compare against all other summaries.
+
 
     Returns
     -------
@@ -673,6 +807,8 @@ def fig_carrier_total_bookings(
         orient=orient,
         title="Carrier Total Bookings",
         ratio=ratio,
+        ratio_all=(ratio == "all"),
+        width=width,
     )
 
 
@@ -682,7 +818,9 @@ def fig_carrier_load_factors(
     raw_df: bool = False,
     load_measure: Literal["sys_lf", "avg_leg_lf"] = "sys_lf",
     orient: Literal["h", "v"] = "h",
-    ratio: str | bool = True,
+    ratio: str | bool = "all",
+    *,
+    width: int = 500,
 ):
     """
     Generate a figure contrasting carrier load factors for one or more runs.
@@ -693,7 +831,12 @@ def fig_carrier_load_factors(
     raw_df : bool, default False
     load_measure : {'sys_lf', 'avg_leg_lf'}, default 'sys_lf'
     orient : {'h', 'v'}, default 'h'
-    ratio : bool or str, default True
+    ratio : bool or str, default "all"
+        Add tooltip(s) giving the percentage change of each carrier's load factor
+        to the load factor of the same carrier in the other summaries.  Can be
+        the key giving a specific summary to compare against, or 'all' to
+        compare against all other summaries.
+
 
     Returns
     -------
@@ -717,6 +860,8 @@ def fig_carrier_load_factors(
         orient=orient,
         title=f"Carrier {measure_name}s",
         ratio=ratio,
+        ratio_all=(ratio == "all"),
+        width=width,
     )
 
 
@@ -780,6 +925,10 @@ def _fig_forecasts(
 ):
     import altair as alt
 
+    selection = alt.selection_point(
+        name="pick_booking_class", fields=["booking_class"], bind="legend"
+    )
+
     encoding = dict(
         x=alt.X(f"days_prior:{rrd_ntype}")
         .scale(reverse=True)
@@ -788,11 +937,13 @@ def _fig_forecasts(
         color="booking_class:N",
         strokeDash=alt.StrokeDash("source:N", title="Source"),
         strokeWidth=alt.StrokeWidth("source:N", title="Source"),
+        opacity=alt.condition(selection, alt.value(1.0), alt.value(0.05)),
     )
+
     if color:
         encoding["color"] = color
     if not facet_on:
-        return alt.Chart(df).mark_line().encode(**encoding)
+        return alt.Chart(df).mark_line().encode(**encoding).add_params(selection)
     else:
         return (
             alt.Chart(df)
@@ -802,6 +953,7 @@ def _fig_forecasts(
                 facet=f"{facet_on}:N",
                 columns=3,
             )
+            .add_params(selection)
         )
 
 
@@ -832,7 +984,16 @@ def fig_leg_forecasts(
                 of=of_,
                 agg_booking_classes=agg_booking_classes,
             )
-        return fig
+        title = f"Leg Forecasts {by_leg_id}"
+        try:
+            if by_leg_id:
+                first_summary = next(iter(summaries.values()))
+                leg_def = first_summary.legs.loc[by_leg_id]
+                title += f": {leg_def['carrier']} {leg_def['flt_no']}"
+                title += f" ({leg_def['orig']}-{leg_def['dest']})"
+        except Exception:
+            raise
+        return fig.properties(title=title).configure_title(fontSize=18)
     df = _assemble(
         summaries, "leg_forecasts", by_leg_id=by_leg_id, by_class=by_class, of=of
     )
@@ -869,6 +1030,9 @@ def fig_leg_forecasts(
     )
 
 
+ForecastOfT = Literal["mu", "sigma", "closed", "adj_price"]
+
+
 @report_figure
 def fig_path_forecasts(
     summaries,
@@ -877,8 +1041,7 @@ def fig_path_forecasts(
     path_names: dict | None = None,
     agg_booking_classes: bool = False,
     by_class: bool | str = True,
-    of: Literal["mu", "sigma", "closed", "adj_price"]
-    | list[Literal["mu", "sigma", "closed", "adj_price"]] = "mu",
+    of: ForecastOfT | list[ForecastOfT] = "mu",
 ):
     if isinstance(of, list):
         if raw_df:
@@ -909,7 +1072,26 @@ def fig_path_forecasts(
                 by_class=by_class,
                 of=of_,
             )
-        return fig
+        if by_path_id:
+            title = f"Path {by_path_id} Forecasts"
+        else:
+            title = "Path Forecasts"
+        try:
+            if by_path_id:
+                first_summary = next(iter(summaries.values()))
+                path_def = first_summary.paths.loc[by_path_id]
+                title += f" ({path_def['orig']}~{path_def['dest']})"
+                for leg_id in first_summary.path_legs.query(
+                    f"path_id == {by_path_id}"
+                ).leg_id:
+                    leg_def = first_summary.legs.loc[leg_id]
+                    title += (
+                        f", {leg_def['carrier']} {leg_def['flt_no']} "
+                        f"({leg_def['orig']}-{leg_def['dest']})"
+                    )
+        except Exception:
+            raise
+        return fig.properties(title=title).configure_title(fontSize=18)
     df = _assemble(
         summaries, "path_forecasts", by_path_id=by_path_id, of=of, by_class=by_class
     )

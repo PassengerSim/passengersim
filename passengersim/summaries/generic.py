@@ -2,20 +2,24 @@ from __future__ import annotations
 
 import glob
 import inspect
+import multiprocessing
 import os
 import pathlib
 import pickle
+import platform
 import time
 import warnings
 from collections.abc import Callable, Collection
+from datetime import datetime, timezone
 from functools import partialmethod
 from typing import TYPE_CHECKING, Any, ClassVar, Self
 
 import pandas as pd
 
+from passengersim.config import Config
+
 if TYPE_CHECKING:
     from passengersim import Simulation
-    from passengersim.config import Config
     from passengersim.database import Database
 
 
@@ -23,6 +27,29 @@ class MissingDataError(KeyError):
     """Exception raised when data is missing from a summary table."""
 
     pass
+
+
+def initialize_metadata() -> dict[str, Any]:
+    """Initialize metadata for the summary."""
+    from passengersim_core import __version__ as core_version
+
+    from passengersim import __version__ as version
+
+    metadata = {}
+    metadata["time.created"] = datetime.now(timezone.utc).isoformat()
+    metadata["machine.system"] = platform.system()
+    metadata["machine.release"] = platform.release()
+    metadata["machine.version"] = platform.version()
+    metadata["machine.machine"] = platform.machine()
+    metadata["machine.processor"] = platform.processor()
+    metadata["machine.architecture"] = platform.architecture()
+    metadata["machine.node"] = platform.node()
+    metadata["machine.platform"] = platform.platform()
+    metadata["machine.python_version"] = platform.python_version()
+    metadata["machine.cpu_count"] = multiprocessing.cpu_count()
+    metadata["version.passengersim"] = version
+    metadata["version.passengersim_core"] = core_version
+    return metadata
 
 
 class SimulationTableItem:
@@ -208,6 +235,9 @@ class GenericSimulationTables:
         self.meta_summaries = []
         """Summaries that were aggregated to create this summary."""
 
+        self._metadata = initialize_metadata()
+        """Metadata for the summary."""
+
     __writable_attrs = {
         "_data",
         "config",
@@ -218,6 +248,7 @@ class GenericSimulationTables:
         "_preserve_meta_summaries",
         "_preserve_config",
         "_items",
+        "_metadata",
     }
 
     def __setattr__(self, item, value):
@@ -354,7 +385,20 @@ class GenericSimulationTables:
 
     def __setstate__(self, state):
         if "_config_yaml" in state:
-            state["config"] = Config.from_raw_yaml(state.pop("_config_yaml"))
+            content = state.pop("_config_yaml")
+            try:
+                state["config"] = Config.from_raw_yaml(content)
+            except Exception:
+                try:
+                    if isinstance(content, bytes):
+                        content_lines = content.decode("utf-8").split("\n")
+                    else:
+                        content_lines = content.split("\n")
+                    for i, line in enumerate(content_lines):
+                        print(f"{i+1:>4} | {line}")
+                except Exception:
+                    pass
+                raise
         self.__dict__.update(state)
         if "cnx" not in self.__dict__:
             self.cnx = None
@@ -364,6 +408,8 @@ class GenericSimulationTables:
             self.config = None
         if "n_total_samples" not in self.__dict__:
             self.n_total_samples = 0
+        if "_metadata" not in self.__dict__:
+            self._metadata = {}
 
     def to_pickle(
         self,
@@ -457,7 +503,10 @@ class GenericSimulationTables:
 
                 try:
                     with lz4.frame.open(filename, "rb") as f:
-                        result = pickle.load(f)
+                        try:
+                            result = pickle.load(f)
+                        except Exception as e:
+                            raise RuntimeError(f"Error loading {filename}: {e}") from e
                         # if result.__class__.__name__ != cls.__name__:
                         #     raise TypeError(f"Expected {cls}, got {type(result)}")
                         return result
@@ -503,3 +552,38 @@ class GenericSimulationTables:
             for k, v in self._data.items():
                 if isinstance(v, pd.DataFrame):
                     v.to_excel(writer, sheet_name=k)
+
+    def to_html(
+        self, filename: str | pathlib.Path, *, cfg: Config | None = None
+    ) -> None:
+        """Write simulation tables report summary to html.
+
+        Parameters
+        ----------
+        filename : Path-like, optional
+            The html file to write.
+        cfg : Config, optional
+            The configuration to use for the report.  If None, the configuration
+            from the simulation object will be used.
+        """
+        from passengersim.reporting.html import to_html
+
+        to_html(self, filename, cfg=cfg)
+
+    def metadata(self, key: str):
+        """Return a metadata value."""
+        if key in self._metadata:
+            return self._metadata[key]
+        if "." in key:
+            # dotted keys are always exact matches
+            raise KeyError(key)
+        matches = {}
+        for k in self._metadata:
+            subkeys = k.split(".")
+            subkey = subkeys[0]
+            others = ".".join(subkeys[1:])
+            if subkey == key:
+                matches[others] = self._metadata[k]
+        if not matches:
+            raise KeyError(key)
+        return matches

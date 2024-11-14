@@ -2014,6 +2014,16 @@ class Simulation(BaseSimulation):
                     "summarizer must be an instance or subclass of "
                     "GenericSimulationTables"
                 )
+
+        # write output files if designated
+        if isinstance(summary, GenericSimulationTables):
+            if self.config.outputs.html:
+                summary.to_html(self.config.outputs.html.filename)
+            if self.config.outputs.pickle:
+                summary.to_pickle(self.config.outputs.pickle)
+            if self.config.outputs.excel:
+                summary.to_xlsx(self.config.outputs.excel)
+
         logger.info(
             f"Th' th' that's all folks !!!    "
             f"(Elapsed time = {round(time.time() - start_time, 2)})"

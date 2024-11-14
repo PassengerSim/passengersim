@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel, ValidationInfo, field_validator
+from pydantic import BaseModel, ValidationInfo, field_serializer, field_validator
 
 
 def create_timestamp(base_date, offset, hh, mm) -> int:
@@ -108,6 +108,12 @@ class Leg(BaseModel, extra="forbid"):
             # when no timezone is specified, assume UTC (not naive)
             v = v.replace(tzinfo=timezone.utc)
         return v
+
+    @field_serializer("date", when_used="always")
+    def serialize_date(self, date: datetime) -> str:
+        if date.tzinfo is None:
+            date = date.replace(tzinfo=timezone.utc)
+        return date.isoformat()
 
     @field_validator("dep_time", "arr_time", mode="before")
     def _timestring_to_int(cls, v, info: ValidationInfo):

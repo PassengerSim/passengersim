@@ -3,6 +3,9 @@ import multiprocessing
 import os
 import pathlib
 import time
+import warnings
+from contextlib import nullcontext
+from datetime import datetime, timezone
 
 from rich.progress import (
     BarColumn,
@@ -111,7 +114,10 @@ class MultiSimulation(BaseSimulation):
 
     def _dump_config(self) -> str:
         """
-        Dump the configuration to a JSON string.
+        Dump the configuration to a JSON string suitable for a subprocess.
+
+        License info is added to the config if available.  Output file
+        reporting is removed.
 
         Returns
         -------
@@ -123,7 +129,9 @@ class MultiSimulation(BaseSimulation):
             except ImportError:
                 raw_license_certificate = None
             self.config.raw_license_certificate = raw_license_certificate
-        return self.config.model_dump_json()
+        return self.config.model_dump_json(
+            exclude={"outputs": {"html", "pickle", "excel", "log_reports"}}
+        )
 
     def run(
         self,
@@ -131,6 +139,7 @@ class MultiSimulation(BaseSimulation):
         summarizer=SimulationTables,
         output_dir: pathlib.Path | None = None,
         max_processes: int | None = None,
+        rich_progress: Progress | None = None,
     ):
         """
         Run the simulation using multiple processes.
@@ -144,11 +153,17 @@ class MultiSimulation(BaseSimulation):
         max_processes : int, optional
             Maximum number of processes to run simultaneously.  If not provided, the
             number of processes will be equal to the number of CPUs on the system.
+        rich_progress : Progress, optional
+            A rich Progress object to use for displaying progress.  If not provided,
+            a new Progress object will be created.
 
         Returns
         -------
         SimulationTables or subclass
         """
+        run_start = time.time()
+        run_start_str = datetime.fromtimestamp(run_start, timezone.utc).isoformat()
+
         progress_queue = multiprocessing.Queue()
         processes = []
         n_processes_started = 0
@@ -161,14 +176,20 @@ class MultiSimulation(BaseSimulation):
 
         results = {}
 
-        with keep_awake():
-            with Progress(
+        if rich_progress is None:
+            rich_progress = Progress(
                 TextColumn("[progress.description]{task.description}"),
                 BarColumn(),
                 MofNCompleteColumn(),
                 TimeRemainingColumn(),
                 auto_refresh=False,
-            ) as progress:
+            )
+            progress_context = rich_progress
+        else:
+            progress_context = nullcontext(rich_progress)
+
+        with keep_awake():
+            with progress_context as progress:
                 task_progress_ids = {
                     task_id: progress.add_task(
                         f"[green]Trial {task_id}", total=num_samples
@@ -203,6 +224,7 @@ class MultiSimulation(BaseSimulation):
                                 completed=num_samples,
                                 description=f"Finished Trial {task_id}",
                                 refresh=True,
+                                visible=False,
                             )
                             results[task_id] = payload
                             if n_processes_started < len(processes):
@@ -236,4 +258,23 @@ class MultiSimulation(BaseSimulation):
 
         result = summarizer.aggregate([value for key, value in sorted(results.items())])
         result.config = self.config.model_copy(deep=True)
+        result._metadata["time.started"] = run_start_str
+        run_finished = time.time()
+        result._metadata["time.runtime"] = run_finished - run_start
+        result._metadata["time.finished"] = datetime.fromtimestamp(
+            run_finished, timezone.utc
+        ).isoformat()
+
+        # write output files if designated
+        if self.config.outputs.html:
+            try:
+                result.to_html(self.config.outputs.html.filename)
+            except Exception as err:
+                warnings.warn(f"Error writing HTML file: {err}", stacklevel=2)
+        if self.config.outputs.pickle:
+            try:
+                result.to_pickle(self.config.outputs.pickle)
+            except Exception as err:
+                warnings.warn(f"Error writing pickle file: {err}", stacklevel=2)
+
         return result

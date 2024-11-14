@@ -126,7 +126,8 @@ class SimTabCarriers(GenericSimulationTables):
     carrier_history2: pd.DataFrame | None = SimulationTableItem(
         aggregation_func=aggregate_by_concat_dataframe("carrier_history2"),
         extraction_func=extract_carrier_history2,
-        doc="Carrier-level summary data from each sample, new version with counters in CoreCarrier.",
+        doc="Carrier-level summary data from each sample, "
+        "new version with counters in CoreCarrier.",
     )
 
     def _fig_carrier_attribute(
@@ -296,6 +297,32 @@ class SimTabCarriers(GenericSimulationTables):
             .configure_legend(
                 titleFontSize=12,
                 labelFontSize=15,
+            )
+        )
+        return fig
+
+    def fig_carrier_revenue_distribution(self, *, raw_df=False):
+        """Figure showing the distribution of carrier revenues."""
+        if raw_df:
+            raise NotImplementedError("Raw data not available for this figure.")
+        import altair as alt
+
+        fig = (
+            alt.Chart(self.carrier_history2.reset_index())
+            .transform_density(
+                "revenue",
+                groupby=["carrier"],
+                as_=["revenue", "density"],
+            )
+            .mark_area()
+            .encode(
+                x=alt.X("revenue:Q", axis=alt.Axis(title="Revenue", format="$.3s")),
+                y=alt.Y("density:Q", title="Density", axis=alt.Axis(labels=False)),
+                color="carrier:N",
+            )
+            .facet(
+                "carrier:N",
+                title="Revenue Distribution by Carrier",
             )
         )
         return fig

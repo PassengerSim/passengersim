@@ -253,7 +253,10 @@ class MultiSimulation(BaseSimulation):
                     #       gracefully, and collect partial results (if any)
                     # terminate all processes so they are not orphaned
                     for p in processes:
-                        p.terminate()
+                        try:
+                            p.terminate()
+                        except AttributeError:
+                            pass
                     raise
 
         result = summarizer.aggregate([value for key, value in sorted(results.items())])
@@ -268,12 +271,12 @@ class MultiSimulation(BaseSimulation):
         # write output files if designated
         if self.config.outputs.html:
             try:
-                result.to_html(self.config.outputs.html.filename)
+                result.to_html(self.config.outputs.html.filename, make_dirs=True)
             except Exception as err:
                 warnings.warn(f"Error writing HTML file: {err}", stacklevel=2)
         if self.config.outputs.pickle:
             try:
-                result.to_pickle(self.config.outputs.pickle)
+                result.to_pickle(self.config.outputs.pickle, make_dirs="git")
             except Exception as err:
                 warnings.warn(f"Error writing pickle file: {err}", stacklevel=2)
 

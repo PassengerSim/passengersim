@@ -98,6 +98,7 @@ class SimTabBidPriceHistory(GenericSimulationTables):
         *,
         raw_df=False,
         trial: int | None = None,
+        title: str | None = "Bid Price History",
     ):
         if cap is None:
             bp_mean = "bid_price_mean"
@@ -167,4 +168,6 @@ class SimTabBidPriceHistory(GenericSimulationTables):
                 y=alt.Y("bid_price_upper:Q", title="Bid Price")
             )
             fig = fig + bound + top_line + bottom_line
+        if title:
+            fig = fig.properties(title=title)
         return fig

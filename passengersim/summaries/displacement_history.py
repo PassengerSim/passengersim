@@ -74,6 +74,7 @@ class SimTabDisplacementHistory(GenericSimulationTables):
         *,
         raw_df=False,
         trial: int | None = None,
+        title: str | None = "Displacement Cost History",
     ):
         df = self.displacement_history.reset_index()
         if trial is not None:
@@ -137,4 +138,6 @@ class SimTabDisplacementHistory(GenericSimulationTables):
                 y=alt.Y("displacement_upper:Q", title="Displacement Cost")
             )
             fig = fig + bound + top_line + bottom_line
+        if title:
+            fig = fig.properties(title=title).configure_title(fontSize=18)
         return fig

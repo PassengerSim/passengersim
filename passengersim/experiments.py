@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+import warnings
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Literal
 
@@ -103,7 +104,11 @@ class Experiments:
 
     @staticmethod
     def _check_loaded_summary(
-        summary: SimulationTables, config: Config, tag: str, check_versions: bool = True
+        summary: SimulationTables,
+        config: Config,
+        tag: str,
+        check_versions: bool = True,
+        check_content: bool = True,
     ) -> tuple[str, SimulationTables | None]:
         """
         Check if the loaded summary matches the config and PassengerSim versions.
@@ -115,6 +120,8 @@ class Experiments:
         tag : str
         check_versions : bool, optional
             If True, check the PassengerSim versions in the loaded summary.
+        check_content : bool, optional
+            If True, check the content of the loaded summary.
 
         Returns
         -------
@@ -167,12 +174,19 @@ class Experiments:
             )
             return msg, None
 
-        if check:
+        if check_content and check:
             msg = (
                 f"Loaded {tag} from {config.outputs.pickle}, "
                 f"but the config has changed:\n{check}"
             )
             return msg, None
+        elif check:
+            msg = (
+                f"Loaded {tag} from {config.outputs.pickle}, "
+                f"but the config has changed:\n{check}"
+            )
+            warnings.warn(msg, stacklevel=2)
+            return msg, summary
 
         msg = f"Loaded {tag} from {config.outputs.pickle}"
         return msg, summary
@@ -183,6 +197,7 @@ class Experiments:
         *,
         tag: str | None = None,
         check_versions: bool = True,
+        check_content: bool = True,
     ):
         """
         Run the experiments.
@@ -200,10 +215,14 @@ class Experiments:
             do not exist for any experiment.
         tag : str, optional
             If provided, only run the experiment with the given tag.
-        check_versions : bool, optional
+        check_versions : bool, default True
             If True, check the PassengerSim versions in the loaded summary (if
             any), and re-run the simulation if they do not match the current
             environment. If False, do not check the PassengerSim versions.
+        check_content : bool, default True
+            If True, check the content of the loaded summary (if any), and re-run
+            the simulation if the config has changed. If False, do not check the
+            content of the loaded summary.
 
         Returns
         -------
@@ -321,7 +340,11 @@ class Experiments:
                         # we would otherwise run, and the versions of PassengerSim
                         # match between the run and the current environment.
                         msg, summary = self._check_loaded_summary(
-                            summary, config, e.tag, check_versions=check_versions
+                            summary,
+                            config,
+                            e.tag,
+                            check_versions=check_versions,
+                            check_content=check_content,
                         )
                         live_display.console.print(msg)
                         if summary is None:

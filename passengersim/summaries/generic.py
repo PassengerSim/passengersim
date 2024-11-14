@@ -12,7 +12,7 @@ import warnings
 from collections.abc import Callable, Collection
 from datetime import datetime, timezone
 from functools import partialmethod
-from typing import TYPE_CHECKING, Any, ClassVar, Self
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, Self
 
 import pandas as pd
 
@@ -418,7 +418,7 @@ class GenericSimulationTables:
         *,
         preserve_meta_summaries: bool = False,
         preserve_config: bool = True,
-        mkdir: bool = False,
+        make_dirs: Literal[True, False, "git"] = True,
     ):
         """Save to a pickle file.
 
@@ -436,11 +436,13 @@ class GenericSimulationTables:
         preserve_config : bool, default False
             Preserve the config attribute in the saved object.  This includes
             the entire network, and can potentially be a lot of data.
-        mkdir : bool, default False
+        make_dirs : bool or "git", default True
             If True, create the parent directory for the pickle file if it does
             not already exist.  If the directory is created, it will be created
             with a `.gitignore` file to prevent accidental inclusion of pickled
-            output in Git repositories.
+            output in Git repositories, unless the value is "git", in which case
+            no `.gitignore` file is created and the results will be eligible for
+            inclusion in Git.
         """
         if add_timestamp_ext:
             filename = pathlib.Path(filename)
@@ -448,12 +450,13 @@ class GenericSimulationTables:
             filename = filename.with_suffix(f".{timestamp}.pkl")
         else:
             filename = pathlib.Path(filename)
-        if mkdir:
+        if make_dirs:
             if not filename.parent.exists():
                 filename.parent.mkdir(parents=True, exist_ok=True)
-                with open(filename.parent / ".gitignore", "w") as f:
-                    f.write("*.pkl\n")
-                    f.write("*.pkl.lz4\n")
+                if make_dirs != "git":
+                    with open(filename.parent / ".gitignore", "w") as f:
+                        f.write("*.pkl\n")
+                        f.write("*.pkl.lz4\n")
 
         try:
             import lz4.frame
@@ -554,7 +557,11 @@ class GenericSimulationTables:
                     v.to_excel(writer, sheet_name=k)
 
     def to_html(
-        self, filename: str | pathlib.Path, *, cfg: Config | None = None
+        self,
+        filename: str | pathlib.Path,
+        *,
+        cfg: Config | None = None,
+        make_dirs: bool = True,
     ) -> None:
         """Write simulation tables report summary to html.
 
@@ -565,10 +572,12 @@ class GenericSimulationTables:
         cfg : Config, optional
             The configuration to use for the report.  If None, the configuration
             from the simulation object will be used.
+        make_dirs : bool, default True
+            If True, create any necessary directories.
         """
         from passengersim.reporting.html import to_html
 
-        to_html(self, filename, cfg=cfg)
+        to_html(self, filename, cfg=cfg, make_dirs=make_dirs)
 
     def metadata(self, key: str):
         """Return a metadata value."""

@@ -32,10 +32,22 @@ class Report(xmle.Reporter):
         self._numbered_figure = xmle.NumberedCaption("Figure", level=2, anchor=True)
         self._numbered_table = xmle.NumberedCaption("Table", level=2, anchor=True)
 
+    def section(self, title, short_title=None):
+        s = xmle.Elem("div", cls="sticky-header")
+        if short_title:
+            s << f"# {title} | {short_title}"
+        else:
+            s << f"# {title}"
+        self << s
+        return s
+
     def add_section(self, title: str, level: int = 1):
         self.__ilshift__(None)  # clear prior seen_html
-        tag = "#" * max(level, 1)
-        self.append(f"{tag} {title}")
+        if level <= 1:
+            self.section(title)
+        else:
+            tag = "#" * max(level, 1)
+            self.append(f"{tag} {title}")
         return self
 
     def add_figure(self, title, fig=None):
@@ -131,6 +143,11 @@ class Report(xmle.Reporter):
           color: white;
         }
 
+        .sticky-header {
+          position: sticky;
+          top: 0;
+          background: white;
+        }
         """
         if timestamp:
             filename = str(filename_with_timestamp(filename))

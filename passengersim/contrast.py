@@ -62,10 +62,17 @@ class MultiContrast(dict):
                 def fig_func(*args, **kwargs):
                     figs = {}
                     kwargs.update(alter_defaults)
+                    report = kwargs.pop("report", None)
+                    trace = kwargs.pop("trace", None)
+                    if trace:
+                        raise NotImplementedError("trace not implemented")
                     for k, v in self.items():
                         if v is not None:
                             figs[k] = partial(g[attr], v)(*args, **kwargs)
-                    return self._hconcat(figs)
+                    fig, title = self._hconcat(figs)
+                    if report:
+                        report.add_figure(title=title, fig=fig)
+                    return fig
 
                 return fig_func
         raise AttributeError(attr)
@@ -76,10 +83,11 @@ class MultiContrast(dict):
         return sorted(x)
 
     @staticmethod
-    def _hconcat(charts: dict[str, alt.Chart]) -> alt.HConcatChart:
+    def _hconcat(charts: dict[str, alt.Chart]) -> tuple[alt.HConcatChart, str]:
         if not charts:
             raise ValueError("no charts to concatenate")
         queue = []
+        title = ""
         for k, c in charts.items():
             if c is None:
                 warnings.warn(f"no data found for {k!r}", stacklevel=2)
@@ -93,7 +101,7 @@ class MultiContrast(dict):
             raise ValueError("no charts to concatenate")
         result = alt.hconcat(*queue)
         result._kwds["config"] = config
-        return result
+        return result, title
 
 
 def _assemble(summaries, base, **kwargs):

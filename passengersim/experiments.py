@@ -197,6 +197,7 @@ class Experiments:
         tag: str | None = None,
         check_versions: bool = True,
         check_content: bool = True,
+        single_process: bool = False,
     ):
         """
         Run the experiments.
@@ -356,7 +357,7 @@ class Experiments:
                     # If we reach this point, we need to run the simulation
 
                     # Initialize the simulation
-                    if e.multi:
+                    if e.multi and not single_process:
                         sim = MultiSimulation(config)
                         summary = sim.run(rich_progress=rich_progress)
                         del sim

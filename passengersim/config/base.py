@@ -349,7 +349,7 @@ class Config(YamlConfig, extra="forbid"):
     @classmethod
     def _db_to_none(
         cls, v: DatabaseConfig | None, nxt: SerializerFunctionWrapHandler
-    ) -> DatabaseConfig | None:
+    ) -> dict | None:
         """Serialize the database to None if it is a null database."""
         if v is None:
             return None

@@ -457,6 +457,14 @@ class Simulation(BaseSimulation):
             market_multipliers[f"{mkt_config.orig}~{mkt_config.dest}"] = (
                 mkt_config.demand_multiplier
             )
+        # This simulates PODS' favored carrier logic.  The CALP values are
+        # all set to 1.0 in all their networks, so hard-coded fo now but
+        # we can load from YAML in the future if we need to
+        if len(config.carriers) > 0:
+            prob = 1.0 / len(config.carriers)
+            calp = {cxr_name : prob for cxr_name in config.carriers.keys()}
+        else:
+            calp = {}
         for dmd_config in config.demands:
             mkt_ident = f"{dmd_config.orig}~{dmd_config.dest}"
             if mkt_ident not in markets:
@@ -490,6 +498,7 @@ class Simulation(BaseSimulation):
                 dmd.add_group_sizes(dmd_config.group_sizes)
             dmd.prob_saturday_night = dmd_config.prob_saturday_night
             dmd.prob_num_days = dmd_config.prob_num_days
+            dmd.prob_favored_carrier = calp
             self.sim.add_demand(dmd)
             if self.debug:
                 print(f"Added demand: {dmd}, base_demand = {dmd.base_demand}")

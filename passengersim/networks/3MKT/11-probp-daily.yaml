@@ -35,11 +35,11 @@ snapshot_filters:
     sample: [ 120, 290, 499 ]
     dcp: [ 63, 56, 21 ]
     flt_no: 111
-    airline: AL1
+    carrier: AL1
     directory: snapshots/probp
   - type: forecast_adj
     title: Forecast Adj Snapshot
     sample: [ 120, 290, 499 ]
     flt_no: 111
-    airline: AL1
+    carrier: AL1
     directory: snapshots/fcst-adj

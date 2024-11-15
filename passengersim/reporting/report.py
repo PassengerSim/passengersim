@@ -147,6 +147,7 @@ class Report(xmle.Reporter):
           position: sticky;
           top: 0;
           background: white;
+          z-index: 9;
         }
         """
         if timestamp:

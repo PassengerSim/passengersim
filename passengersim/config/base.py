@@ -711,6 +711,27 @@ class Config(YamlConfig, extra="forbid"):
                 )
         return m
 
+    @model_validator(mode="after")
+    def _bp_controls_are_expected_but_not_set(cls, m: Config):
+        """Warn if bid price controls are expected but not set."""
+        for rm_system in m.rm_systems.values():
+            if "dcp" in rm_system.processes:
+                for step in rm_system.processes["dcp"]:
+                    if isinstance(step, RmStepBase):
+                        try:
+                            req = step.require_availability_control
+                        except AttributeError:
+                            req = None
+                        if (
+                            req is not None
+                            and rm_system.availability_control not in req
+                        ):
+                            raise ValueError(
+                                f"RM System {rm_system.name} requires "
+                                f"availability control {req} for step {step.name}"
+                            )
+        return m
+
     __rm_steps_loaded: ClassVar[set[type[RmStepBase]]] = RmStepBase._get_subclasses()
 
     @classmethod

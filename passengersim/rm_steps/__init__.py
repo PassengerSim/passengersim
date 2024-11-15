@@ -51,6 +51,17 @@ class RmStep(RmStepBase, ABC):
         """
         return []
 
+    @property
+    def require_availability_control(self) -> set[str] | None:
+        """
+        A set of availability controls that this RM step requires.
+
+        If the RM step requires a specific availability control, or one of a set of
+        availability controls, this property should be overridden to return the
+        required availability control(s).
+        """
+        return None
+
     debug_filters: list[str] = []
 
     def __str__(self):

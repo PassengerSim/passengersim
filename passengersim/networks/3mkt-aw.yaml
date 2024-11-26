@@ -29,8 +29,8 @@ simulation_controls:
   controller_time_zone: 0  # -7
   generate_3seg: True
   debug_connections: False
-  debug_choice: True
-#  show_progress_bar: True
+  debug_choice: False
+  show_progress_bar: True
 
 db:
   write_items:
@@ -837,7 +837,7 @@ choice_models:
 
 carriers:
   - name: AL1
-    rm_system: rm_leg
+    rm_system: rm_pro_bp
     truncation_rule: 1
 #    frat5: curve_G
 #    fare_adjustment_scale: 0.3

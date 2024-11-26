@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 from .named import Named
 
@@ -38,6 +38,9 @@ class Carrier(Named, extra="forbid"):
     """Named Load Factor curve.
     This is the default that will be applied if not found at a more detailed level
     """
+
+    brand_preference: Optional[float] = 1.0
+    """Used for airline preference to give premium airlines a bump"""
 
     ancillaries: dict[str, float] | None = {}
     """Specifies ancillaries offered by the carrier, codes are ANC1 .. ANC4"""

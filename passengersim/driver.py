@@ -331,12 +331,6 @@ class Simulation(BaseSimulation):
             if todd.early_dep:
                 dwm.early_dep_alpha = todd.early_dep[0]
                 dwm.early_dep_beta = todd.early_dep[1]
-            if todd.late_dep:
-                dwm.late_dep_alpha = todd.late_dep[0]
-                dwm.late_dep_beta = todd.late_dep[1]
-            if todd.late_dep:
-                dwm.late_dep_alpha = todd.late_dep[0]
-                dwm.late_dep_beta = todd.late_dep[1]
             if todd.late_arr:
                 dwm.late_arr_alpha = todd.late_arr[0]
                 dwm.late_arr_beta = todd.late_arr[1]

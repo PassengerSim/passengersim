@@ -383,6 +383,8 @@ class Simulation(BaseSimulation):
             carrier.truncation_rule = carrier_config.truncation_rule
             carrier.continuous_pricing = carrier_config.continuous_pricing
             carrier.cp_quantize = carrier_config.cp_quantize
+            carrier.cp_scale = carrier_config.cp_scale
+            carrier.cp_record = carrier_config.cp_record
             if carrier_config.frat5 is not None and carrier_config.frat5 != "":
                 # We want a deep copy of the Frat5 curve,
                 # in case two carriers are using the same curve,

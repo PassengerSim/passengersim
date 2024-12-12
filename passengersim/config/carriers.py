@@ -27,6 +27,12 @@ class Carrier(Named, extra="forbid"):
                  The difference is $100, and a 0.25 multiplier will set the lower bound
                  for Y1 as $375 and the upper bound for Y2 as $325"""
 
+    cp_scale: float = 1.0
+    """Scales the fare modifier, which was computed using WTP"""
+
+    cp_record: str = "highest_closed"
+    """Do we record the sale in the highest_closed class, lowest_open or nearest?"""
+
     frat5: str | None = ""
     """Named FRAT5 curve.
     This is the default that will be applied if not found at a more detailed level

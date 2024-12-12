@@ -623,6 +623,16 @@ class Config(YamlConfig, extra="forbid"):
         return m
 
     @model_validator(mode="after")
+    def _choice_set_sampling(cls, m: Config):
+        """Don't allow a choice set to be created without a specified limit of observations
+           as unlimited sampling will run out of storage very quickly"""
+        if len(m.simulation_controls.capture_choice_set_file) > 0 \
+            and m.simulation_controls.capture_choice_set_obs is None:
+            m.simulation_controls.capture_choice_set_obs = 10000
+            warnings.warn(f"capture_choice_set_obs not specified, has been set to 10000", stacklevel=2)
+        return m
+
+    @model_validator(mode="after")
     def _demand_todd_curves_exist(cls, m: Config):
         """Check that any TODD curves referenced in Demand objects have been defined."""
         for dmd in m.demands:

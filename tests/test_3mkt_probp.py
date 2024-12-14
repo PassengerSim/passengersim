@@ -15,8 +15,8 @@ def config() -> Config:
     input_file = demo_network("3MKT/11-probp-daily")
     cfg = Config.from_yaml(input_file)
     cfg.simulation_controls.num_trials = 2
-    cfg.simulation_controls.num_samples = 150
-    cfg.simulation_controls.burn_samples = 75
+    cfg.simulation_controls.num_samples = 100
+    cfg.simulation_controls.burn_samples = 60
     cfg.outputs.reports.clear()
     cfg.outputs.reports.add("*")
     return cfg

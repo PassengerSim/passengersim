@@ -80,16 +80,17 @@ class SimulationTableItem:
             df = instance._data[self.name]
             if isinstance(df, Exception):
                 raise df
-            engine = "python" if len(df) < 10000 else "numexpr"
-            for field, func in self._computed_fields.items():
-                if field in df:
-                    continue
-                try:
-                    df[field] = df.eval(func, engine=engine)
-                except Exception as e:
-                    warnings.warn(
-                        f"Error computing {field} for {self.name}: {e}", stacklevel=2
-                    )
+            if df is not None:
+                engine = "python" if len(df) < 10000 else "numexpr"
+                for field, func in self._computed_fields.items():
+                    if field in df:
+                        continue
+                    try:
+                        df[field] = df.eval(func, engine=engine)
+                    except Exception as e:
+                        warnings.warn(
+                            f"Error computing {field} for {self.name}: {e}", stacklevel=2
+                        )
             return df
         except KeyError:
             raise MissingDataError(self.name) from None
@@ -274,6 +275,7 @@ class GenericSimulationTables:
             raise ValueError(
                 "insufficient number of samples outside burn period for reporting"
                 f"\n- num_trials = {eng.num_trials}"
+                f"\n- num_trials_completed = {eng.num_trials_completed}"
                 f"\n- num_samples = {eng.num_samples}"
                 f"\n- burn_samples = {eng.burn_samples}"
             )

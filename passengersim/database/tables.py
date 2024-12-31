@@ -378,7 +378,8 @@ def create_table_path_class_detail(cnx: Database, primary_key: bool = False):
         forecast_closed_in_tf FLOAT,
         forecast_closed_in_future FLOAT,
         adjusted_price  FLOAT,
-        updated_at		DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        updated_at		DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        closed          INT
         {primary_key}
     );
     """

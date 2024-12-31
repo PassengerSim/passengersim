@@ -659,6 +659,57 @@ def path_forecasts(
     )
 
 
+def edgar(
+        cnx: Database, *, scenario: str = None, burn_samples: int = 100
+) -> pd.DataFrame:
+    """
+    Forecast errors, following the EDGAR approach from United Airlines.
+    "Demand Forecast Accuracy", Anubhav Jain and Wen Zhao, AGIFORS May 2018
+
+    Parameters
+    ----------
+    cnx : Database
+    scenario : str
+    burn_samples : int, default 100
+        The forecasts will be analyzed ignoring this many samples from the
+        beginning of each trial.
+
+    Returns
+    -------
+    pandas.DataFrame
+        The resulting dataframe is indexed by:
+           (trial, sample, path_id, booking_class, days_prior
+    """
+    qry = """
+    SELECT
+        trial,
+        sample,
+        path_id,
+        booking_class,
+        days_prior,
+        sold,
+        closed,
+        forecast_mean,
+        forecast_stdev,
+        forecast_closed_in_tf,
+        forecast_closed_in_future,
+        adjusted_price
+    FROM
+        path_class_detail
+    WHERE
+        sample >= ?1
+        AND scenario = ?2
+    """
+    if scenario is None:
+        qry = qry.replace("AND scenario = ?2", "")
+        params = (burn_samples,)
+    else:
+        params = (burn_samples, scenario)
+    return cnx.dataframe(qry, params).set_index(
+        ["trial", "sample", "path_id", "booking_class", "days_prior"]
+    )
+
+
 def demand_to_come(
     cnx: Database, *, scenario: str = None, burn_samples: int = 100
 ) -> pd.DataFrame:

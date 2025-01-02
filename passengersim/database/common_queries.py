@@ -688,9 +688,11 @@ def edgar(
         booking_class,
         days_prior,
         sold,
+        sold_this_tf,
         closed,
         forecast_mean,
         forecast_stdev,
+        forecast_this_tf,
         forecast_closed_in_tf,
         forecast_closed_in_future,
         adjusted_price

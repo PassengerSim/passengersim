@@ -19,6 +19,7 @@ from . import (
     demand_to_come,
     demands,
     displacement_history,
+    edgar,
     fare_class_mix,
     forecasts,
     legbuckets,

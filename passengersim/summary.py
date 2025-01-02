@@ -168,6 +168,7 @@ class SummaryTables:
         bookings_by_timeframe = concat("bookings_by_timeframe")
         segmentation_by_timeframe = concat("segmentation_by_timeframe")
         demand_to_come = concat("demand_to_come")
+        edgar = concat("edgar")
 
         # demands has some columns that are averages and some that are sums
         demands_avg = sum(
@@ -260,25 +261,26 @@ class SummaryTables:
         leg_local_fraction_distribution = sum_count("leg_local_fraction_distribution")
 
         result = cls(
-            demands=demands,
-            legs=legs,
-            paths=paths,
-            carriers=carriers,
-            fare_class_mix=fare_class_mix,
-            leg_forecasts=leg_forecasts,
-            path_forecasts=path_forecasts,
-            carrier_history=carrier_history,
             bookings_by_timeframe=bookings_by_timeframe,
-            segmentation_by_timeframe=segmentation_by_timeframe,
+            carriers=carriers,
+            carrier_history=carrier_history,
             bid_price_history=bid_price_history,
-            displacement_history=displacement_history,
+            demands=demands,
             demand_to_come=demand_to_come,
             demand_to_come_summary=demand_to_come_summary,
+            displacement_history=displacement_history,
+            edgar=edgar,
+            fare_class_mix=fare_class_mix,
+            legs=legs,
             leg_avg_load_factor_distribution=leg_avg_load_factor_distribution,
+            leg_forecasts=leg_forecasts,
             leg_local_fraction_distribution=leg_local_fraction_distribution,
-            raw_load_factor_distribution=raw_load_factor_distribution,
-            raw_fare_class_mix=raw_fare_class_mix,
             n_total_samples=sum(s.n_total_samples for s in summaries),
+            paths=paths,
+            path_forecasts=path_forecasts,
+            raw_fare_class_mix=raw_fare_class_mix,
+            raw_load_factor_distribution=raw_load_factor_distribution,
+            segmentation_by_timeframe=segmentation_by_timeframe,
         )
         result.meta_trials = summaries
         return result
@@ -353,6 +355,7 @@ class SummaryTables:
         scenario: str,
         burn_samples: int,
         additional: Collection[str | tuple] | str | None = (
+            "edgar",
             "fare_class_mix",
             "bookings_by_timeframe",
             "total_demand",
@@ -395,6 +398,7 @@ class SummaryTables:
                 if "pathclass" in cfg.db.write_items:
                     additional.add("path_forecasts")
                     additional.add("local_and_flow_yields")
+                    additional.add("edgar")
                 if "pathclass_final" in cfg.db.write_items:
                     additional.add("local_and_flow_yields")
                 if "leg" in cfg.db.write_items and cfg.db.store_leg_bid_prices:
@@ -478,6 +482,12 @@ class SummaryTables:
                 db, scenario=scenario, burn_samples=burn_samples
             )
 
+        if "edgar" in additional and db.is_open:
+            logger.info("loading edgar")
+            self.edgar = database.common_queries.edgar(
+                db, scenario=scenario, burn_samples=burn_samples
+            )
+
         if "demand_to_come" in additional and db.is_open:
             logger.info("loading demand_to_come")
             self.demand_to_come = database.common_queries.demand_to_come(
@@ -542,6 +552,7 @@ class SummaryTables:
         od_fare_class_mix: dict[tuple[str, str], pd.DataFrame] | None = None,
         leg_forecasts: pd.DataFrame | None = None,
         path_forecasts: pd.DataFrame | None = None,
+        edgar: pd.DataFrame | None = None,
         carrier_history: pd.DataFrame | None = None,
         demand_to_come: pd.DataFrame | None = None,
         demand_to_come_summary: pd.DataFrame | None = None,
@@ -566,29 +577,30 @@ class SummaryTables:
         self.sim = sim
         """The simulation object that generated the summary tables."""
 
-        self.class_dist = class_dist
-        self.demands = demands
-        self.fares = fares
-        self.legs = legs
-        self.paths = paths
-        self.path_classes = path_classes
-        self.carriers = carriers
-        self.fare_class_mix = fare_class_mix
-        self.od_fare_class_mix = od_fare_class_mix
-        self.load_factors = load_factors
+        self.bid_price_history = bid_price_history
         self.bookings_by_timeframe = bookings_by_timeframe
-        self.segmentation_by_timeframe = segmentation_by_timeframe
-        self.total_demand = total_demand
-        self.leg_forecasts = leg_forecasts
-        self.path_forecasts = path_forecasts
+        self.carriers = carriers
+        self.class_dist = class_dist
         self.carrier_history = carrier_history
+        self.demands = demands
         self.demand_to_come = demand_to_come
         self.demand_to_come_summary = demand_to_come_summary
-        self.bid_price_history = bid_price_history
         self.displacement_history = displacement_history
-        self.local_and_flow_yields = local_and_flow_yields
+        self.edgar = edgar
+        self.fares = fares
+        self.fare_class_mix = fare_class_mix
+        self.legs = legs
         self.leg_carried = leg_carried
+        self.leg_forecasts = leg_forecasts
+        self.load_factors = load_factors
         self.load_factor_distribution = load_factor_distribution
+        self.local_and_flow_yields = local_and_flow_yields
+        self.od_fare_class_mix = od_fare_class_mix
+        self.paths = paths
+        self.path_classes = path_classes
+        self.path_forecasts = path_forecasts
+        self.segmentation_by_timeframe = segmentation_by_timeframe
+        self.total_demand = total_demand
 
         self.leg_avg_load_factor_distribution = leg_avg_load_factor_distribution
         """Leg average load factor distribution (integers 0-100)."""

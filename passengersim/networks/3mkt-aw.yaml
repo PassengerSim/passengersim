@@ -58,6 +58,7 @@ outputs:
     - total_demand
     - demand_to_come
     - carrier_history2
+    - edgar
 
 frat5_curves:
   - name: curve_A

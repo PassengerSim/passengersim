@@ -458,7 +458,7 @@ class Simulation(BaseSimulation):
         # we can load from YAML in the future if we need to
         if len(config.carriers) > 0:
             prob = 1.0 / len(config.carriers)
-            calp = {cxr_name : prob for cxr_name in config.carriers.keys()}
+            calp = {cxr_name: prob for cxr_name in config.carriers.keys()}
         else:
             calp = {}
         for dmd_config in config.demands:
@@ -682,9 +682,20 @@ class Simulation(BaseSimulation):
         logger.debug(f"Connections done, num_paths = {num_paths}")
         self.sim.initialize_pathclasses()
 
+        if len(self.dcps) == 0:
+            raise ValueError("No DCPs defined in the configuration file")
+
         # Airlines using Q-forecasting need to have pathclasses set up for all paths
         # so Q-demand can be forecasted by pathclass even in the absence of bookings
         for carrier in self.sim.carriers:
+            self.sim.initialize_histories(
+                carrier,
+                num_departures=26,  # TODO make this a parameter
+                num_timeframes=len(self.dcps),
+                truncation_rule=carrier.truncation_rule,
+                store_priceable=bool(carrier.frat5),
+                floating_closures=False,
+            )
             if carrier.frat5:
                 logger.info(
                     f"Setting up path classes for carrier {carrier.name}, "

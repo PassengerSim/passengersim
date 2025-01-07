@@ -695,6 +695,7 @@ class Simulation(BaseSimulation):
                 truncation_rule=carrier.truncation_rule,
                 store_priceable=bool(carrier.frat5),
                 floating_closures=False,
+                wipe_existing=True,
             )
             if carrier.frat5:
                 logger.info(
@@ -756,6 +757,9 @@ class Simulation(BaseSimulation):
 
         # Record the departure statistics to carrier-level counters in the simulation
         self.sim.record_departure_statistics()
+
+        # Roll histories to next sample
+        self.sim.next_departure()
 
         # Commit data to the database
         if self.cnx:

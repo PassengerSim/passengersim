@@ -24,6 +24,7 @@ except ImportError:
     Path = None
     PathClass = None
     ProBP = None
+    Profiler = None
     SimulationEngine = None
     UserAction = None
     __version__ = None
@@ -50,6 +51,7 @@ else:
         Path,
         PathClass,
         ProBP,
+        Profiler,
         SimulationEngine,
         UserAction,
         __version__,
@@ -77,6 +79,7 @@ __all__ = [
     "Path",
     "PathClass",
     "ProBP",
+    "Profiler",
     "SimulationEngine",
     "UserAction",
     "__version__",

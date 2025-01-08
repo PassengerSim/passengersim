@@ -682,9 +682,6 @@ class Simulation(BaseSimulation):
         logger.debug(f"Connections done, num_paths = {num_paths}")
         self.sim.initialize_pathclasses()
 
-        if len(self.dcps) == 0:
-            raise ValueError("No DCPs defined in the configuration file")
-
         # Airlines using Q-forecasting need to have pathclasses set up for all paths
         # so Q-demand can be forecasted by pathclass even in the absence of bookings
         for carrier in self.sim.carriers:

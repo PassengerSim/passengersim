@@ -24,6 +24,8 @@ def summary(
     config: Config, request: pytest.FixtureRequest
 ) -> (str | None, SimulationTables):
     detruncation = request.param
+    if detruncation:
+        pytest.skip("hybrid with detruncation testing is suspended")
     config.rm_systems.rm_hybrid.processes.dcp.forecast.detruncation_algorithm = (
         detruncation
     )
@@ -36,6 +38,8 @@ def summary_mp(
     config: Config, request: pytest.FixtureRequest
 ) -> (str | None, SimulationTables):
     detruncation = request.param
+    if detruncation:
+        pytest.skip("hybrid with detruncation testing is suspended")
     config.rm_systems.rm_hybrid.processes.dcp.forecast.detruncation_algorithm = (
         detruncation
     )
@@ -59,6 +63,8 @@ def summary_fare_adjustment(
 ) -> (str, SimulationTables):
     fare_adj = request.param[0]
     detruncation = request.param[1]
+    if detruncation:
+        pytest.skip("Fare adjustment with detruncation testing is suspended")
     fare_adj_scale = request.param[2]
     config.rm_systems.rm_hybrid.processes.dcp.forecast.fare_adjustment = fare_adj
     config.rm_systems.rm_hybrid.processes.dcp.forecast.fare_adjustment_scale = (

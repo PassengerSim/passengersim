@@ -685,15 +685,6 @@ class Simulation(BaseSimulation):
         # Airlines using Q-forecasting need to have pathclasses set up for all paths
         # so Q-demand can be forecasted by pathclass even in the absence of bookings
         for carrier in self.sim.carriers:
-            self.sim.initialize_histories(
-                carrier,
-                num_departures=26,  # TODO make this a parameter
-                num_timeframes=len(self.dcps),
-                truncation_rule=carrier.truncation_rule,
-                store_priceable=bool(carrier.frat5),
-                floating_closures=False,
-                wipe_existing=True,
-            )
             if carrier.frat5:
                 logger.info(
                     f"Setting up path classes for carrier {carrier.name}, "
@@ -792,6 +783,31 @@ class Simulation(BaseSimulation):
                 else:
                     m.set_carrier_share(a.name, share)
 
+    def begin_trial(self, trial: int):
+        """Beginning of trial processing.
+
+        Parameters
+        ----------
+        trial : int
+            The trial number.
+        """
+        self.sim.trial = trial
+        self.sim.reset_trial_counters()
+
+        for carrier in self.sim.carriers:
+            # Initialize the histories all the various things that need them.
+            # This is by-carrier, as the carriers may eventually have different
+            # data requirements (sizes) for their history arrays.
+            self.sim.initialize_histories(
+                carrier,
+                num_departures=26,  # TODO make this a parameter
+                num_timeframes=len(self.dcps),
+                truncation_rule=carrier.truncation_rule,
+                store_priceable=bool(carrier.frat5),
+                floating_closures=False,
+                wipe_existing=True,
+            )
+
     def end_trial(self):
         """End of trial processing."""
         self.extract_segmentation_by_timeframe()
@@ -853,8 +869,8 @@ class Simulation(BaseSimulation):
         memory_log(f"begin _run_single_trial {trial}")
         if not n_samples_total:
             n_samples_total = self.sim.num_trials * self.sim.num_samples
-        self.sim.trial = trial
-        self.sim.reset_trial_counters()
+
+        self.begin_trial(trial)
         for sample in range(self.sim.num_samples):
             if self.sim.config.simulation_controls.double_capacity_until:
                 # Just trying this, PODS has something similar during burn phase

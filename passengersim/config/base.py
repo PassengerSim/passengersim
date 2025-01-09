@@ -624,12 +624,19 @@ class Config(YamlConfig, extra="forbid"):
 
     @model_validator(mode="after")
     def _choice_set_sampling(cls, m: Config):
-        """Don't allow a choice set to be created without a specified limit of observations
-           as unlimited sampling will run out of storage very quickly"""
-        if len(m.simulation_controls.capture_choice_set_file) > 0 \
-            and m.simulation_controls.capture_choice_set_obs is None:
+        """Ensure there is a limit on the number of observations in a choice set.
+
+        Don't allow a choice set to be created without a specified limit of observations
+        as unlimited sampling will run out of storage very quickly"""
+        if (
+            len(m.simulation_controls.capture_choice_set_file) > 0
+            and m.simulation_controls.capture_choice_set_obs is None
+        ):
             m.simulation_controls.capture_choice_set_obs = 10000
-            warnings.warn(f"capture_choice_set_obs not specified, has been set to 10000", stacklevel=2)
+            warnings.warn(
+                "capture_choice_set_obs not specified, has been set to 10000",
+                stacklevel=2,
+            )
         return m
 
     @model_validator(mode="after")

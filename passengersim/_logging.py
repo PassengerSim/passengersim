@@ -116,7 +116,8 @@ class TimingLog:
         if self.split_time is not None:
             self.log.log(
                 self.level,
-                f"<SPLIT> {self.label} / Final <{timesize_stack(now - self.split_time)}>",
+                f"<SPLIT> {self.label} / Final "
+                f"<{timesize_stack(now - self.split_time)}>",
             )
         if exc_type is None:
             self.log.log(

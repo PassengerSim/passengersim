@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from .named import Named
 
@@ -45,7 +45,7 @@ class Carrier(Named, extra="forbid"):
     This is the default that will be applied if not found at a more detailed level
     """
 
-    brand_preference: Optional[float] = 1.0
+    brand_preference: float | None = 1.0
     """Used for airline preference to give premium airlines a bump"""
 
     ancillaries: dict[str, float] | None = {}

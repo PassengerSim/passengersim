@@ -51,7 +51,9 @@ class Demand(BaseModel, extra="forbid"):
     distribution of customer arrivals."""
 
     group_sizes: list[float] | None = None
-    """Probability of each group size.  i.e. [0.5, 0.3, 0.2] will give 50% one pax, 30% 2 pax, etc"""
+    """Probability of each group size.
+
+    i.e. [0.5, 0.3, 0.2] will give 50% one pax, 30% 2 pax, etc"""
 
     prob_saturday_night: bool = False
     """Probability that the customer has a R/T itinerary with a Saturday night stay.

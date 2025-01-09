@@ -37,7 +37,7 @@ for path in sorted(doc_path.rglob("*.ipynb")):
         try:
             ep.preprocess(nb, {"metadata": {"path": path.parent}})
         except CellExecutionError:
-            print('Error executing the notebook "%s".' % path)
+            print(f'Error executing the notebook "{path}".')
         finally:
             with open(path.with_suffix(".nbconvert.ipynb"), "w", encoding="utf-8") as f:
                 nbformat.write(nb, f)

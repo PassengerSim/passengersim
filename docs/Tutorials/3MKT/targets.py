@@ -17,7 +17,7 @@ def load(experiment_n: int, config: Config):
         10: "./pods-outputs/ZF2-1/08_ProBPnoreoptnok",
         11: "./pods-outputs/ZF2-1/probo-daily-method3",  # probp, daily re-opt method 3
         12: "./pods-outputs/ZF2-1/probo-daily-method2",  # probp, daily re-opt method 2
-        13: "./pods-outputs/ZF2-1/08_ProBPdailyreoptnok",  # probp, daily re-opt method 1
+        13: "./pods-outputs/ZF2-1/08_ProBPdailyreoptnok",  # probp daily re-opt method 1
         "10-ZF2": "./3MKT/pods-outputs/ZF2-2/08_ProBPnoreopt",
     }
     target = vt.pods(files[experiment_n], config)

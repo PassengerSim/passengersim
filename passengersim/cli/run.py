@@ -14,7 +14,8 @@ def run(
         ...,
         "-c",
         "--config",
-        help="Configuration file(s) that defines the network and various simulation options.",
+        help="Configuration file(s) that defines the network "
+        "and various simulation options.",
     ),
 ):
     info()

@@ -89,7 +89,8 @@ class SimulationTableItem:
                         df[field] = df.eval(func, engine=engine)
                     except Exception as e:
                         warnings.warn(
-                            f"Error computing {field} for {self.name}: {e}", stacklevel=2
+                            f"Error computing {field} for {self.name}: {e}",
+                            stacklevel=2,
                         )
             return df
         except KeyError:

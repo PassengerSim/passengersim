@@ -7,9 +7,8 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
-from pydantic import Field, field_validator, model_validator
 from .named import Named
+
 
 class CircuityRule(Named, extra="forbid"):
     carrier: str | None = None
@@ -24,5 +23,3 @@ class CircuityRule(Named, extra="forbid"):
     # To prohibit a conection, set alpha and beta to 0.0
     alpha: float
     beta: float
-
-

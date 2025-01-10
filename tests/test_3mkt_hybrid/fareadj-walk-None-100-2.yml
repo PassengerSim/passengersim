@@ -1,0 +1,342 @@
+Path-1:
+  Class-Y0:
+    forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+    q_forecast:
+      mean_in_timeframe: NA
+      mean_to_departure: NA
+      stdev_in_timeframe: NA
+      stdev_to_departure: NA
+    sold: 0
+    sold_priceable: 0
+    y_forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+  Class-Y1:
+    forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+    q_forecast:
+      mean_in_timeframe: NA
+      mean_to_departure: NA
+      stdev_in_timeframe: NA
+      stdev_to_departure: NA
+    sold: 0
+    sold_priceable: 0
+    y_forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+  Class-Y2:
+    forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+    q_forecast:
+      mean_in_timeframe: NA
+      mean_to_departure: NA
+      stdev_in_timeframe: NA
+      stdev_to_departure: NA
+    sold: 0
+    sold_priceable: 0
+    y_forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+  Class-Y3:
+    forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+    q_forecast:
+      mean_in_timeframe: NA
+      mean_to_departure: NA
+      stdev_in_timeframe: NA
+      stdev_to_departure: NA
+    sold: 0
+    sold_priceable: 0
+    y_forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+  Class-Y4:
+    forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+    q_forecast:
+      mean_in_timeframe: NA
+      mean_to_departure: NA
+      stdev_in_timeframe: NA
+      stdev_to_departure: NA
+    sold: 0
+    sold_priceable: 0
+    y_forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+  Class-Y5:
+    forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+    q_forecast:
+      mean_in_timeframe: NA
+      mean_to_departure: NA
+      stdev_in_timeframe: NA
+      stdev_to_departure: NA
+    sold: 35
+    sold_priceable: 35
+    y_forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+  path_level_q_forecast:
+    mean_in_timeframe: []
+    mean_to_departure: []
+    stdev_in_timeframe: []
+    stdev_to_departure: []
+Path-11:
+  Class-Y0:
+    forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+    q_forecast:
+      mean_in_timeframe: NA
+      mean_to_departure: NA
+      stdev_in_timeframe: NA
+      stdev_to_departure: NA
+    sold: 0
+    sold_priceable: 0
+    y_forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+  Class-Y1:
+    forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+    q_forecast:
+      mean_in_timeframe: NA
+      mean_to_departure: NA
+      stdev_in_timeframe: NA
+      stdev_to_departure: NA
+    sold: 0
+    sold_priceable: 0
+    y_forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+  Class-Y2:
+    forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+    q_forecast:
+      mean_in_timeframe: NA
+      mean_to_departure: NA
+      stdev_in_timeframe: NA
+      stdev_to_departure: NA
+    sold: 0
+    sold_priceable: 0
+    y_forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+  Class-Y3:
+    forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+    q_forecast:
+      mean_in_timeframe: NA
+      mean_to_departure: NA
+      stdev_in_timeframe: NA
+      stdev_to_departure: NA
+    sold: 0
+    sold_priceable: 0
+    y_forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+  Class-Y4:
+    forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+    q_forecast:
+      mean_in_timeframe: NA
+      mean_to_departure: NA
+      stdev_in_timeframe: NA
+      stdev_to_departure: NA
+    sold: 0
+    sold_priceable: 0
+    y_forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+  Class-Y5:
+    forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+    q_forecast:
+      mean_in_timeframe: NA
+      mean_to_departure: NA
+      stdev_in_timeframe: NA
+      stdev_to_departure: NA
+    sold: 58
+    sold_priceable: 58
+    y_forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+  path_level_q_forecast:
+    mean_in_timeframe: []
+    mean_to_departure: []
+    stdev_in_timeframe: []
+    stdev_to_departure: []
+Path-6:
+  Class-Y0:
+    forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+    q_forecast:
+      mean_in_timeframe: NA
+      mean_to_departure: NA
+      stdev_in_timeframe: NA
+      stdev_to_departure: NA
+    sold: 0
+    sold_priceable: 0
+    y_forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+  Class-Y1:
+    forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+    q_forecast:
+      mean_in_timeframe: NA
+      mean_to_departure: NA
+      stdev_in_timeframe: NA
+      stdev_to_departure: NA
+    sold: 0
+    sold_priceable: 0
+    y_forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+  Class-Y2:
+    forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+    q_forecast:
+      mean_in_timeframe: NA
+      mean_to_departure: NA
+      stdev_in_timeframe: NA
+      stdev_to_departure: NA
+    sold: 0
+    sold_priceable: 0
+    y_forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+  Class-Y3:
+    forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+    q_forecast:
+      mean_in_timeframe: NA
+      mean_to_departure: NA
+      stdev_in_timeframe: NA
+      stdev_to_departure: NA
+    sold: 0
+    sold_priceable: 0
+    y_forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+  Class-Y4:
+    forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+    q_forecast:
+      mean_in_timeframe: NA
+      mean_to_departure: NA
+      stdev_in_timeframe: NA
+      stdev_to_departure: NA
+    sold: 0
+    sold_priceable: 0
+    y_forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+  Class-Y5:
+    forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+    q_forecast:
+      mean_in_timeframe: NA
+      mean_to_departure: NA
+      stdev_in_timeframe: NA
+      stdev_to_departure: NA
+    sold: 46
+    sold_priceable: 46
+    y_forecast:
+      mean_in_timeframe: []
+      mean_to_departure: []
+      stdev_in_timeframe: []
+      stdev_to_departure: []
+  path_level_q_forecast:
+    mean_in_timeframe: []
+    mean_to_departure: []
+    stdev_in_timeframe: []
+    stdev_to_departure: []

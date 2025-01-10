@@ -389,3 +389,60 @@ def test_3mkt_08_detrunc_bookings_by_timeframe(summary1, summary2, summary3):
             assert p.truncation_rule == 3
         else:
             raise AssertionError(f"Unexpected carrier {p.carrier}")
+
+
+def test_truncation_rule_1() -> SummaryTables:
+    input_file = demo_network("3MKT/08-untrunc-em")
+    cfg = Config.from_yaml(input_file)
+    cfg.simulation_controls.num_trials = 1
+    cfg.simulation_controls.num_samples = 500
+    cfg.outputs.reports.add(("od_fare_class_mix", "BOS", "ORD"))
+    cfg.carriers["AL1"].truncation_rule = 1
+    cfg.carriers["AL2"].truncation_rule = 1
+    sim = Simulation(cfg)
+
+    sim.setup_scenario()
+    sim.begin_trial(0)
+
+    import numpy
+
+    numpy.set_printoptions(linewidth=400)
+
+    for s in range(11):
+        with sim.run_single_sample():
+            print("===== Sample", s, "=====")
+            leg = sim.legs[101]
+            bkt = leg.buckets[1]
+            bs = {b.name: b.sold for b in leg.buckets}
+            print(leg, bkt, "SOLD:", leg.sold, bs)
+
+            if s < 9:
+                continue
+
+            for b in leg.buckets:
+                v = b.forecast.get_vectors()
+                # print(v.mean_in_timeframe[::-1])
+                print(b.name, v.mean_to_departure)
+
+            print(bkt.forecast.history.as_arrays()["sold"])
+            print(bkt.forecast.history.as_arrays()["closed_flags"])
+            print("FINAL TIMEFRAMES")
+            print(bkt.forecast.get_detruncated_demand_array()[:, -1])
+            print(bkt.forecast.get_detruncated_demand_array()[:, -2])
+            print(bkt.forecast.get_detruncated_demand_array()[:, -3])
+            print(bkt.forecast.get_detruncated_demand_array()[:, -4])
+
+            # other_demand = np.asarray([
+            #      [0., 1., 1., 0., 0., 0., 0., 1., 0., 0., 1., 0., 1., 3., 0., 0.],
+            #      [2., 1., 1., 1., 0., 0., 0., 0., 2., 2., 0., 1., 1., 1., 4., 0.],
+            #      [1., 0., 1., 1., 0., 1., 0., 0., 2., 0., 2., 3., 0., 1., 0., 0.],
+            #      [1., 2., 0., 0., 0., 1., 0., 0., 0., 1., 0., 2., 1., 0., 1., 0.],
+            #      [0., 0., 0., 0., 1., 2., 0., 0., 0., 2., 0., 5., 0., 0., 0., 0.],
+            #      [0., 0., 0., 2., 1., 0., 0., 0., 0., 0., 0., 1., 0., 2., 2., 2.],
+            #      [2., 0., 0., 0., 0., 1., 0., 0., 2., 0., 2., 2., 0., 0., 4., 1.],
+            #      [0., 1., 1., 0., 1., 1., 1., 0., 0., 2., 1., 1., 0., 0., 2., 1.],
+            #      [0., 0., 0., 0., 0., 1., 1., 0., 0., 1., 1., 1., 1., 2., 3., 0.],
+            #      [1., 0., 0., 0., 1., 1., 0., 3., 2., 0., 1., 0., 0., 0., 0., 0.],
+            # ])
+            # print("OTHER DEMAND")
+            # print(bkt.forecast.history.as_arrays()['sold'] - other_demand)

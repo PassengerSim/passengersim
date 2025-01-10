@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import pathlib
@@ -856,6 +857,41 @@ class Simulation(BaseSimulation):
         df = pd.concat(top_level, axis=1, names=["metric"])
         self.segmentation_data_by_timeframe[self.sim.trial] = df
         return df
+
+    @contextlib.contextmanager
+    def run_single_sample(self) -> int:
+        """Context manager to run the next sample in the current trial.
+
+        On entry, the sample number is run through to departure, so all
+        sales have happened, but per-sample wrap up (e.g. rolling history
+        forward, resetting counters) is deferred until exit.  This is useful
+        for running a single sample in a testing framework.
+
+        Yields
+        ------
+        int
+            The sample number just completed.
+        """
+        self.sim.sample += 1
+        self.reseed(
+            [
+                self.sim.config.simulation_controls.random_seed,
+                self.sim.trial,
+                self.sim.sample,
+            ]
+        )
+        self.sim.reset_counters()
+        self.generate_demands()
+        while True:
+            event = self.sim.go()
+            self.run_carrier_models(event)
+            if event is None or str(event) == "Done" or (event[0] == "Done"):
+                assert (
+                    self.sim.num_events() == 0
+                ), f"Event queue still has {self.sim.num_events()} events"
+                break
+        yield self.sim.sample
+        self.end_sample()
 
     def _run_single_trial(
         self,

@@ -175,105 +175,86 @@ def test_fare_adj_walk(data_regression, fareadj, adjscale):
     # self.sim.update_db_write_flags()
     self.begin_trial(trial)
 
-    def run_single_sample(sample):
-        self.sim.sample = sample
-        self.reseed(
-            [
-                self.sim.config.simulation_controls.random_seed,
-                trial,
-                sample,
-            ]
-        )
-        self.sim.reset_counters()
-        self.generate_demands()
-        while True:
-            event = self.sim.go()
-            self.run_carrier_models(event)
-            if event is None or str(event) == "Done" or (event[0] == "Done"):
-                assert (
-                    self.sim.num_events() == 0
-                ), f"Event queue still has {self.sim.num_events()} events"
-                break
-        self.end_sample()
-
     for s in range(cfg.simulation_controls.num_samples):
-        run_single_sample(s)
-        state = {}
-        if s > 14 and s % 5:
-            # after the 15th sample, check every 5th sample
-            continue
-        for pth in self.sim.paths:
-            # select three paths for checking
-            if pth.path_id not in [1, 6, 11]:
+        with self.run_single_sample():
+            state = {}
+            if s > 14 and s % 5:
+                # after the 15th sample, check every 5th sample
                 continue
-            try:
-                pth_q = pth.q_forecast.get_vectors()
-            except ValueError:
-                pth_q = ForecastVectors(["NA", "NA", "NA", "NA", "NA", "NA"])
-            state[f"Path-{pth.path_id}"] = {
-                "path_level_q_forecast": {
-                    "mean_in_timeframe": pth_q.mean_in_timeframe,
-                    "mean_to_departure": pth_q.mean_to_departure,
-                    "stdev_in_timeframe": pth_q.stdev_in_timeframe,
-                    "stdev_to_departure": pth_q.stdev_to_departure,
-                },
-            }
-            for pc in pth.pathclasses:
+            for pth in self.sim.paths:
+                # select three paths for checking
+                if pth.path_id not in [1, 6, 11]:
+                    continue
                 try:
-                    q = pc.q_forecast.get_vectors()
+                    pth_q = pth.q_forecast.get_vectors()
+                except AttributeError:
+                    pth_q = ForecastVectors([(), (), (), (), (), ()])
                 except ValueError:
-                    q = ForecastVectors(["NA", "NA", "NA", "NA", "NA", "NA"])
-                try:
-                    y = pc.y_forecast.get_vectors()
-                except ValueError:
-                    y = ForecastVectors(["NA", "NA", "NA", "NA", "NA", "NA"])
-                try:
-                    t = pc.forecast.get_vectors()
-                except ValueError:
-                    t = ForecastVectors(["NA", "NA", "NA", "NA", "NA", "NA"])
-                state[f"Path-{pth.path_id}"][f"Class-{pc.booking_class}"] = {
-                    "sold": pc.sold,
-                    "sold_priceable": pc.sold_priceable,
-                    "adj_fares": pc.raw_adjusted_fare_price,
-                    "q_forecast": {
-                        "mean_in_timeframe": q.mean_in_timeframe,
-                        "mean_to_departure": q.mean_to_departure,
-                        "stdev_in_timeframe": q.stdev_in_timeframe,
-                        "stdev_to_departure": q.stdev_to_departure,
-                    },
-                    "y_forecast": {
-                        "mean_in_timeframe": y.mean_in_timeframe,
-                        "mean_to_departure": y.mean_to_departure,
-                        "stdev_in_timeframe": y.stdev_in_timeframe,
-                        "stdev_to_departure": y.stdev_to_departure,
-                    },
-                    "forecast": {
-                        "mean_in_timeframe": t.mean_in_timeframe,
-                        "mean_to_departure": t.mean_to_departure,
-                        "stdev_in_timeframe": t.stdev_in_timeframe,
-                        "stdev_to_departure": t.stdev_to_departure,
+                    pth_q = ForecastVectors(["NA", "NA", "NA", "NA", "NA", "NA"])
+                state[f"Path-{pth.path_id}"] = {
+                    "path_level_q_forecast": {
+                        "mean_in_timeframe": pth_q.mean_in_timeframe,
+                        "mean_to_departure": pth_q.mean_to_departure,
+                        "stdev_in_timeframe": pth_q.stdev_in_timeframe,
+                        "stdev_to_departure": pth_q.stdev_to_departure,
                     },
                 }
-
-        if adjscale < 0.0001 or fareadj is None:
-            # change to no fare adjustment for this check, to confirm that
-            # scaling fare adjustment all the way to zero is equivalent to
-            # no fare adjustment
-            fareadj = None
-            adjscale = 1.0
-            # also remove calculated adjusted fares from the state, there will
-            # be insignificant differences we want to ignore
-            for pth in self.sim.paths:
                 for pc in pth.pathclasses:
                     try:
-                        state[f"Path-{pth.path_id}"][f"Class-{pc.booking_class}"].pop(
-                            "adj_fares"
-                        )
-                    except KeyError:
-                        pass
-        data_regression.check(
-            state, basename=f"fareadj-walk-{fareadj}-{int(adjscale*100):03d}-{s}"
-        )
+                        q = pc.q_forecast.get_vectors()
+                    except ValueError:
+                        q = ForecastVectors(["NA", "NA", "NA", "NA", "NA", "NA"])
+                    try:
+                        y = pc.y_forecast.get_vectors()
+                    except ValueError:
+                        y = ForecastVectors(["NA", "NA", "NA", "NA", "NA", "NA"])
+                    try:
+                        t = pc.forecast.get_vectors()
+                    except ValueError:
+                        t = ForecastVectors(["NA", "NA", "NA", "NA", "NA", "NA"])
+                    state[f"Path-{pth.path_id}"][f"Class-{pc.booking_class}"] = {
+                        "sold": pc.sold,
+                        "sold_priceable": pc.sold_priceable,
+                        "adj_fares": pc.raw_adjusted_fare_price,
+                        "q_forecast": {
+                            "mean_in_timeframe": q.mean_in_timeframe,
+                            "mean_to_departure": q.mean_to_departure,
+                            "stdev_in_timeframe": q.stdev_in_timeframe,
+                            "stdev_to_departure": q.stdev_to_departure,
+                        },
+                        "y_forecast": {
+                            "mean_in_timeframe": y.mean_in_timeframe,
+                            "mean_to_departure": y.mean_to_departure,
+                            "stdev_in_timeframe": y.stdev_in_timeframe,
+                            "stdev_to_departure": y.stdev_to_departure,
+                        },
+                        "forecast": {
+                            "mean_in_timeframe": t.mean_in_timeframe,
+                            "mean_to_departure": t.mean_to_departure,
+                            "stdev_in_timeframe": t.stdev_in_timeframe,
+                            "stdev_to_departure": t.stdev_to_departure,
+                        },
+                    }
+
+            if adjscale < 0.0001 or fareadj is None:
+                # change to no fare adjustment for this check, to confirm that
+                # scaling fare adjustment all the way to zero is equivalent to
+                # no fare adjustment
+                fareadj = None
+                adjscale = 1.0
+                # also remove calculated adjusted fares from the state, there will
+                # be insignificant differences we want to ignore
+                for pth in self.sim.paths:
+                    for pc in pth.pathclasses:
+                        try:
+                            state[f"Path-{pth.path_id}"][
+                                f"Class-{pc.booking_class}"
+                            ].pop("adj_fares")
+                        except KeyError:
+                            pass
+            data_regression.check(
+                state, basename=f"fareadj-walk-{fareadj}-{int(adjscale*100):03d}-{s}"
+            )
 
         # # check selected internal results at every sample
         # if s < 10: continue

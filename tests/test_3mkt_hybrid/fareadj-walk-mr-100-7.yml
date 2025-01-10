@@ -106,8 +106,8 @@ Path-1:
       mean_to_departure: NA
       stdev_in_timeframe: NA
       stdev_to_departure: NA
-    sold: 37
-    sold_priceable: 37
+    sold: 26
+    sold_priceable: 26
     y_forecast:
       mean_in_timeframe: []
       mean_to_departure: []
@@ -226,8 +226,8 @@ Path-11:
       mean_to_departure: NA
       stdev_in_timeframe: NA
       stdev_to_departure: NA
-    sold: 49
-    sold_priceable: 49
+    sold: 57
+    sold_priceable: 57
     y_forecast:
       mean_in_timeframe: []
       mean_to_departure: []
@@ -346,8 +346,8 @@ Path-6:
       mean_to_departure: NA
       stdev_in_timeframe: NA
       stdev_to_departure: NA
-    sold: 79
-    sold_priceable: 79
+    sold: 59
+    sold_priceable: 59
     y_forecast:
       mean_in_timeframe: []
       mean_to_departure: []

@@ -4,10 +4,10 @@ forecast:
   stdev_in_timeframe: []
   stdev_to_departure: []
 q_forecast:
-  mean_in_timeframe: NA
-  mean_to_departure: NA
-  stdev_in_timeframe: NA
-  stdev_to_departure: NA
+  mean_in_timeframe: []
+  mean_to_departure: []
+  stdev_in_timeframe: []
+  stdev_to_departure: []
 sold: 38
 sold_priceable: 38
 y_forecast:

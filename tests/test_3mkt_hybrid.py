@@ -203,36 +203,36 @@ def test_fare_adj_walk(data_regression, fareadj, adjscale):
                     try:
                         q = pc.q_forecast.get_vectors()
                     except ValueError:
-                        q = ForecastVectors(["NA", "NA", "NA", "NA", "NA", "NA"])
+                        q = ForecastVectors([(), (), (), (), (), ()])
                     try:
                         y = pc.y_forecast.get_vectors()
                     except ValueError:
-                        y = ForecastVectors(["NA", "NA", "NA", "NA", "NA", "NA"])
+                        y = ForecastVectors([(), (), (), (), (), ()])
                     try:
                         t = pc.forecast.get_vectors()
                     except ValueError:
-                        t = ForecastVectors(["NA", "NA", "NA", "NA", "NA", "NA"])
+                        t = ForecastVectors([(), (), (), (), (), ()])
                     state[f"Path-{pth.path_id}"][f"Class-{pc.booking_class}"] = {
                         "sold": pc.sold,
                         "sold_priceable": pc.sold_priceable,
                         "adj_fares": pc.raw_adjusted_fare_price,
                         "q_forecast": {
-                            "mean_in_timeframe": q.mean_in_timeframe,
-                            "mean_to_departure": q.mean_to_departure,
-                            "stdev_in_timeframe": q.stdev_in_timeframe,
-                            "stdev_to_departure": q.stdev_to_departure,
+                            "mean_in_timeframe": list(q.mean_in_timeframe),
+                            "mean_to_departure": list(q.mean_to_departure),
+                            "stdev_in_timeframe": list(q.stdev_in_timeframe),
+                            "stdev_to_departure": list(q.stdev_to_departure),
                         },
                         "y_forecast": {
-                            "mean_in_timeframe": y.mean_in_timeframe,
-                            "mean_to_departure": y.mean_to_departure,
-                            "stdev_in_timeframe": y.stdev_in_timeframe,
-                            "stdev_to_departure": y.stdev_to_departure,
+                            "mean_in_timeframe": list(y.mean_in_timeframe),
+                            "mean_to_departure": list(y.mean_to_departure),
+                            "stdev_in_timeframe": list(y.stdev_in_timeframe),
+                            "stdev_to_departure": list(y.stdev_to_departure),
                         },
                         "forecast": {
-                            "mean_in_timeframe": t.mean_in_timeframe,
-                            "mean_to_departure": t.mean_to_departure,
-                            "stdev_in_timeframe": t.stdev_in_timeframe,
-                            "stdev_to_departure": t.stdev_to_departure,
+                            "mean_in_timeframe": list(t.mean_in_timeframe),
+                            "mean_to_departure": list(t.mean_to_departure),
+                            "stdev_in_timeframe": list(t.stdev_in_timeframe),
+                            "stdev_to_departure": list(t.stdev_to_departure),
                         },
                     }
 
@@ -258,6 +258,7 @@ def test_fare_adj_walk(data_regression, fareadj, adjscale):
                         vv,
                         basename=f"fareadj-walk/{fareadj}-{int(adjscale*100):03d}/"
                         f"Sample{s}/{k}/{kk}",
+                        round_digits=6,
                     )
 
         # # check selected internal results at every sample

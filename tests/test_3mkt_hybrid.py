@@ -193,10 +193,10 @@ def test_fare_adj_walk(data_regression, fareadj, adjscale):
                     pth_q = ForecastVectors(["NA", "NA", "NA", "NA", "NA", "NA"])
                 state[f"Path-{pth.path_id}"] = {
                     "path_level_q_forecast": {
-                        "mean_in_timeframe": pth_q.mean_in_timeframe,
-                        "mean_to_departure": pth_q.mean_to_departure,
-                        "stdev_in_timeframe": pth_q.stdev_in_timeframe,
-                        "stdev_to_departure": pth_q.stdev_to_departure,
+                        "mean_in_timeframe": list(pth_q.mean_in_timeframe),
+                        "mean_to_departure": list(pth_q.mean_to_departure),
+                        "stdev_in_timeframe": list(pth_q.stdev_in_timeframe),
+                        "stdev_to_departure": list(pth_q.stdev_to_departure),
                     },
                 }
                 for pc in pth.pathclasses:

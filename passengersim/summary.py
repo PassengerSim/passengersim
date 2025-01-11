@@ -22,6 +22,14 @@ if TYPE_CHECKING:
 logger = logging.getLogger("passengersim.summary")
 
 
+def summarytables_is_deprecated():
+    warnings.warn(
+        "SummaryTables is deprecated and will be removed in a future version.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
+
 class SummaryTables:
     @classmethod
     def from_sqlite(
@@ -30,6 +38,7 @@ class SummaryTables:
         make_indexes: bool | dict = False,
         additional: Collection[str | tuple] | str | None = None,
     ):
+        summarytables_is_deprecated()
         if not os.path.isfile(filename):
             raise FileNotFoundError(filename)
         db = database.Database(
@@ -129,6 +138,8 @@ class SummaryTables:
         read_latest : bool, default True
             If True, read the latest file matching the pattern.
         """
+        summarytables_is_deprecated()
+
         import glob
         import pickle
 
@@ -150,6 +161,8 @@ class SummaryTables:
     @classmethod
     def aggregate(cls, summaries: Collection[SummaryTables]):
         """Aggregate multiple summary tables."""
+        summarytables_is_deprecated()
+
         if not summaries:
             return None
 
@@ -308,6 +321,8 @@ class SummaryTables:
         -------
         SummaryTables
         """
+        summarytables_is_deprecated()
+
         import glob
 
         cfg = None
@@ -557,6 +572,8 @@ class SummaryTables:
         local_fraction_by_place: pd.DataFrame | None = None,
         n_total_samples: int = 0,
     ):
+        summarytables_is_deprecated()
+
         self.config = config
         """Configuration used in the simulation that generated the summary tables."""
 

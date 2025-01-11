@@ -215,7 +215,7 @@ def test_fare_adj_walk(data_regression, fareadj, adjscale):
                     state[f"Path-{pth.path_id}"][f"Class-{pc.booking_class}"] = {
                         "sold": pc.sold,
                         "sold_priceable": pc.sold_priceable,
-                        "adj_fares": pc.raw_adjusted_fare_price,
+                        "adj_fares": list(pc.raw_adjusted_fare_price),
                         "q_forecast": {
                             "mean_in_timeframe": list(q.mean_in_timeframe),
                             "mean_to_departure": list(q.mean_to_departure),

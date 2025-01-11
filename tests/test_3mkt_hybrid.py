@@ -252,9 +252,13 @@ def test_fare_adj_walk(data_regression, fareadj, adjscale):
                             ].pop("adj_fares")
                         except KeyError:
                             pass
-            data_regression.check(
-                state, basename=f"fareadj-walk-{fareadj}-{int(adjscale*100):03d}-{s}"
-            )
+            for k, v in state.items():
+                for kk, vv in v.items():
+                    data_regression.check(
+                        vv,
+                        basename=f"fareadj-walk/{fareadj}-{int(adjscale*100):03d}/"
+                        f"Sample{s}/{k}/{kk}",
+                    )
 
         # # check selected internal results at every sample
         # if s < 10: continue

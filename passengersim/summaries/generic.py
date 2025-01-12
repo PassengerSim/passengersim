@@ -593,13 +593,15 @@ class GenericSimulationTables:
 
         to_html(self, filename, cfg=cfg, make_dirs=make_dirs)
 
-    def metadata(self, key: str):
+    def metadata(self, key: str = ""):
         """Return a metadata value."""
         if key in self._metadata:
             return self._metadata[key]
         if "." in key:
             # dotted keys are always exact matches
             raise KeyError(key)
+        if key == "":
+            return self._metadata.copy()
         matches = {}
         for k in self._metadata:
             subkeys = k.split(".")

@@ -9,7 +9,7 @@ def fig_forecasts_and_bid_prices(
     sim: Simulation,
     trial: int = 0,
     days_prior: int = 63,
-    flt_no: int = 101,
+    leg_id: int = 101,
     joint_scale: bool = False,
     *,
     trace: pd.ExcelWriter | None = None,
@@ -26,9 +26,9 @@ def fig_forecasts_and_bid_prices(
         WHERE sample >= ?1
           AND trial == ?2
           AND days_prior == ?3
-          AND flt_no == ?4
+          AND leg_id == ?4
         """,
-        (burn, trial, days_prior, flt_no),
+        (burn, trial, days_prior, leg_id),
     )
 
     lg_df = sim.cnx.dataframe(
@@ -40,9 +40,9 @@ def fig_forecasts_and_bid_prices(
         WHERE sample >= ?1
           AND trial == ?2
           AND days_prior == ?3
-          AND flt_no == ?4
+          AND leg_id == ?4
         """,
-        (burn, trial, days_prior, flt_no),
+        (burn, trial, days_prior, leg_id),
     )
 
     lg_df = lg_df.join(bp_df.groupby("sample").forecast_mean.sum(), on="sample")

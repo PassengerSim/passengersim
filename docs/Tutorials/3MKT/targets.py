@@ -29,7 +29,8 @@ def load(experiment_n: int, config: Config):
         else:
             raise FileNotFoundError(f"{filename} IN {os.getcwd()}")
     target = vt.pods(filename, config)
-    target.leg_forecasts.index = target.leg_forecasts.index.set_names(
-        "leg_id", level="flt_no"
-    )
+    if target.leg_forecasts is not None:
+        target.leg_forecasts.index = target.leg_forecasts.index.set_names(
+            "leg_id", level="flt_no"
+        )
     return target

@@ -27,7 +27,7 @@ outputs:
     - carrier_history
 
 simulation_controls:
-  num_trials: 10
+  num_trials: 1
   num_samples: 500
   random_seed: 42
   sys_k_factor: 0.1

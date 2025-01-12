@@ -513,6 +513,11 @@ class GenericSimulationTables:
                             raise RuntimeError(f"Error loading {filename}: {e}") from e
                         # if result.__class__.__name__ != cls.__name__:
                         #     raise TypeError(f"Expected {cls}, got {type(result)}")
+                        if hasattr(result, "_metadata"):
+                            result._metadata["loaded.filename"] = filename
+                            result._metadata["loaded.time"] = datetime.now(
+                                timezone.utc
+                            ).isoformat()
                         return result
                 except RuntimeError as err:
                     if "LZ4F_decompress failed" in str(err):
@@ -521,6 +526,11 @@ class GenericSimulationTables:
                             result = pickle.load(f)
                             # if result.__class__.__name__ != cls.__name__:
                             #     raise TypeError(f"Expected {cls}, got {type(result)}")
+                            if hasattr(result, "_metadata"):
+                                result._metadata["loaded.filename"] = filename
+                                result._metadata["loaded.time"] = datetime.now(
+                                    timezone.utc
+                                ).isoformat()
                             return result
                     raise
             except FileNotFoundError:
@@ -539,6 +549,9 @@ class GenericSimulationTables:
             result = pickle.load(f)
             if result.__class__.__name__ != cls.__name__:
                 raise TypeError(f"Expected {cls}, got {type(result)}")
+            if hasattr(result, "_metadata"):
+                result._metadata["loaded.filename"] = filename
+                result._metadata["loaded.time"] = datetime.now(timezone.utc).isoformat()
             return result
 
     def to_xlsx(self, filename: str | pathlib.Path) -> None:

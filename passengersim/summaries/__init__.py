@@ -13,6 +13,10 @@ each module, the SimulationTableItem instance is created using the
 
 from __future__ import annotations
 
+from datetime import datetime
+
+import pandas as pd
+
 from . import (
     bid_price_history,
     carriers,
@@ -42,3 +46,28 @@ class SimulationTables(*GenericSimulationTables.subclasses()):
     """
 
     __final__ = True
+
+    def __repr__(self) -> str:
+        """Includes information about what data is stored in this summary."""
+        table_keys = []
+        for k, v in self._data.items():
+            if isinstance(v, pd.DataFrame):
+                table_keys.append(f"* {k} ({len(v)} row DataFrame)")
+            elif v is not None:
+                try:
+                    typename = type(v).__name__
+                except AttributeError:
+                    typename = str(type(v))
+                table_keys.append(f"* {k} ({typename})")
+        table_info = " " + "\n ".join(table_keys)
+        try:
+            timestamp = self.metadata("time.created")
+        except KeyError:
+            time_created = ""
+        else:
+            date_string = datetime.fromisoformat(timestamp).strftime("%Y-%m-%d")
+            time_created = f" created on {date_string}"
+        return (
+            f"<passengersim.summaries.SimulationTables{time_created}>\n"
+            f"{table_info}\n<*>"
+        )

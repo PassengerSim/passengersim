@@ -10,6 +10,7 @@ from .cli.info import info  # noqa: F401
 from .config import Config, OptionalPath
 from .driver import Simulation
 from .mp_driver2 import MultiSimulation
+from .summaries import SimulationTables
 from .summary import SummaryTables
 
 __all__ = [
@@ -18,6 +19,7 @@ __all__ = [
     "MultiSimulation",
     "OptionalPath",
     "SummaryTables",
+    "SimulationTables",
     "demo_network",
     "__version__",
     "__version_tuple__",

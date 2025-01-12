@@ -1010,7 +1010,7 @@ def fig_leg_forecasts(
         color = "source:N"
         if of == "mu":
             df = (
-                df.groupby(["source", "flt_no", "days_prior"])
+                df.groupby(["source", "leg_id", "days_prior"])
                 .forecast_mean.sum()
                 .reset_index()
             )
@@ -1020,7 +1020,7 @@ def fig_leg_forecasts(
                 return np.sqrt(sum(x**2))
 
             df = (
-                df.groupby(["source", "flt_no", "days_prior"])
+                df.groupby(["source", "leg_id", "days_prior"])
                 .forecast_stdev.apply(sum_sigma)
                 .reset_index()
             )

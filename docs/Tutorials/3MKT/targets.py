@@ -1,3 +1,5 @@
+import os
+
 import verification_tools as vt
 
 from passengersim import Config
@@ -20,5 +22,14 @@ def load(experiment_n: int, config: Config):
         13: "./pods-outputs/ZF2-1/08_ProBPdailyreoptnok",  # probp daily re-opt method 1
         "10-ZF2": "./3MKT/pods-outputs/ZF2-2/08_ProBPnoreopt",
     }
-    target = vt.pods(files[experiment_n], config)
+    filename = files[experiment_n]
+    if not os.path.exists(filename):
+        if os.path.exists(os.path.join("3MKT", filename)):
+            filename = os.path.join("3MKT", filename)
+        else:
+            raise FileNotFoundError(f"{filename} IN {os.getcwd()}")
+    target = vt.pods(filename, config)
+    target.leg_forecasts.index = target.leg_forecasts.index.set_names(
+        "leg_id", level="flt_no"
+    )
     return target

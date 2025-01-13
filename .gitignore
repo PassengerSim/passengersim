@@ -170,3 +170,4 @@ sandbox.py
 # notebooks executed for documentation
 *.nbconvert.ipynb
 docs/Tutorials/3MKT/targets
+*.hash.txt

@@ -13,8 +13,21 @@ atl_at_gt = [
     "#E04F39",  # orange
 ]
 
+passengersim_colors = [
+    "#6a3d9a",  # dark purple
+    "#cab2d6",  # light purple
+    "#33a02c",  # dark green
+    "#b2df8a",  # light green
+    "#ff7f00",  # dark orange
+    "#fdbf6f",  # light orange
+    "#1f78b4",  # dark blue
+    "#a6cee3",  # light blue
+    "#e31a1c",  # dark red
+    "#fb9a99",  # light red
+]
 
-def atl_at_gt_theme():
+
+def passengersim_theme():
     font = "Roboto, Arial, sans-serif"
     return {
         "config": {
@@ -22,7 +35,7 @@ def atl_at_gt_theme():
                 "continuousHeight": 300,
                 "continuousWidth": 400,
             },  # from the default theme
-            "range": {"category": atl_at_gt},
+            "range": {"category": passengersim_colors, "Sequential": "plasma"},
             "title": {"font": font, "fontSize": 18, "anchor": "start", "offset": 8},
             "axis": {"labelFont": font, "titleFont": font},
             "header": {"labelFont": font, "titleFont": font},
@@ -31,5 +44,5 @@ def atl_at_gt_theme():
     }
 
 
-alt.themes.register("atl_at_gt", atl_at_gt_theme)
-alt.themes.enable("atl_at_gt")
+alt.themes.register("passengersim", passengersim_theme)
+alt.themes.enable("passengersim")

@@ -30,12 +30,16 @@ def extract_carriers(sim: Simulation) -> pd.DataFrame:
     carrier_rpm = defaultdict(float)
     carrier_leg_lf = defaultdict(float)
     carrier_leg_count = defaultdict(float)
+    carrier_local_leg_pax = defaultdict(float)
+    carrier_total_leg_pax = defaultdict(float)
     for leg in eng.legs:
         carrier_name = leg.carrier.name
         carrier_asm[carrier_name] += leg.distance * leg.capacity * num_samples
         carrier_rpm[carrier_name] += leg.distance * leg.gt_sold
         carrier_leg_lf[carrier_name] += leg.gt_sold / (leg.capacity * num_samples)
         carrier_leg_count[carrier_name] += 1
+        carrier_local_leg_pax[carrier_name] += leg.gt_sold_local
+        carrier_total_leg_pax[carrier_name] += leg.gt_sold
 
     carrier_data = []
     for carrier in sim.sim.carriers:
@@ -59,6 +63,8 @@ def extract_carriers(sim: Simulation) -> pd.DataFrame:
                 "asm": carrier_asm[carrier.name] / num_samples,
                 "rpm": rpm,
                 "ancillary_rev": tot_anc_rev,
+                "avg_local_leg_pax": carrier_local_leg_pax[carrier.name] / num_samples,
+                "avg_total_leg_pax": carrier_total_leg_pax[carrier.name] / num_samples,
             }
         )
     if len(carrier_data) == 0:
@@ -113,6 +119,8 @@ class SimTabCarriers(GenericSimulationTables):
             "avg_price": "avg_rev / avg_sold",
             "yield": "avg_rev / rpm",
             "sys_lf": "100.0 * rpm / asm",
+            "local_pct_leg_pax": "100.0 * avg_local_leg_pax / avg_total_leg_pax",
+            "local_pct_bookings": "100.0 * avg_local_leg_pax / avg_sold",
         },
         doc="Carrier-level summary data.",
     )
@@ -149,6 +157,7 @@ class SimTabCarriers(GenericSimulationTables):
             bars = chart.mark_bar().encode(
                 x=alt.X("carrier:N", title="Carrier"),
                 y=alt.Y(f"{load_measure}:Q", title=measure_name).stack("zero"),
+                color=alt.Color("carrier:N", title="Carrier"),
                 tooltip=[
                     alt.Tooltip("carrier", title="Carrier"),
                     alt.Tooltip(
@@ -165,6 +174,7 @@ class SimTabCarriers(GenericSimulationTables):
             bars = chart.mark_bar().encode(
                 y=alt.Y("carrier:N", title="Carrier"),
                 x=alt.X(f"{load_measure}:Q", title=measure_name).stack("zero"),
+                color=alt.Color("carrier:N", title="Carrier"),
                 tooltip=[
                     alt.Tooltip("carrier", title="Carrier"),
                     alt.Tooltip(
@@ -235,6 +245,26 @@ class SimTabCarriers(GenericSimulationTables):
             "Total Bookings",
             ".4s",
             title="Carrier Total Bookings",
+        )
+
+    @report_figure
+    def fig_carrier_local_share(
+        self,
+        load_measure: Literal["bookings", "leg_pax"] = "bookings",
+        *,
+        raw_df=False,
+    ):
+        measure_name = (
+            "Local Percent of Bookings"
+            if load_measure == "bookings"
+            else "Local Percent of Leg Passengers"
+        )
+        m = "local_pct_bookings" if load_measure == "bookings" else "local_pct_leg_pax"
+        return self._fig_carrier_attribute(
+            raw_df,
+            m,
+            measure_name,
+            title=f"Carrier {measure_name}",
         )
 
     @report_figure

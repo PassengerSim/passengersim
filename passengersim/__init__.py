@@ -12,6 +12,7 @@ from .driver import Simulation
 from .mp_driver2 import MultiSimulation
 from .summaries import SimulationTables
 from .summary import SummaryTables
+from .utils.colors import passengersim_colors as _colors  # noqa: F401
 
 __all__ = [
     "Config",

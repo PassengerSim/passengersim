@@ -456,8 +456,9 @@ class GenericSimulationTables:
                 filename.parent.mkdir(parents=True, exist_ok=True)
                 if make_dirs != "git":
                     with open(filename.parent / ".gitignore", "w") as f:
-                        f.write("*.pkl\n")
-                        f.write("*.pkl.lz4\n")
+                        f.write(".gitignore\n")  # ignore this file itself
+                        f.write("*.pkl\n")  # ignore pickles
+                        f.write("*.pkl.lz4\n")  # ignore compressed pickles
 
         try:
             import lz4.frame

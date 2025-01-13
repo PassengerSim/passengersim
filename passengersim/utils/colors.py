@@ -27,22 +27,21 @@ passengersim_colors = [
 ]
 
 
+@alt.theme.register("passengersim", enable=True)
 def passengersim_theme():
     font = "Roboto, Arial, sans-serif"
-    return {
-        "config": {
-            "view": {
-                "continuousHeight": 300,
-                "continuousWidth": 400,
-            },  # from the default theme
-            "range": {"category": passengersim_colors, "Sequential": "plasma"},
-            "title": {"font": font, "fontSize": 18, "anchor": "start", "offset": 8},
-            "axis": {"labelFont": font, "titleFont": font},
-            "header": {"labelFont": font, "titleFont": font},
-            "legend": {"labelFont": font, "titleFont": font},
+    return alt.theme.ThemeConfig(
+        {
+            "config": {
+                "view": {
+                    "continuousHeight": 300,
+                    "continuousWidth": 400,
+                },  # from the default theme
+                "range": {"category": passengersim_colors, "Sequential": "plasma"},
+                "title": {"font": font, "fontSize": 18, "anchor": "start", "offset": 8},
+                "axis": {"labelFont": font, "titleFont": font},
+                "header": {"labelFont": font, "titleFont": font},
+                "legend": {"labelFont": font, "titleFont": font},
+            }
         }
-    }
-
-
-alt.themes.register("passengersim", passengersim_theme)
-alt.themes.enable("passengersim")
+    )

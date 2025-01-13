@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+import warnings
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Literal
 
@@ -31,12 +32,20 @@ if TYPE_CHECKING:
 class Experiment:
     def __init__(
         self,
-        title: str,
+        title: str | None,
         tag: str | None = None,
         multiprocess: bool = True,
         *,
         external: str | os.PathLike | None = None,
     ):
+        """
+        Parameters
+        ----------
+        title : str
+            A short human-friendly title for the experiment.  This title is used in
+            generating an HTML report of the experiment results.  If not provided,
+            the tag is used as the title in reporting.
+        """
         self.title = title
         self.tag = tag
         self.multi = multiprocess
@@ -66,12 +75,19 @@ class Experiments:
         self,
         config: Config,
         output_dir: pathlib.Path | None = None,
+        *,
         pickle: bool | str = "passengersim_output",
         html: bool | str = "passengersim_output",
+        hide_from_git: bool = True,
     ):
         self.experiments: list[Experiment] = []
         self.base_config = config
         self.output_dir = output_dir if output_dir is None else pathlib.Path(output_dir)
+        if self.output_dir is not None and hide_from_git:
+            if not self.output_dir.exists():
+                self.output_dir.mkdir(parents=True)
+            if not self.output_dir.joinpath(".gitignore").exists():
+                self.output_dir.joinpath(".gitignore").write_text("**\n")
         # ensure the base config has pickle output
         if pickle and self.base_config.outputs.pickle is None:
             if pickle is True:
@@ -97,7 +113,21 @@ class Experiments:
         *,
         external: str | os.PathLike | None = None,
     ):
-        e = Experiment(title, tag, multiprocess, external=external)
+        if not isinstance(title, str):
+            # called as a decorator, so the first argument is the function
+            e = Experiment(None, tag, multiprocess, external=external)(title)
+        else:
+            e = Experiment(title, tag, multiprocess, external=external)
+        # check if this is a duplicate of an existing experiment
+        # if so, overwrite the existing experiment and warn the user
+        for i in range(len(self.experiments)):
+            if e.tag == self.experiments[i].tag:
+                warnings.warn(
+                    f"Overwriting existing experiment tag: {e.tag}", stacklevel=2
+                )
+                self.experiments[i] = e
+                return e
+        # otherwise add the new experiment
         self.experiments.append(e)
         return e
 
@@ -235,6 +265,8 @@ class Experiments:
         tags = set()
         for e in self.experiments:
             if e.tag is None:
+                if e.title is None:
+                    raise ValueError("Experiment missing tag and title")
                 raise ValueError("Experiment missing tag: " + e.title)
             if e.tag in tags:
                 raise ValueError("Duplicate experiment tag: " + e.tag)
@@ -305,7 +337,7 @@ class Experiments:
 
                 # Create the modified config for this experiment
                 config = e.func(self.base_config.model_copy(deep=True))
-                config.outputs.html.title = e.title
+                config.outputs.html.title = e.title or e.tag
 
                 # Update the paths for the output files
                 if config.outputs.html.filename:

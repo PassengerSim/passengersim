@@ -157,7 +157,7 @@ class SimTabCarriers(GenericSimulationTables):
             bars = chart.mark_bar().encode(
                 x=alt.X("carrier:N", title="Carrier"),
                 y=alt.Y(f"{load_measure}:Q", title=measure_name).stack("zero"),
-                color=alt.Color("carrier:N", title="Carrier"),
+                color=alt.Color("carrier:N", title="Carrier", legend=None),
                 tooltip=[
                     alt.Tooltip("carrier", title="Carrier"),
                     alt.Tooltip(
@@ -174,7 +174,7 @@ class SimTabCarriers(GenericSimulationTables):
             bars = chart.mark_bar().encode(
                 y=alt.Y("carrier:N", title="Carrier"),
                 x=alt.X(f"{load_measure}:Q", title=measure_name).stack("zero"),
-                color=alt.Color("carrier:N", title="Carrier"),
+                color=alt.Color("carrier:N", title="Carrier", legend=None),
                 tooltip=[
                     alt.Tooltip("carrier", title="Carrier"),
                     alt.Tooltip(

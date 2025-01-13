@@ -32,14 +32,17 @@ for path in sorted(doc_path.rglob("*.ipynb")):
     if exclude:
         continue
 
-    print(f"📓 reading {path} to {path.with_suffix('.nbconvert.ipynb')}")
+    print(f"📓 reading {path}")
     with open(path, "rb") as f:
         content = f.read()
         hash_value = hashlib.sha256(content).hexdigest()
         print(f"  SHA-256 hash of the notebook content: {hash_value}")
 
     skip_execution = False
-    if os.path.exists(path.with_suffix(".hash.txt")):
+    if (
+        path.with_suffix(".hash.txt").exists()
+        and path.with_suffix(".nbconvert.ipynb").exists()
+    ):
         with open(path.with_suffix(".hash.txt"), encoding="utf-8") as f:
             if f.read() == hash_value:
                 print("  🌟 The notebook content has not changed. Skipping execution.")

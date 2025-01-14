@@ -70,6 +70,49 @@ class SimTabForecasts(GenericSimulationTables):
         of: Literal["mu", "sigma", "closed", "adj_price"] = "mu",
         raw_df=False,
     ):
+        if isinstance(of, list):
+            if raw_df:
+                df = {
+                    _of: self.fig_path_forecasts(
+                        by_path_id=by_path_id,
+                        by_class=by_class,
+                        of=_of,
+                        raw_df=raw_df,
+                    )
+                    for _of in of
+                }
+                return pd.concat(df, axis=0, names=["measurement"]).reset_index(0)
+            fig = self.fig_path_forecasts(
+                by_path_id=by_path_id,
+                by_class=by_class,
+                of=of[0],
+            )
+            for of_ in of[1:]:
+                fig |= self.fig_path_forecasts(
+                    by_path_id=by_path_id,
+                    by_class=by_class,
+                    of=of_,
+                )
+            if by_path_id:
+                title = f"Path {by_path_id} Forecasts"
+            else:
+                title = "Path Forecasts"
+            try:
+                if by_path_id:
+                    path_def = self.paths.loc[by_path_id]
+                    title += f" ({path_def['orig']}~{path_def['dest']})"
+                    for leg_id in self.path_legs.query(
+                        f"path_id == {by_path_id}"
+                    ).leg_id:
+                        leg_def = self.legs.loc[leg_id]
+                        title += (
+                            f", {leg_def['carrier']} {leg_def['flt_no']} "
+                            f"({leg_def['orig']}-{leg_def['dest']})"
+                        )
+            except Exception:
+                raise
+            return fig.properties(title=title)
+
         if self.path_forecasts is None:
             raise ValueError("the path_forecasts table is not available")
         of_columns = {

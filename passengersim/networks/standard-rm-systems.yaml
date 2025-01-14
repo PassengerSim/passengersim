@@ -1,0 +1,105 @@
+rm_systems:
+
+  E:
+    availability_control: leg
+    processes:
+      DCP:
+      - step_type: untruncation
+        name: untruncation
+        algorithm: em
+        kind: leg
+        initialization_method: default
+      - step_type: forecast
+        name: forecast
+        algorithm: additive_pickup
+        kind: leg
+      - step_type: emsr
+        name: optimization
+        algorithm: emsrb
+        kind: leg
+
+  P:
+    availability_control: bp
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: path
+        - step_type: forecast
+          name: path_forecast
+          algorithm: additive_pickup
+          kind: path
+        - step_type: probp
+          name: optimization
+      DAILY:
+        - step_type: forecastadjustment
+          algorithm: timeframe
+          kind: path
+        - step_type: probp
+          name: optimization
+
+  U:
+    availability_control: bp
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: path
+          initialization_method: pods
+          minimum_mu: 0.01
+        - step_type: forecast
+          name: path_forecast
+          algorithm: additive_pickup
+          kind: path
+        - step_type: udp
+          name: optimization
+          arrivals_per_time_slice: 0.1
+      DAILY:
+        - step_type: udpupdate
+          name: optimization
+
+  C:
+    availability_control: bp
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: path
+        - step_type: forecast
+          name: path_forecast
+          algorithm: additive_pickup
+          kind: conditional
+        - step_type: probp
+          name: optimization
+      DAILY:
+        - step_type: forecastadjustment
+          algorithm: timeframe
+          kind: path
+        - step_type: probp
+          name: optimization
+
+  M:
+    availability_control: bp
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: path
+        - step_type: forecast
+          name: path_forecast
+          algorithm: additive_pickup
+          kind: conditional
+          fare_adjustment: mr
+          fare_adjustment_scale: 0.5
+        - step_type: probp
+          name: optimization
+      DAILY:
+        - step_type: forecastadjustment
+          algorithm: timeframe
+          kind: path
+        - step_type: probp
+          name: optimization

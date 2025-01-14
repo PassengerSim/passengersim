@@ -592,14 +592,34 @@ class Config(YamlConfig, extra="forbid"):
             )
         return m
 
+    def _load_std_rm_system(self, std_name: str):
+        """Load a standard RM system from the standard RM systems file.
+
+        Parameters
+        ----------
+        std_name : str
+            The name of the standard RM system to load.
+        """
+        from passengersim import demo_network
+
+        std_cfg = Config.from_yaml(demo_network("standard-rm-systems.yaml"))
+        if std_name in std_cfg.rm_systems:
+            self.rm_systems[std_name] = std_cfg.rm_systems[std_name]
+        else:
+            raise KeyError(f"Unknown standard RM system {std_name}")
+
     @model_validator(mode="after")
     def _carriers_have_rm_systems(cls, m: Config):
         """Check that all carriers have RM systems that have been defined."""
         for carrier in m.carriers.values():
             if carrier.rm_system not in m.rm_systems:
-                raise ValueError(
-                    f"Carrier {carrier.name} has unknown RM system {carrier.rm_system}"
-                )
+                try:
+                    m._load_std_rm_system(carrier.rm_system)
+                except KeyError:
+                    raise ValueError(
+                        f"Carrier {carrier.name} has unknown "
+                        f"RM system {carrier.rm_system}"
+                    ) from None
         return m
 
     @model_validator(mode="after")

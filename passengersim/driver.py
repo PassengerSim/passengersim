@@ -13,7 +13,7 @@ from collections import defaultdict
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from math import sqrt
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import numpy as np
 import pandas as pd
@@ -45,9 +45,14 @@ from passengersim.utils.si import si_units  # noqa: F401
 from . import database
 from .progressbar import DummyProgressBar, ProgressBar
 
+if TYPE_CHECKING:
+    from passengersim.config.rm_systems import RmSystem as RmSystemConfig
+
 logger = logging.getLogger("passengersim")
 
 SimulationTablesT = TypeVar("SimulationTablesT", bound=GenericSimulationTables)
+
+_warn_skips = (os.path.dirname(__file__), os.path.dirname(contextlib.__file__))
 
 
 def memory_log(tag):
@@ -309,18 +314,21 @@ class Simulation(BaseSimulation):
             # SimulationEngine will iterate over it
             self.sim.add_circuity_rule(dict(rule))
 
-    def _init_rm_systems(self, config):
-        self.rm_systems = {}
+    def _init_rm_system(self, rm_name: str, rm_system: RmSystemConfig, config: Config):
         from passengersim_core.carrier.rm_system import Rm_System
 
+        x = self.rm_systems[rm_name] = Rm_System(rm_name)
+        x.availability_control = rm_system.availability_control
+        for process_name, process in rm_system.processes.items():
+            step_list = [s._factory() for s in process]
+            for s in step_list:
+                s.use_config(config)
+            x.add_process(process_name, step_list)
+
+    def _init_rm_systems(self, config):
+        self.rm_systems = {}
         for rm_name, rm_system in config.rm_systems.items():
-            x = self.rm_systems[rm_name] = Rm_System(rm_name)
-            x.availability_control = rm_system.availability_control
-            for process_name, process in rm_system.processes.items():
-                step_list = [s._factory() for s in process]
-                for s in step_list:
-                    s.use_config(config)
-                x.add_process(process_name, step_list)
+            self._init_rm_system(rm_name, rm_system, config)
 
     def _init_todd_curves(self, config):
         for todd_name, todd in config.todd_curves.items():
@@ -372,12 +380,20 @@ class Simulation(BaseSimulation):
         for lf_name, lf_curve in config.load_factor_curves.items():
             self.load_factor_curves[lf_name] = lf_curve
 
-    def _init_carriers(self, config):
+    def _init_carriers(self, config: Config):
         self.carriers_dict = {}
         for carrier_name, carrier_config in config.carriers.items():
-            availability_control = self.rm_systems[
-                carrier_config.rm_system
-            ].availability_control
+            try:
+                rm_sys = self.rm_systems[carrier_config.rm_system]
+            except KeyError:
+                config._load_std_rm_system(carrier_config.rm_system)
+                self._init_rm_system(
+                    carrier_config.rm_system,
+                    config.rm_systems[carrier_config.rm_system],
+                    config,
+                )
+                rm_sys = self.rm_systems[carrier_config.rm_system]
+            availability_control = rm_sys.availability_control
             carrier = passengersim.core.Carrier(carrier_name, availability_control)
             self.carriers_dict[carrier_name] = carrier
             carrier.rm_system = self.rm_systems[carrier_config.rm_system]
@@ -872,6 +888,14 @@ class Simulation(BaseSimulation):
         int
             The sample number just completed.
         """
+        if self.sim.trial < 0:
+            warnings.warn(
+                "Trial must be started before running a sample, "
+                "implicitly starting Trial 0",
+                skip_file_prefixes=_warn_skips,
+                stacklevel=1,
+            )
+            self.begin_trial(0)
         self.sim.sample += 1
         self.reseed(
             [

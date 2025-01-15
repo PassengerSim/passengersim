@@ -95,7 +95,7 @@ rm_systems:
           kind: conditional
           fare_adjustment: mr
           fare_adjustment_scale: 0.5
-          weighted_by_ratio: false
+          weighted_by_ratio: true
         - step_type: probp
           name: optimization
       DAILY:

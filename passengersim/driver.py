@@ -43,6 +43,7 @@ from passengersim.utils.nested_dict import from_nested_dict  # noqa: F401
 from passengersim.utils.si import si_units  # noqa: F401
 
 from . import database
+from .callbacks import CallbackMixin
 from .progressbar import DummyProgressBar, ProgressBar
 
 if TYPE_CHECKING:
@@ -135,7 +136,7 @@ class BaseSimulation(ABC):
                 yield from path.pathclasses
 
 
-class Simulation(BaseSimulation):
+class Simulation(BaseSimulation, CallbackMixin):
     def __init__(
         self,
         config: Config,
@@ -759,6 +760,7 @@ class Simulation(BaseSimulation):
 
     def end_sample(self):
         """End of sample processing."""
+        self.trigger_end_sample_callbacks()
 
         # Record the departure statistics to carrier-level counters in the simulation
         self.sim.record_departure_statistics()

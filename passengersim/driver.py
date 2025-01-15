@@ -763,7 +763,6 @@ class Simulation(BaseSimulation, CallbackMixin):
 
     def end_sample(self):
         """End of sample processing."""
-        self.trigger_end_sample_callbacks()
 
         # Record the departure statistics to carrier-level counters in the simulation
         self.sim.record_departure_statistics()
@@ -1052,6 +1051,13 @@ class Simulation(BaseSimulation, CallbackMixin):
     def run_carrier_models(self, info: Any = None, departed: bool = False, debug=False):
         try:
             event_type = info[0]
+
+            if callable(event_type):
+                # This is a callback function, not a string event type
+                # so, call it with the remaining arguments
+                event_type(self, *info[1:])
+                return
+
             recording_day = info[
                 1
             ]  # could in theory also be non-integer for fractional days
@@ -1172,6 +1178,9 @@ class Simulation(BaseSimulation, CallbackMixin):
             leg.capture_dcp(dcp_index)
         for path in self.sim.paths:
             path.capture_dcp(dcp_index, closures_only=closures_only)
+        for carrier in self.sim.carriers:
+            if dcp_index > 0:
+                carrier.current_tf_index += 1
 
     def _accum_by_tf(self, dcp_index):
         # This is now replaced by C++ native counters ...
@@ -1225,6 +1234,9 @@ class Simulation(BaseSimulation, CallbackMixin):
                 self.sim.add_event(rm_event)
             else:
                 dcp_idx += 1
+
+        # add events for begin and end sample callbacks
+        self.add_callback_events()
 
     def generate_demands(self, system_rn=None, debug=False):
         """Generate demands, following the procedure used in PODS

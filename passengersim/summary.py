@@ -535,6 +535,12 @@ class SummaryTables:
                 db, scenario=scenario, burn_samples=burn_samples
             )
 
+        if "edgar" in additional and db.is_open:
+            logger.info("loading edgar")
+            self.edgar = database.common_queries.edgar(
+                db, scenario=scenario, burn_samples=burn_samples
+            )
+
     def __init__(
         self,
         *,

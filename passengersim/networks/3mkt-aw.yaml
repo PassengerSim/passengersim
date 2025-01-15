@@ -44,6 +44,7 @@ db:
     - leg_final
     - fare_final
     - demand_final
+    - edgar
   fast: true
   engine: sqlite
 #  filename: "AW-3MKT.sqlite"
@@ -59,6 +60,7 @@ outputs:
     - demand_to_come
     - carrier_history2
     - carrier_history
+    - edgar
 
 frat5_curves:
   - name: curve_A

@@ -399,14 +399,14 @@ def create_table_edgar(cnx: Database, primary_key: bool = False):
         iteration		INT NOT NULL,
         trial	    	INT NOT NULL,
         sample  		INT NOT NULL,
-        days_prior   	INT NOT NULL,
+        timeframe   	INT NOT NULL,
         path_id			INT NOT NULL,
         booking_class   VARCHAR(10) NOT NULL,
         sold			INT,
         sold_priceable  INT,
         forecast_mean   FLOAT,
         forecast_stdev  FLOAT,
-        closed          INT,
+        closed          FLOAT,
         updated_at		DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         {primary_key}
     );

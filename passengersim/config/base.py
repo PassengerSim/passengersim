@@ -734,6 +734,12 @@ class Config(YamlConfig, extra="forbid"):
                     "the `load_factor_distribution` report requires recording "
                     "at least `leg_final` details in the database"
                 )
+        if "edgar" in m.outputs.reports:
+            if not m.db.write_items & {"edgar"}:
+                raise ValueError(
+                    "the 'edgar' forecast accuray report requires recording "
+                    "'edgar' details in the database"
+                )
         return m
 
     @model_validator(mode="after")

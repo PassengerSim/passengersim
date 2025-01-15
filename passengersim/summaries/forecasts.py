@@ -8,7 +8,7 @@ from passengersim.database import common_queries
 from passengersim.reporting import report_figure
 
 from .generic import DatabaseTableItem, GenericSimulationTables
-from .tools import aggregate_by_averaging_dataframe
+from .tools import aggregate_by_averaging_dataframe, aggregate_by_concat_dataframe
 
 if TYPE_CHECKING:
     import altair as alt
@@ -59,6 +59,12 @@ class SimTabForecasts(GenericSimulationTables):
         aggregation_func=aggregate_by_averaging_dataframe("leg_forecasts"),
         query_func=common_queries.leg_forecasts,
         doc="Leg forecasts.",
+    )
+
+    edgar: pd.DataFrame = DatabaseTableItem(
+        aggregation_func=aggregate_by_concat_dataframe("edgar"),
+        query_func=common_queries.edgar,
+        doc="EDGAR forecast accuracy measurement.",
     )
 
     @report_figure

@@ -308,6 +308,10 @@ class Simulation(BaseSimulation, CallbackMixin):
             for dcp_index, days_prior in enumerate(config.dcps):
                 self.sim.add_dcp(dcp_index, days_prior)
                 self.dcps.append(days_prior)
+            # We need to add the last DCP, which is always 0, if not already in the list
+            if self.dcps[-1] != 0:
+                self.sim.add_dcp(len(self.dcps), 0)
+                self.dcps.append(0)
 
     def _init_circuity(self, config):
         for rule in config.circuity_rules:
@@ -430,7 +434,6 @@ class Simulation(BaseSimulation, CallbackMixin):
 
         self.classes = config.classes
         self.init_rm = {}  # TODO
-        self.dcps = config.dcps
 
     def _init_airports(self, config: Config):
         # Load the places into Airport objects.  We use lat/lon to get
@@ -820,7 +823,7 @@ class Simulation(BaseSimulation, CallbackMixin):
             self.sim.initialize_histories(
                 carrier,
                 num_departures=26,  # TODO make this a parameter
-                num_timeframes=len(self.dcps),
+                num_timeframes=len(self.dcps) - 1,
                 truncation_rule=carrier.truncation_rule,
                 store_priceable=bool(carrier.frat5),
                 floating_closures=False,

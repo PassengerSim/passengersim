@@ -988,7 +988,6 @@ class Simulation(BaseSimulation):
             f"run_sim, num_trials = {self.sim.num_trials}, "
             f"num_samples = {self.sim.num_samples}"
         )
-        self.sim.update_db_write_flags()
         self.db_writer.update_db_write_flags()
         n_samples_total = self.sim.num_trials * self.sim.num_samples
         n_samples_done = 0
@@ -1009,7 +1008,6 @@ class Simulation(BaseSimulation):
 
     def _run_sim_single_trial(self, trial: int):
         update_freq = self.update_frequency
-        self.sim.update_db_write_flags()
         self.db_writer.update_db_write_flags()
         n_samples_total = self.sim.num_samples
         n_samples_done = 0
@@ -2108,7 +2106,6 @@ class Simulation(BaseSimulation):
             f"run_sim, num_trials = {self.sim.num_trials}, "
             f"num_samples = {self.sim.num_samples}"
         )
-        self.sim.update_db_write_flags()
         self.db_writer.update_db_write_flags()
         n_samples_total = self.sim.num_samples
         n_samples_done = 0

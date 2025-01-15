@@ -16,6 +16,7 @@ from typing import Any, Literal
 
 import pandas as pd
 
+from passengersim_core import DbWriter
 from passengersim.config import Config
 from passengersim.core import SimulationEngine
 
@@ -209,14 +210,14 @@ class Database:
             else:
                 return raw
 
-    def save_details(self: Database, sim: SimulationEngine, dcp: int):
+    def save_details(self: Database, db_writer: DbWriter, sim: SimulationEngine, dcp: int):
         """
         Save details, can be done at each RRD/DCP and at the end of the run
         """
         if not sim.save_timeframe_details and dcp > 0:
             return
         if sim.config.db.fast and isinstance(self._connection, sqlite3.Connection):
-            _internal_log = sim.write_to_sqlite(
+            _internal_log = db_writer.write_to_sqlite(
                 self._connection,
                 dcp,
                 store_bid_prices=sim.config.db.store_leg_bid_prices,

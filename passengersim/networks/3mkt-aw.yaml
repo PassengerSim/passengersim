@@ -39,7 +39,7 @@ db:
     - fare
     - demand
     - bookings
-#    - bucket
+    - bucket
     - pathclass
     - leg_final
     - fare_final
@@ -58,6 +58,7 @@ outputs:
     - total_demand
     - demand_to_come
     - carrier_history2
+    - carrier_history
 
 frat5_curves:
   - name: curve_A

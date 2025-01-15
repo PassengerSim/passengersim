@@ -370,9 +370,7 @@ def leg_forecasts(
         name as booking_class,
         days_prior,
         AVG(forecast_mean) as forecast_mean,
-        AVG(forecast_stdev) as forecast_stdev,
-        AVG(forecast_closed_in_tf) as forecast_closed_in_tf,
-        AVG(forecast_closed_in_future) as forecast_closed_in_future
+        AVG(forecast_stdev) as forecast_stdev
     FROM
         leg_bucket_detail LEFT JOIN leg_defs USING (leg_id)
     WHERE
@@ -638,8 +636,6 @@ def path_forecasts(
         days_prior,
         AVG(forecast_mean) as forecast_mean,
         AVG(forecast_stdev) as forecast_stdev,
-        AVG(forecast_closed_in_tf) as forecast_closed_in_tf,
-        AVG(forecast_closed_in_future) as forecast_closed_in_future,
         AVG(adjusted_price) as adjusted_price
     FROM
         path_class_detail

@@ -413,7 +413,7 @@ def create_table_edgar(cnx: Database, primary_key: bool = False):
     """
     if primary_key is True:
         sql = sql.format(
-            primary_key=", PRIMARY KEY(scenario, iteration, trial, sample, days_prior, "
+            primary_key=", PRIMARY KEY(scenario, iteration, trial, sample, timeframe, "
                         "path_id, booking_class)"
         )
     else:
@@ -442,6 +442,7 @@ def create_tables(cnx: Database, primary_keys: dict[str, bool] | None = None):
         leg=False,
         leg_bucket=False,
         demand=False,
+        edgar=False,
         fare=False,
         booking_curve=True,
         distance=True,
@@ -458,6 +459,6 @@ def create_tables(cnx: Database, primary_keys: dict[str, bool] | None = None):
     create_table_bookings_by_timeframe(cnx, pk["bookings"])
     create_table_booking_curve(cnx, pk["booking_curve"])
     create_table_path_class_detail(cnx, pk["path_class"])
-    create_table_edgar(cnx, pk["path_class"])
+    create_table_edgar(cnx, pk["edgar"])
     create_table_distance(cnx, pk["distance"])
     cnx._commit_raw()

@@ -1,6 +1,8 @@
 rm_systems:
 
   E:
+    description: |
+      Leg-based additive pickup forecast, EM detruncation, EMSR-B optimization.
     availability_control: leg
     processes:
       DCP:
@@ -94,7 +96,31 @@ rm_systems:
           algorithm: additive_pickup
           kind: conditional
           fare_adjustment: mr
-          fare_adjustment_scale: 0.5
+          fare_adjustment_scale: 0.25
+          weighted_by_ratio: true
+        - step_type: probp
+          name: optimization
+      DAILY:
+        - step_type: forecastadjustment
+          algorithm: timeframe
+          kind: path
+        - step_type: probp
+          name: optimization
+
+  K:
+    availability_control: bp
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: path
+        - step_type: forecast
+          name: path_forecast
+          algorithm: additive_pickup
+          kind: conditional
+          fare_adjustment: ki
+          fare_adjustment_scale: 0.25
           weighted_by_ratio: true
         - step_type: probp
           name: optimization

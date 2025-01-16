@@ -54,8 +54,20 @@ def test_summary_tables(summary, dataframe_regression, table_name: str):
 
 FIGURES = [
     ("fig_carrier_revenues", {}),
+    ("fig_carrier_load_factors", {}),
+    ("fig_carrier_yields", {}),
+    ("fig_carrier_local_share", {}),
+    ("fig_carrier_local_share", dict(load_measure="leg_pax")),
+    ("fig_leg_load_v_local", {}),
     ("fig_leg_forecasts", dict(by_leg_id=101, of=["mu", "sigma", "closed"])),
     ("fig_leg_forecasts", dict(by_leg_id=111, of=["mu", "sigma", "closed"])),
+    ("fig_od_fare_class_mix", dict(orig="ORD", dest="LAX")),
+    ("fig_segmentation_by_timeframe", dict(metric="bookings")),
+    ("fig_segmentation_by_timeframe", dict(metric="revenue")),
+    (
+        "fig_segmentation_by_timeframe",
+        dict(metric="bookings", by_carrier="AL1", by_class=True),
+    ),
 ]
 
 

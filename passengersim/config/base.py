@@ -863,6 +863,12 @@ class Config(YamlConfig, extra="forbid"):
         __tracebackhide__ = True
         return reloaded_class.__pydantic_validator__.validate_python(*args, **kwargs)
 
+    def model_revalidate(
+        self,
+    ) -> typing.Self:
+        """Revalidate the passengersim Config instance."""
+        return self.__class__.model_validate(self)
+
     @classmethod
     @property
     def as_reloaded(cls) -> type[Config]:

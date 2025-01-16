@@ -375,6 +375,8 @@ def create_table_path_class_detail(cnx: Database, primary_key: bool = False):
         revenue         FLOAT,
         forecast_mean   FLOAT,
         forecast_stdev  FLOAT,
+        forecast_closed_in_tf FLOAT,
+        forecast_closed_in_future FLOAT,
         adjusted_price  FLOAT,
         updated_at		DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         {primary_key}
@@ -414,7 +416,7 @@ def create_table_edgar(cnx: Database, primary_key: bool = False):
     if primary_key is True:
         sql = sql.format(
             primary_key=", PRIMARY KEY(scenario, iteration, trial, sample, timeframe, "
-                        "path_id, booking_class)"
+            "path_id, booking_class)"
         )
     else:
         sql = sql.format(primary_key="")

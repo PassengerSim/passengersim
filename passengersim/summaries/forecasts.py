@@ -161,7 +161,23 @@ class SimTabForecasts(GenericSimulationTables):
     ):
         if isinstance(of, list):
             if raw_df:
-                raise NotImplementedError
+                df0 = self.fig_leg_forecasts(
+                    by_leg_id=by_leg_id,
+                    by_class=by_class,
+                    of=of[0],
+                    raw_df=True,
+                )
+                df0 = df0.set_index(list(df0.columns[:-1]))
+                for of_ in of[1:]:
+                    df1 = self.fig_leg_forecasts(
+                        by_leg_id=by_leg_id,
+                        by_class=by_class,
+                        of=of_,
+                        raw_df=True,
+                    )
+                    df1 = df1.set_index(list(df1.columns[:-1]))
+                    df0 = pd.concat([df0, df1], axis=1)
+                return df0.reset_index()
             fig = self.fig_leg_forecasts(
                 by_leg_id=by_leg_id,
                 by_class=by_class,

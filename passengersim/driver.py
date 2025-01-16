@@ -1062,6 +1062,7 @@ class Simulation(BaseSimulation, CallbackMixin):
             )
 
     def run_carrier_models(self, info: Any = None, departed: bool = False, debug=False):
+        what_had_happened_was = []
         try:
             event_type = info[0]
 
@@ -1077,8 +1078,6 @@ class Simulation(BaseSimulation, CallbackMixin):
             dcp_index = info[2]
             if dcp_index == -1:
                 dcp_index = len(self.dcp_list) - 1
-
-            what_had_happened_was = []
 
             if event_type.lower() in {"dcp", "done"}:
                 self.sim.last_dcp = recording_day

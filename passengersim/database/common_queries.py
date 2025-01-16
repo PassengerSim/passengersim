@@ -370,7 +370,9 @@ def leg_forecasts(
         name as booking_class,
         days_prior,
         AVG(forecast_mean) as forecast_mean,
-        AVG(forecast_stdev) as forecast_stdev
+        AVG(forecast_stdev) as forecast_stdev,
+        AVG(forecast_closed_in_tf) as forecast_closed_in_tf,
+        AVG(forecast_closed_in_future) as forecast_closed_in_future
     FROM
         leg_bucket_detail LEFT JOIN leg_defs USING (leg_id)
     WHERE
@@ -636,6 +638,8 @@ def path_forecasts(
         days_prior,
         AVG(forecast_mean) as forecast_mean,
         AVG(forecast_stdev) as forecast_stdev,
+        AVG(forecast_closed_in_tf) as forecast_closed_in_tf,
+        AVG(forecast_closed_in_future) as forecast_closed_in_future,
         AVG(adjusted_price) as adjusted_price
     FROM
         path_class_detail
@@ -1229,7 +1233,7 @@ def leg_local_and_flow_by_class(
 
 
 def edgar(
-        cnx: Database, *, scenario: str = None, burn_samples: int = 100
+    cnx: Database, *, scenario: str = None, burn_samples: int = 100
 ) -> pd.DataFrame:
     """
     Forecast accuracy information.
@@ -1253,8 +1257,8 @@ def edgar(
 
     qry = """
         SELECT
-            iteration, trial, sample, timeframe, path_id, booking_class, sold, sold_priceable,
-            forecast_mean, forecast_stdev, closed
+            iteration, trial, sample, timeframe, path_id, booking_class, sold,
+            sold_priceable, forecast_mean, forecast_stdev, closed
         FROM
             edgar
         WHERE
@@ -1269,4 +1273,3 @@ def edgar(
         params = (burn_samples, scenario)
     e = cnx.dataframe(qry, params)  # , dtype={"edgar": np.int32})
     return e
-

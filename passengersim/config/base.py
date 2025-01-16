@@ -608,7 +608,7 @@ class Config(YamlConfig, extra="forbid"):
         else:
             raise KeyError(f"Unknown standard RM system {std_name}")
 
-    @model_validator(mode="after")
+    @classmethod
     def _carriers_have_rm_systems(cls, m: Config):
         """Check that all carriers have RM systems that have been defined."""
         for carrier in m.carriers.values():
@@ -641,7 +641,13 @@ class Config(YamlConfig, extra="forbid"):
     @model_validator(mode="after")
     def _carriers_have_frat5(cls, m: Config):
         """Check that all carriers have defined or null Frat5 curves."""
+        cls._carriers_have_rm_systems(m)
         for carrier in m.carriers.values():
+            # first, if the carrier has no Frat5 curve, see if the RM system has one
+            if not carrier.frat5:
+                rm_system = m.rm_systems[carrier.rm_system]
+                if rm_system.frat5:
+                    carrier.frat5 = rm_system.frat5
             if carrier.frat5 and carrier.frat5 not in m.frat5_curves:
                 try:
                     m._load_std_frat5(carrier.frat5)

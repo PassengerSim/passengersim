@@ -104,7 +104,7 @@ def test_carriers_have_classes():
         frat5: curve_G
       AL2:
         rm_system: SystemA
-        frat5: curve_1_5
+        frat5: flat_curve
         classes:
           - F
           - C
@@ -122,6 +122,55 @@ def test_carriers_have_classes():
     loaded = Config.model_validate(content)
     assert loaded.carriers["AL1"].classes == ["Y0", "Y1", "Y2", "Y3"]
     assert loaded.carriers["AL2"].classes == ["F", "C", "Y"]
+
+
+def test_carriers_std_rm():
+    demo = """
+    carriers:
+      AL1:
+        rm_system: E
+      AL2:
+        rm_system: P
+    classes:
+      - Y0
+      - Y1
+      - Y2
+      - Y3
+    """
+    content = yaml.safe_load(io.StringIO(demo))
+    loaded = Config.model_validate(content)
+    assert not loaded.carriers["AL1"].frat5  # no curve on E
+    assert loaded.carriers["AL2"].frat5  # defined on rm_system
+    assert loaded.rm_systems.keys() == {"E", "P"}
+
+
+def test_carriers_std_frat5():
+    demo = """
+    carriers:
+      AL1:
+        rm_system: SystemA
+      AL2:
+        rm_system: SystemA
+        frat5: flat_curve
+        classes:
+          - F
+          - C
+          - Y
+    classes: # global classes assigned to AL1 because it has none of its own
+      - Y0
+      - Y1
+      - Y2
+      - Y3
+    rm_systems:
+      - name: SystemA
+        frat5: curve_G
+        processes: {}
+    """
+    content = yaml.safe_load(io.StringIO(demo))
+    loaded = Config.model_validate(content)
+    assert loaded.carriers["AL1"].frat5 == "curve_G"  # inherit from rm_system
+    assert loaded.carriers["AL2"].frat5 == "flat_curve"  # defined on carrier
+    assert loaded.frat5_curves.keys() == {"curve_G", "flat_curve"}
 
 
 def test_format_tags():

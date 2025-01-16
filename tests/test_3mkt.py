@@ -8,7 +8,7 @@ from passengersim.database.write_demands import save_demand_to_database
 
 
 def test_3mkt(data_regression):
-    input_file = demo_network("3mkt")
+    input_file = demo_network("3mkt-old")
     config = Config.from_yaml(input_file)
     config.simulation_controls.num_trials = 1
     config.simulation_controls.num_samples = 10
@@ -23,14 +23,14 @@ def test_3mkt(data_regression):
 
 
 def test_3mkt_alt():
-    cfg0 = Config.from_yaml(demo_network("3mkt"))
+    cfg0 = Config.from_yaml(demo_network("3mkt-old"))
     cfg1 = Config.from_yaml(demo_network("3mkt-alt"))
     assert cfg0.model_dump() == cfg1.model_dump()
 
 
 @pytest.mark.parametrize("fast", [True, False])
 def test_3mkt_db_detail(fast):
-    input_file = demo_network("3mkt")
+    input_file = demo_network("3mkt-old")
     config = Config.from_yaml(input_file)
 
     n_legs = len(config.legs)

@@ -370,9 +370,7 @@ def leg_forecasts(
         name as booking_class,
         days_prior,
         AVG(forecast_mean) as forecast_mean,
-        AVG(forecast_stdev) as forecast_stdev,
-        AVG(forecast_closed_in_tf) as forecast_closed_in_tf,
-        AVG(forecast_closed_in_future) as forecast_closed_in_future
+        AVG(forecast_stdev) as forecast_stdev
     FROM
         leg_bucket_detail LEFT JOIN leg_defs USING (leg_id)
     WHERE
@@ -638,8 +636,6 @@ def path_forecasts(
         days_prior,
         AVG(forecast_mean) as forecast_mean,
         AVG(forecast_stdev) as forecast_stdev,
-        AVG(forecast_closed_in_tf) as forecast_closed_in_tf,
-        AVG(forecast_closed_in_future) as forecast_closed_in_future,
         AVG(adjusted_price) as adjusted_price
     FROM
         path_class_detail
@@ -1230,3 +1226,47 @@ def leg_local_and_flow_by_class(
         ),
     )
     return df
+
+
+def edgar(
+        cnx: Database, *, scenario: str = None, burn_samples: int = 100
+) -> pd.DataFrame:
+    """
+    Forecast accuracy information.
+
+    Parameters
+    ----------
+    cnx : Database
+    scenario : str, optional
+    burn_samples : int, default 100
+        The demand will be returned ignoring this many samples from the
+        beginning of each trial.
+
+    Returns
+    -------
+    pandas.DataFrame
+        The resulting dataframe is indexed by `iteration`, `trial`, `sample`,
+        `segment`, `orig`, and `dest`; and has columns defined by the DCPs.
+        The values stored are the total remaining demand to come at each DCP.
+    """
+    # Provides content similar to PODS *.DHS output file, but with market level detail
+
+    qry = """
+        SELECT
+            iteration, trial, sample, timeframe, path_id, booking_class, sold, sold_priceable,
+            forecast_mean, forecast_stdev, closed
+        FROM
+            edgar
+        WHERE
+            sample >= ?1
+            AND scenario = ?2
+        """
+
+    if scenario is None:
+        qry = qry.replace("AND scenario = ?2", "")
+        params = (burn_samples,)
+    else:
+        params = (burn_samples, scenario)
+    e = cnx.dataframe(qry, params)  # , dtype={"edgar": np.int32})
+    return e
+

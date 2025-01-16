@@ -44,6 +44,7 @@ class DatabaseConfig(PrettyModel, extra="forbid", validate_assignment=True):
         Literal[
             "leg",
             "bucket",
+            "edgar",
             "fare",
             "demand",
             "leg_daily",

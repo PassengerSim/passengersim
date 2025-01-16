@@ -1,3 +1,8 @@
+#
+# Driver program to load a simulation from YAML, run it and return results
+# (c) PassengerSim LLC
+#
+
 from __future__ import annotations
 
 import contextlib
@@ -18,7 +23,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 import numpy as np
 import pandas as pd
 import psutil  # noqa: F401
-from passengersim_core import Ancillary
+from passengersim_core import Ancillary, DbWriter
 from passengersim_core.utils.airsim_utils import get_mileage
 from scipy.stats import gamma
 
@@ -153,7 +158,7 @@ class Simulation(BaseSimulation, CallbackMixin):
                 self.file_writer = FileWriter.FileWriter(output_dir)
         else:
             self.file_writer = None
-        #        self.dcp_list = [63, 24, 17, 10, 5]
+        self.db_writer = None
         self.dcp_list = [63, 56, 49, 42, 35, 31, 28, 24, 21, 17, 14, 10, 7, 5, 3, 1, 0]
         self.classes = []
         self.fare_sales_by_dcp = defaultdict(int)
@@ -254,6 +259,7 @@ class Simulation(BaseSimulation, CallbackMixin):
         self._init_demands(config)
         self._init_fares(config)
         self.sim.connect_markets()
+        self.db_writer = DbWriter("db", config, self.sim)
 
     def _init_sim_and_parms(self, config):
         self.sim = passengersim.core.SimulationEngine(name=config.scenario)
@@ -840,7 +846,8 @@ class Simulation(BaseSimulation, CallbackMixin):
         self.extract_segmentation_by_timeframe()
         self.extract_and_reset_bid_price_traces()
         if self.cnx.is_open:
-            self.cnx.save_final(self.sim)
+            self.db_writer.final_write_to_sqlite(self.cnx._connection)
+            # self.cnx.save_final(self.sim)
 
     def extract_and_reset_bid_price_traces(self):
         self.bid_price_traces[self.sim.trial] = {
@@ -1015,7 +1022,7 @@ class Simulation(BaseSimulation, CallbackMixin):
             f"run_sim, num_trials = {self.sim.num_trials}, "
             f"num_samples = {self.sim.num_samples}"
         )
-        self.sim.update_db_write_flags()
+        self.db_writer.update_db_write_flags()
         n_samples_total = self.sim.num_trials * self.sim.num_samples
         n_samples_done = 0
         self.sample_done_callback(n_samples_done, n_samples_total)
@@ -1035,7 +1042,7 @@ class Simulation(BaseSimulation, CallbackMixin):
 
     def _run_sim_single_trial(self, trial: int):
         update_freq = self.update_frequency
-        self.sim.update_db_write_flags()
+        self.db_writer.update_db_write_flags()
         n_samples_total = self.sim.num_samples
         n_samples_done = 0
         self.sample_done_callback(n_samples_done, n_samples_total)
@@ -1148,7 +1155,7 @@ class Simulation(BaseSimulation, CallbackMixin):
                     # if self.sim.sample == 101:
                     #     print("write_to_sqlite DAILY")
                     what_had_happened_was.append("write_to_sqlite daily")
-                    _internal_log = self.sim.write_to_sqlite(
+                    _internal_log = self.db_writer.write_to_sqlite(
                         self.cnx._connection,
                         recording_day,
                         store_bid_prices=self.sim.config.db.store_leg_bid_prices,
@@ -1157,7 +1164,7 @@ class Simulation(BaseSimulation, CallbackMixin):
                     )
             elif event_type.lower() in {"dcp", "done"}:
                 if self.cnx.is_open:
-                    self.cnx.save_details(self.sim, recording_day)
+                    self.cnx.save_details(self.db_writer, self.sim, recording_day)
                 if self.file_writer is not None:
                     self.file_writer.save_details(self.sim, recording_day)
 
@@ -2146,7 +2153,7 @@ class Simulation(BaseSimulation, CallbackMixin):
             f"run_sim, num_trials = {self.sim.num_trials}, "
             f"num_samples = {self.sim.num_samples}"
         )
-        self.sim.update_db_write_flags()
+        self.db_writer.update_db_write_flags()
         n_samples_total = self.sim.num_samples
         n_samples_done = 0
         self.sample_done_callback(n_samples_done, n_samples_total)

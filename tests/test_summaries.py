@@ -91,6 +91,7 @@ TABLES = [
     "demands",
     "demand_to_come",
     "demand_to_come_summary",
+##    "edgar",
     "fare_class_mix",
     "legs",
     "legbuckets",

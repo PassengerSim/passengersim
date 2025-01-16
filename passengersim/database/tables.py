@@ -375,8 +375,6 @@ def create_table_path_class_detail(cnx: Database, primary_key: bool = False):
         revenue         FLOAT,
         forecast_mean   FLOAT,
         forecast_stdev  FLOAT,
-        forecast_closed_in_tf FLOAT,
-        forecast_closed_in_future FLOAT,
         adjusted_price  FLOAT,
         updated_at		DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         {primary_key}
@@ -386,6 +384,37 @@ def create_table_path_class_detail(cnx: Database, primary_key: bool = False):
         sql = sql.format(
             primary_key=", PRIMARY KEY(scenario, iteration, trial, sample, days_prior, "
             "path_id, booking_class)"
+        )
+    else:
+        sql = sql.format(primary_key="")
+    cnx.execute(sql)
+
+
+def create_table_edgar(cnx: Database, primary_key: bool = False):
+    """Forecast accuracy data, modeled after UA's EDGAR approach"""
+    sql = """
+    CREATE TABLE IF NOT EXISTS edgar
+    (
+        scenario		VARCHAR(20) NOT NULL,
+        iteration		INT NOT NULL,
+        trial	    	INT NOT NULL,
+        sample  		INT NOT NULL,
+        timeframe   	INT NOT NULL,
+        path_id			INT NOT NULL,
+        booking_class   VARCHAR(10) NOT NULL,
+        sold			INT,
+        sold_priceable  INT,
+        forecast_mean   FLOAT,
+        forecast_stdev  FLOAT,
+        closed          FLOAT,
+        updated_at		DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        {primary_key}
+    );
+    """
+    if primary_key is True:
+        sql = sql.format(
+            primary_key=", PRIMARY KEY(scenario, iteration, trial, sample, timeframe, "
+                        "path_id, booking_class)"
         )
     else:
         sql = sql.format(primary_key="")
@@ -413,6 +442,7 @@ def create_tables(cnx: Database, primary_keys: dict[str, bool] | None = None):
         leg=False,
         leg_bucket=False,
         demand=False,
+        edgar=False,
         fare=False,
         booking_curve=True,
         distance=True,
@@ -429,5 +459,6 @@ def create_tables(cnx: Database, primary_keys: dict[str, bool] | None = None):
     create_table_bookings_by_timeframe(cnx, pk["bookings"])
     create_table_booking_curve(cnx, pk["booking_curve"])
     create_table_path_class_detail(cnx, pk["path_class"])
+    create_table_edgar(cnx, pk["edgar"])
     create_table_distance(cnx, pk["distance"])
     cnx._commit_raw()

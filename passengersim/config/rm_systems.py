@@ -33,6 +33,19 @@ class RmSystem(Named, extra="forbid"):
     - "none": No controls.
     """
 
+    description: str = ""
+    """Description of the RM system.
+
+    The description is optional and can be used to summarize the RM system.
+    It has no effect on the actual operation of the RM system."""
+
+    frat5: str | None = None
+    """Name of the FRAT5 curve to use.
+
+    This is the default that will be applied if not found at a more detailed
+    level (e.g. carrier level).
+    """
+
     @field_validator("processes")
     @classmethod
     def _require_dcp_process(cls, value: dict[str, RmProcess]):

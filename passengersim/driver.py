@@ -407,15 +407,21 @@ class Simulation(BaseSimulation, CallbackMixin):
             carrier.cp_quantize = carrier_config.cp_quantize
             carrier.cp_scale = carrier_config.cp_scale
             carrier.cp_record = carrier_config.cp_record
-            if carrier_config.frat5 is not None and carrier_config.frat5 != "":
+            frat5_name = carrier_config.frat5
+            if not frat5_name:
+                frat5_name = config.rm_systems[carrier_config.rm_system].frat5
+            if frat5_name is not None and frat5_name != "":
                 # We want a deep copy of the Frat5 curve,
                 # in case two carriers are using the same curve,
                 # and we want to adjust one of them using ML
-                f5_data = config.frat5_curves[carrier_config.frat5]
+                try:
+                    f5_data = config.frat5_curves[frat5_name]
+                except KeyError:
+                    config._load_std_frat5(frat5_name)
+                    f5_data = config.frat5_curves[frat5_name]
                 f5 = Frat5(f5_data.name)
                 for _dcp, val in f5_data.curve.items():
                     f5.add_vals(val)
-                # f5 = self.frat5curves[carrier_config.frat5]
                 if carrier_config.fare_adjustment_scale is not None:
                     f5.fare_adjustment_scale = carrier_config.fare_adjustment_scale
                 carrier.frat5 = f5

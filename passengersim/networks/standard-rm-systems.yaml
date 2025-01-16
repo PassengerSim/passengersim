@@ -22,6 +22,7 @@ rm_systems:
 
   P:
     availability_control: bp
+    frat5: curve_C
     processes:
       DCP:
         - step_type: untruncation
@@ -64,6 +65,7 @@ rm_systems:
 
   C:
     availability_control: bp
+    frat5: curve_C
     processes:
       DCP:
         - step_type: untruncation
@@ -85,6 +87,7 @@ rm_systems:
 
   M:
     availability_control: bp
+    frat5: curve_C
     processes:
       DCP:
         - step_type: untruncation
@@ -109,6 +112,7 @@ rm_systems:
 
   K:
     availability_control: bp
+    frat5: curve_C
     processes:
       DCP:
         - step_type: untruncation

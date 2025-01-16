@@ -34,8 +34,10 @@ class Carrier(Named, extra="forbid"):
     """Do we record the sale in the highest_closed class, lowest_open or nearest?"""
 
     frat5: str | None = ""
-    """Named FRAT5 curve.
-    This is the default that will be applied if not found at a more detailed level
+    """Name of the FRAT5 curve to use.
+
+    This is the default that will be applied if not found at a more detailed level.
+    If not specified, the default frat5 from the carrier's RM system is used.
     """
 
     fare_adjustment_scale: float | None = 1.0

@@ -622,6 +622,36 @@ class Config(YamlConfig, extra="forbid"):
                     ) from None
         return m
 
+    def _load_std_frat5(self, std_name: str):
+        """Load a standard Frat5 curve from the standard Frat5 file.
+
+        Parameters
+        ----------
+        std_name : str
+            The name of the standard Frat5 curve to load.
+        """
+        from passengersim import demo_network
+
+        std_cfg = Config.from_yaml(demo_network("standard-frat5.yaml"))
+        if std_name in std_cfg.frat5_curves:
+            self.frat5_curves[std_name] = std_cfg.frat5_curves[std_name]
+        else:
+            raise KeyError(f"Unknown standard Frat5 curve {std_name}")
+
+    @model_validator(mode="after")
+    def _carriers_have_frat5(cls, m: Config):
+        """Check that all carriers have defined or null Frat5 curves."""
+        for carrier in m.carriers.values():
+            if carrier.frat5 and carrier.frat5 not in m.frat5_curves:
+                try:
+                    m._load_std_frat5(carrier.frat5)
+                except KeyError:
+                    raise ValueError(
+                        f"Carrier {carrier.name} has unknown "
+                        f"Frat5 curve {carrier.frat5}"
+                    ) from None
+        return m
+
     @model_validator(mode="after")
     def _legs_have_carriers(cls, m: Config):
         """Check that all legs have a carrier that has been defined."""

@@ -2,7 +2,6 @@
 # DOC-NAME: 00-configs
 from __future__ import annotations
 
-import gzip
 import importlib
 import io
 import logging
@@ -27,6 +26,7 @@ from pydantic import (
 )
 
 from passengersim.pseudonym import random_label
+from passengersim.utils.compression import smart_open
 
 from .blf_curves import BlfCurve
 from .booking_curves import BookingCurve
@@ -110,10 +110,10 @@ class YamlConfig(PrettyModel):
                 with open(filename, "rb") as f:
                     raw_config.raw_license_certificate = f.read()
             else:
-                opener = gzip.open if filename.suffix == ".gz" else open
+                opener = smart_open
                 if filename.parts[0] in {"https:", "http:", "s3:"}:
                     opener = web_opener
-                    if filename.suffix == ".gz":
+                    if filename.suffix == ".gz" or filename.suffix == ".lz4":
                         raise NotImplementedError(
                             "cannot load compressed files from web yet"
                         )

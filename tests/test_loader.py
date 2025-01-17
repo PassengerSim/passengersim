@@ -130,7 +130,7 @@ def test_carriers_std_rm():
       AL1:
         rm_system: E
       AL2:
-        rm_system: P
+        rm_system: C
     classes:
       - Y0
       - Y1
@@ -141,7 +141,7 @@ def test_carriers_std_rm():
     loaded = Config.model_validate(content)
     assert not loaded.carriers["AL1"].frat5  # no curve on E
     assert loaded.carriers["AL2"].frat5  # defined on rm_system
-    assert loaded.rm_systems.keys() == {"E", "P"}
+    assert loaded.rm_systems.keys() == {"E", "C"}
 
 
 def test_carriers_std_frat5():

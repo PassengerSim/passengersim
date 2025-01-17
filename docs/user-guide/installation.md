@@ -32,13 +32,15 @@ and navigate to the directory where the file is located.  Then, run the followin
 bash install-passengersim-mac-v0.0-20240101.sh
 ```
 
-```{tip}
-Don't copy-paste the command above, as the exact filename of the installation script
-will vary based on the version of PassengerSim and the release data.  Instead, use the
-filename of the file you have received.
-```
+!!! tip
 
-This should install PassengerSim in a conda environment named `SKY`.  If you already
+    Don't copy-paste the command above, as the exact filename of the installation script
+    will vary based on the version of PassengerSim and the release data.  Instead, use the
+    filename of the file you have received.
+
+### Changing the conda environment name
+
+The default install will put PassengerSim in a conda environment named `SKY`.  If you already
 have a conda environment named `SKY`, the installation script will update the environment
 to the relevant version of PassengerSim.  If you prefer to install PassengerSim in a
 different environment (e.g. `myenv`), you can specify the environment name as an argument
@@ -56,6 +58,10 @@ by running the following command:
 ```shell
 conda run -n SKY jupyter lab
 ```
+
+If you installed PassengerSim in an environment named something other than `SKY`, replace
+`SKY` in the command above with the name of the environment you used.
+
 
 ## Alternative Installation: Docker
 

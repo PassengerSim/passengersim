@@ -24,7 +24,6 @@ rm_systems:
     description: >-
       Path-based additive pickup forecast, EM detruncation, ProBP optimization.
     availability_control: bp
-    frat5: curve_C
     processes:
       DCP:
         - step_type: untruncation

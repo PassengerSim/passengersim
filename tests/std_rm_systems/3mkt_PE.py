@@ -7,10 +7,15 @@ from pytest import fixture, mark
 import passengersim as pax
 
 
-@fixture(scope="module")
-def config() -> pax.Config:
+@fixture(scope="module", params=[True, False])
+def config(request) -> pax.Config:
+    assign_frat5 = request.param
     cfg = pax.Config.from_yaml(pax.demo_network("3MKT"))
     cfg.carriers.AL1.rm_system = "P"
+    if assign_frat5:
+        # P does not use the frat5 curve, but we want to test that it
+        # does not spoil the simulation even if it is assigned
+        cfg.carriers.AL2.frat5 = "curve_C"
     cfg.carriers.AL2.rm_system = "E"
     cfg.simulation_controls.num_trials = 1
     return cfg

@@ -13,6 +13,17 @@ atl_at_gt = [
     "#E04F39",  # orange
 ]
 
+DarkPurple = "#6a3d9a"
+LightPurple = "#cab2d6"
+DarkGreen = "#33a02c"
+LightGreen = "#b2df8a"
+DarkOrange = "#ff7f00"
+LightOrange = "#fdbf6f"
+DarkBlue = "#1f78b4"
+LightBlue = "#a6cee3"
+DarkRed = "#e31a1c"
+LightRed = "#fb9a99"
+
 passengersim_colors = [
     "#6a3d9a",  # dark purple
     "#cab2d6",  # light purple
@@ -37,11 +48,14 @@ def passengersim_theme():
                     "continuousHeight": 300,
                     "continuousWidth": 400,
                 },  # from the default theme
-                "range": {"category": passengersim_colors, "Sequential": "plasma"},
+                "range": {"category": passengersim_colors, "heatmap": "plasma"},
                 "title": {"font": font, "fontSize": 18, "anchor": "start", "offset": 8},
                 "axis": {"labelFont": font, "titleFont": font},
                 "header": {"labelFont": font, "titleFont": font},
                 "legend": {"labelFont": font, "titleFont": font},
+                "bar": {"color": passengersim_colors[0]},
+                "mark": {"color": passengersim_colors[0]},
+                "line": {"color": passengersim_colors[0]},
             }
         }
     )

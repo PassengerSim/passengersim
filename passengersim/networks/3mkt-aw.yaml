@@ -841,14 +841,16 @@ choice_models:
 
 carriers:
   - name: AL1
-    rm_system: rm_leg
+    rm_system: rm_udp
     truncation_rule: 1
-#    frat5: curve_G
+    frat5: curve_C
 #    fare_adjustment_scale: 0.3
 #    load_factor_curve: lf_curve1
-#    continuous_pricing: CBC
-#    cp_bounds: 0.95
+    continuous_pricing: CBC
+    cp_bounds: 0.95
 #    cp_quantize: 5
+    cp_scale: 0.5
+    cp_record: lowest_open
     classes:
       - (Y0, Y)
       - (Y1, Y)
@@ -857,7 +859,7 @@ carriers:
       - (Y4, Y)
       - (Y5, Y)
   - name: AL2
-    rm_system: rm_leg
+    rm_system: rm_udp
     truncation_rule: 1
 #    frat5: curve_C
 #    fare_adjustment_scale: 0.5

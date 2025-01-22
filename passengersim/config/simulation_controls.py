@@ -286,3 +286,13 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     """
     Which algorithm to use for time frame demand allocation.
     """
+
+    allow_unused_restrictions: bool = False
+    """
+    Allow restrictions to be defined but not used.
+
+    If set to False, any restriction that is defined as a parameter of a choice
+    model but not present on any fare, or vice versa, will raise a ValueError.
+    Users may override this behavior by setting this parameter to True, which
+    will emit a warning instead of an error.
+    """

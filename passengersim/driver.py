@@ -308,6 +308,7 @@ class Simulation(BaseSimulation, CallbackMixin):
                 "simple_k_factor",
                 "timeframe_demand_allocation",
                 "tot_z_factor",
+                "allow_unused_restrictions",
             ]:
                 pass
             else:
@@ -578,6 +579,8 @@ class Simulation(BaseSimulation, CallbackMixin):
         # self.fares = []
         disable_ap = config.simulation_controls.disable_ap
 
+        discovered_restrictions = set()
+
         for fare_config in config.fares:
             fare = passengersim.core.Fare(
                 self.carriers_dict[fare_config.carrier],
@@ -594,16 +597,40 @@ class Simulation(BaseSimulation, CallbackMixin):
                 )
                 if rest_num:
                     fare.add_restriction(rest_num)
+                    discovered_restrictions.add(str(rest_code).casefold())
                 else:
-                    warnings.warn(
-                        f"Restriction {rest_code!r} not used in any choice model",
-                        skip_file_prefixes=_warn_skips,
-                        stacklevel=1,
-                    )
+                    if config.simulation_controls.allow_unused_restrictions:
+                        warnings.warn(
+                            f"Restriction {rest_code!r} found in fares "
+                            f"but not used in any choice model",
+                            skip_file_prefixes=_warn_skips,
+                            stacklevel=1,
+                        )
+                    else:
+                        raise ValueError(
+                            f"Restriction {rest_code!r} found in fares but not "
+                            f"used in any choice model"
+                        )
             self.sim.add_fare(fare)
             if self.debug:
                 print(f"Added fare: {fare}")
             # self.fares.append(fare)
+
+        # check that all restrictions used in choice models are present in fares
+        for r in self._fare_restriction_list:
+            if r not in discovered_restrictions:
+                if config.simulation_controls.allow_unused_restrictions:
+                    warnings.warn(
+                        f"Restriction {r!r} used in choice models but "
+                        f"not found in fares",
+                        skip_file_prefixes=_warn_skips,
+                        stacklevel=1,
+                    )
+                else:
+                    raise ValueError(
+                        f"Restriction {r!r} used in choice models but not found "
+                        f"in fares"
+                    )
 
         carriers = {cxr.name: cxr for cxr in self.sim.carriers}
         for path_config in config.paths:

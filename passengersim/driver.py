@@ -413,7 +413,10 @@ class Simulation(BaseSimulation, CallbackMixin):
                 elif pname == "restrictions":
                     for rname, rvalue in pvalue.items():
                         restriction_num = self._get_fare_restriction_num(rname)
-                        x.add_restriction(restriction_num, rvalue)
+                        if isinstance(rvalue, list | tuple):
+                            x.add_restriction(restriction_num, *rvalue)
+                        else:
+                            x.add_restriction(restriction_num, rvalue)
                 elif isinstance(pvalue, list | tuple):
                     x.add_parm(pname, *pvalue)
                 else:

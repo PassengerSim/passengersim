@@ -199,6 +199,12 @@ class Simulation(BaseSimulation, CallbackMixin):
         The key is the trial number, and the value is a dictionary with
         carrier names as keys and displacement cost traces as values."""
 
+        self._fare_restriction_mapping = {}
+        """Mapping of fare restriction names to restriction numbers."""
+
+        self._fare_restriction_list = []
+        """List of fare restriction names in the order they were added."""
+
         self._initialize(config)
         if not config.db:
             self.cnx = database.Database()
@@ -212,6 +218,9 @@ class Simulation(BaseSimulation, CallbackMixin):
         if self.cnx.is_open:
             database.tables.create_table_leg_defs(self.cnx._connection, self.sim.legs)
             database.tables.create_table_fare_defs(self.cnx._connection, self.sim.fares)
+            database.tables.create_table_fare_restriction_defs(
+                self.cnx._connection, self._fare_restriction_list
+            )
             database.tables.create_table_path_defs(self.cnx._connection, self.sim.paths)
             if config.db != ":memory:":
                 self.cnx.save_configs(config)
@@ -361,6 +370,33 @@ class Simulation(BaseSimulation, CallbackMixin):
                 dwm.dwm_tod = list(todd.probabilities.values())
             self.todd_curves[todd_name] = dwm
 
+    def _get_fare_restriction_num(
+        self, restriction_name: str, *, ignore_when_missing: bool = False
+    ):
+        r = str(restriction_name).casefold()
+        if r not in self._fare_restriction_mapping:
+            if ignore_when_missing:
+                return None
+            self._fare_restriction_mapping[r] = len(self._fare_restriction_mapping) + 1
+            self._fare_restriction_list.append(r)
+        return self._fare_restriction_mapping[r]
+
+    def parse_restriction_flags(self, restriction_flags: int) -> list[str]:
+        """Convert restriction flags to a tuple of restriction names."""
+        result = []
+        rest_num = 1
+        rest_names = self._fare_restriction_list
+        while restriction_flags:
+            if restriction_flags & 1:
+                result.append(rest_names[rest_num - 1])
+            rest_num += 1
+            restriction_flags >>= 1
+        return result
+
+    def get_restriction_name(self, restriction_num: int) -> str:
+        """Convert restriction number to a restriction name."""
+        return self._fare_restriction_list[restriction_num - 1]
+
     def _init_choice_models(self, config):
         for cm_name, cm in config.choice_models.items():
             x = passengersim.core.ChoiceModel(
@@ -375,8 +411,8 @@ class Simulation(BaseSimulation, CallbackMixin):
                     x.add_dwm(tmp_dwm)
                 elif pname == "restrictions":
                     for rname, rvalue in pvalue.items():
-                        # TODO: This needs a new func to accept arbitrary restrictions
-                        x.add_parm(rname, rvalue)
+                        restriction_num = self._get_fare_restriction_num(rname)
+                        x.add_restriction(restriction_num, rvalue)
                 elif isinstance(pvalue, list | tuple):
                     x.add_parm(pname, *pvalue)
                 else:
@@ -553,7 +589,17 @@ class Simulation(BaseSimulation, CallbackMixin):
             if not disable_ap:
                 fare.adv_purch = fare_config.advance_purchase
             for rest_code in fare_config.restrictions:
-                fare.add_restriction(rest_code)
+                rest_num = self._get_fare_restriction_num(
+                    rest_code, ignore_when_missing=True
+                )
+                if rest_num:
+                    fare.add_restriction(rest_num)
+                else:
+                    warnings.warn(
+                        f"Restriction {rest_code!r} not used in any choice model",
+                        skip_file_prefixes=_warn_skips,
+                        stacklevel=1,
+                    )
             self.sim.add_fare(fare)
             if self.debug:
                 print(f"Added fare: {fare}")

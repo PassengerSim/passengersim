@@ -66,6 +66,41 @@ def create_table_leg_defs(cnx: Database, legs: Iterable | None = None):
         )
 
 
+def create_table_fare_restriction_defs(cnx: Database, restrictions: list[str]) -> None:
+    """
+    Create and populate a static database table of fare restrictions.
+
+    The contents of this table is static input data, used but not mutated
+    by the simulator.
+
+    Parameters
+    ----------
+    cnx : Database
+    restrictions : list[str]
+        The restrictions to store in the database.
+    """
+    sql = """
+    CREATE TABLE IF NOT EXISTS fare_restriction_defs
+    (
+        restriction_id INTEGER PRIMARY KEY,
+        restriction TEXT NOT NULL
+    );
+    """
+    cnx.execute(sql)
+    for idx, restriction in enumerate(restrictions, start=1):
+        cnx.execute(
+            """
+            INSERT OR REPLACE INTO fare_restriction_defs(
+                restriction_id,
+                restriction
+            ) VALUES (
+                ?1, ?2
+            )
+            """,
+            (idx, restriction),
+        )
+
+
 def create_table_fare_defs(cnx: Database, fares: Iterable | None = None) -> None:
     """
     Create and populate a static database table of fares.
@@ -123,12 +158,7 @@ def create_table_fare_defs(cnx: Database, fares: Iterable | None = None) -> None
                 fare.dest,
                 fare.booking_class,
                 fare.price,
-                ",".join(
-                    [
-                        fare.get_restriction(pos)
-                        for pos in range(fare.num_restrictions())
-                    ]
-                ),
+                ",".join([str(r) for r in fare.get_restrictions()]),
                 fare.category,
             ),
         )

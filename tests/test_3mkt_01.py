@@ -17,10 +17,11 @@ DEFAULT_TOLERANCE = dict(rtol=2e-02, atol=1e-06)
 
 @pytest.fixture(scope="module")
 def summary() -> SummaryTables:
-    input_file = demo_network("3MKT/01-base")
+    input_file = demo_network("3mkt/01-base")
     cfg = Config.from_yaml(input_file)
     cfg.simulation_controls.num_trials = 1
     cfg.simulation_controls.num_samples = 500
+    cfg.simulation_controls.allow_unused_restrictions = True
     cfg.outputs.reports.add(("od_fare_class_mix", "BOS", "ORD"))
     cfg.outputs.reports.add("load_factor_distribution")
     sim = Simulation(cfg)

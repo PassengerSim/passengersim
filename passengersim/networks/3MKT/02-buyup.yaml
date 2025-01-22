@@ -1,9 +1,11 @@
 choice_models:
   business:
-    r1: 1.0
-    r2: 0.35
-    r3: 0.50
+    restrictions:
+      r1: 1.0
+      r2: 0.35
+      r3: 0.50
   leisure:
-    r1: 0.70
-    r2: 0.35
-    r3: 0.35
+    restrictions:
+      r1: 0.70
+      r2: 0.35
+      r3: 0.35

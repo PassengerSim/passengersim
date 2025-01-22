@@ -373,6 +373,10 @@ class Simulation(BaseSimulation, CallbackMixin):
                 if pname == "todd_curve":
                     tmp_dwm = self.todd_curves[pvalue]
                     x.add_dwm(tmp_dwm)
+                elif pname == "restrictions":
+                    for rname, rvalue in pvalue.items():
+                        # TODO: This needs a new func to accept arbitrary restrictions
+                        x.add_parm(rname, rvalue)
                 elif isinstance(pvalue, list | tuple):
                     x.add_parm(pname, *pvalue)
                 else:

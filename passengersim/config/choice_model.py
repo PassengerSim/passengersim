@@ -1,14 +1,82 @@
 # TITLE: Choice Models
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from .named import Named
 
 
-class PodsChoiceModel(Named, extra="forbid"):
+class CommonChoiceModel(Named, extra="forbid"):
+    """A common base class for choice models.
+
+    Defines restrictions and other parameters that are common to all
+    choice models."""
+
+    restrictions: dict[str, float] | None = None
+
+    @property
+    def r1(self):
+        """Restriction 1.
+
+        This is deprecated in favor of the `restrictions` dictionary."""
+        return self.restrictions.get("r1", None)
+
+    @r1.setter
+    def r1(self, value: float):
+        self.restrictions["r1"] = value
+
+    @property
+    def r2(self):
+        """Restriction 2.
+
+        This is deprecated in favor of the `restrictions` dictionary."""
+        return self.restrictions.get("r2", None)
+
+    @r2.setter
+    def r2(self, value: float):
+        self.restrictions["r2"] = value
+
+    @property
+    def r3(self):
+        """Restriction 3.
+
+        This is deprecated in favor of the `restrictions` dictionary."""
+        return self.restrictions.get("r3", None)
+
+    @r3.setter
+    def r3(self, value: float):
+        self.restrictions["r3"] = value
+
+    @property
+    def r4(self):
+        """Restriction 4.
+
+        This is deprecated in favor of the `restrictions` dictionary."""
+        return self.restrictions.get("r4", None)
+
+    @r4.setter
+    def r4(self, value: float):
+        self.restrictions["r4"] = value
+
+    @model_validator(mode="before")
+    @classmethod
+    def _named_restrictions(cls, data: Any) -> Any:
+        restricts = data.get("restrictions", {})
+        if "r1" in data:
+            restricts["r1"] = data.pop("r1")
+        if "r2" in data:
+            restricts["r2"] = data.pop("r2")
+        if "r3" in data:
+            restricts["r3"] = data.pop("r3")
+        if "r4" in data:
+            restricts["r4"] = data.pop("r4")
+        data["restrictions"] = restricts
+        return data
+
+
+class PodsChoiceModel(CommonChoiceModel, extra="forbid"):
     kind: Literal["pods"]
 
     emult: float | None = None
@@ -22,10 +90,6 @@ class PodsChoiceModel(Named, extra="forbid"):
     buffer_threshold: int | None = None
     buffer_time: tuple[float, float] | None = None
     replanning: tuple[float, float] | None = None
-    r1: float | None = None
-    r2: float | None = None
-    r3: float | None = None
-    r4: float | None = None
     tolerance: float | None = None
     non_stop_multiplier: float | None = None
     connection_multiplier: float | None = None
@@ -37,16 +101,11 @@ class PodsChoiceModel(Named, extra="forbid"):
     anc4_relevance: float | None = None
 
 
-class LogitChoiceModel(Named, extra="forbid"):
+class LogitChoiceModel(CommonChoiceModel, extra="forbid"):
     kind: Literal["logit"]
 
     emult: float | None = None
     """Using for WTP, a bit of a quick and dirty until we have a better approach"""
-
-    r1: float | None = None
-    r2: float | None = None
-    r3: float | None = None
-    r4: float | None = None
 
     anc1_relevance: float | None = None
     anc2_relevance: float | None = None

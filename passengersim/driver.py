@@ -267,10 +267,12 @@ class Simulation(BaseSimulation, CallbackMixin):
         self._init_airports(config)
         self._init_demands(config)
         self._init_fares(config)
+        logger.info("Connecting markets")
         self.sim.connect_markets()
         self.db_writer = DbWriter("db", config, self.sim)
 
     def _init_sim_and_parms(self, config):
+        logger.info("Initializing simulation engine parameters")
         self.sim = passengersim.core.SimulationEngine(name=config.scenario)
         self.sim.config = config
         self.sim.random_generator = self.random_generator
@@ -330,6 +332,7 @@ class Simulation(BaseSimulation, CallbackMixin):
                 self.dcps.append(0)
 
     def _init_circuity(self, config):
+        logger.info("Initializing circuity rules")
         for rule in config.circuity_rules:
             # Flatten the object into a dictionary,
             # SimulationEngine will iterate over it
@@ -338,6 +341,7 @@ class Simulation(BaseSimulation, CallbackMixin):
     def _init_rm_system(self, rm_name: str, rm_system: RmSystemConfig, config: Config):
         from passengersim_core.carrier.rm_system import Rm_System
 
+        logger.info("Initializing RM system %s", rm_name)
         x = self.rm_systems[rm_name] = Rm_System(rm_name)
         x.availability_control = rm_system.availability_control
         for process_name, process in rm_system.processes.items():
@@ -352,6 +356,7 @@ class Simulation(BaseSimulation, CallbackMixin):
             self._init_rm_system(rm_name, rm_system, config)
 
     def _init_todd_curves(self, config):
+        logger.info("Initializing TODD curves")
         for todd_name, todd in config.todd_curves.items():
             dwm = DecisionWindow(todd_name)
             if todd.k_factor:
@@ -396,9 +401,12 @@ class Simulation(BaseSimulation, CallbackMixin):
 
     def get_restriction_name(self, restriction_num: int) -> str:
         """Convert restriction number to a restriction name."""
+        if restriction_num < 1:
+            raise IndexError(restriction_num)
         return self._fare_restriction_list[restriction_num - 1]
 
     def _init_choice_models(self, config):
+        logger.info("Initializing choice models")
         for cm_name, cm in config.choice_models.items():
             x = passengersim.core.ChoiceModel(
                 cm_name, cm.kind, random_generator=self.random_generator
@@ -424,6 +432,7 @@ class Simulation(BaseSimulation, CallbackMixin):
             self.choice_models[cm_name] = x
 
     def _init_frat5_curves(self, config):
+        logger.info("Initializing Frat5 curves")
         for f5_name, f5_data in config.frat5_curves.items():
             f5 = Frat5(f5_name)
             for _dcp, val in f5_data.curve.items():
@@ -432,10 +441,12 @@ class Simulation(BaseSimulation, CallbackMixin):
             self.frat5curves[f5_name] = f5
 
     def _init_load_factor_curves(self, config):
+        logger.info("Initializing load factor curves")
         for lf_name, lf_curve in config.load_factor_curves.items():
             self.load_factor_curves[lf_name] = lf_curve
 
     def _init_carriers(self, config: Config):
+        logger.info("Initializing carriers")
         self.carriers_dict = {}
         for carrier_name, carrier_config in config.carriers.items():
             try:
@@ -492,6 +503,7 @@ class Simulation(BaseSimulation, CallbackMixin):
         self.init_rm = {}  # TODO
 
     def _init_airports(self, config: Config):
+        logger.info("Initializing airports")
         # Load the places into Airport objects.  We use lat/lon to get
         # great circle distance, and this also has the MCT data
         for code, p in config.places.items():
@@ -512,6 +524,7 @@ class Simulation(BaseSimulation, CallbackMixin):
             self.sim.add_airport(a)
 
     def _init_booking_curves(self, config):
+        logger.info("Initializing booking curves")
         self.curves = {}
         for curve_name, curve_config in config.booking_curves.items():
             bc = passengersim.core.BookingCurve(curve_name)
@@ -524,6 +537,7 @@ class Simulation(BaseSimulation, CallbackMixin):
         self._initialize_leg_cabin_bucket(config)
 
     def _init_demands(self, config):
+        logger.info("Initializing demands")
         markets = {}
         market_multipliers = {}
         for mkt_config in config.markets:
@@ -557,10 +571,16 @@ class Simulation(BaseSimulation, CallbackMixin):
                 dmd.distance = dmd_config.distance
             elif dmd.orig in self.airports and dmd.dest in self.airports:
                 dmd.distance = get_mileage(self.airports, dmd.orig, dmd.dest)
-            model_name = dmd_config.choice_model
+
+            # Get the choice model name to use for this demand.
+            model_name = dmd_config.choice_model or dmd_config.segment
             cm = self.choice_models.get(model_name, None)
             if cm is not None:
                 dmd.add_choice_model(cm)
+            else:
+                raise ValueError(
+                    f"Choice model {model_name} not found for demand {dmd}"
+                )
             if dmd_config.curve:
                 curve_name = str(dmd_config.curve).strip()
                 curve = self.curves[curve_name]
@@ -579,6 +599,7 @@ class Simulation(BaseSimulation, CallbackMixin):
         self._markets = {k: v for k, v in self.markets.items()}
 
     def _init_fares(self, config: Config):
+        logger.info("Initializing fares")
         # self.fares = []
         disable_ap = config.simulation_controls.disable_ap
 
@@ -690,24 +711,23 @@ class Simulation(BaseSimulation, CallbackMixin):
                         fare.price_upper_bound = fare.price
                     prev_fare = fare
 
+        logger.info("Initializing bucket decision fares")
         for leg in self.sim.legs:
-            for fare in self.sim.fares:
-                if (
-                    fare.carrier_name
-                    == (
-                        leg.carrier_name
-                        if hasattr(leg, "carrier_name")
-                        else leg.carrier
-                    )  # TODO: clean me
-                    and fare.orig == leg.orig
-                    and fare.dest == leg.dest
-                ):
+            try:
+                leg_market = self.sim.markets[f"{leg.orig}~{leg.dest}"]
+            except KeyError:
+                # no market for this leg, so no fares, that's ok
+                continue
+            assert len(leg_market.fares) > 0, f"No fares found for market {leg_market}"
+            for fare in leg_market.fares:
+                if fare.carrier_name == leg.carrier_name:
                     leg.set_bucket_decision_fare(fare.booking_class, fare.price)
                     leg.set_bucket_fcst_revenue(fare.booking_class, fare.price)
 
         self.sim.base_time = config.simulation_controls.reference_epoch()
 
     def _initialize_leg_cabin_bucket(self, config: Config):
+        logger.info("Initializing legs, cabins, and buckets")
         self.legs = {}
         carriers = {}
         for carrier in self.sim.carriers:

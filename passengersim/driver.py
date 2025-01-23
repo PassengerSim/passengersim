@@ -409,7 +409,7 @@ class Simulation(BaseSimulation, CallbackMixin):
             self.carriers_dict[carrier_name] = carrier
             carrier.rm_system = self.rm_systems[carrier_config.rm_system]
             carrier.truncation_rule = carrier_config.truncation_rule
-            carrier.continuous_pricing = carrier_config.continuous_pricing
+            carrier.cp_algorithm = carrier_config.cp_algorithm
             carrier.cp_quantize = carrier_config.cp_quantize
             carrier.cp_scale = carrier_config.cp_scale
             carrier.cp_record = carrier_config.cp_record

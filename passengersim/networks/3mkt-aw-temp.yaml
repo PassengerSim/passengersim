@@ -824,7 +824,7 @@ carriers:
     frat5: curve_G
     #    fare_adjustment_scale: 0.3
     #    load_factor_curve: lf_curve1
-    continuous_pricing: CBC
+    cp_algorithm: CBC
     #    cp_quantize: 5
     classes:
       - (Y0, Y)
@@ -838,7 +838,7 @@ carriers:
     frat5: curve_C
     fare_adjustment_scale: 0.5
     load_factor_curve: lf_curve1
-#    continuous_pricing: BP
+#    cp_algorithm: BP
 #    ancillaries:
 #      ANC1: 75.0
 #      ANC2: 40.0

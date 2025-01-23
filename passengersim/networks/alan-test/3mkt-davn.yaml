@@ -704,7 +704,7 @@ carriers:
     frat5: curve_C
     #    fare_adjustment_scale: 0.3
     #    load_factor_curve: lf_curve1
-    #    continuous_pricing: True
+    #    cp_algorithm: True
     classes:
       - (Y0, Y)
       - (Y1, Y)
@@ -717,7 +717,7 @@ carriers:
     frat5: curve_C
     fare_adjustment_scale: 0.5
     load_factor_curve: lf_curve1
-#    continuous_pricing: True
+#    cp_algorithm: True
 #    ancillaries:
 #      ANC1: 75.0
 #      ANC2: 40.0

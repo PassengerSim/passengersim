@@ -14,7 +14,7 @@ class Carrier(Named, extra="forbid"):
     control: str = ""
     """Deprecated.  No effect"""
 
-    continuous_pricing: str | None = "None"
+    cp_algorithm: str | None = "None"
     """Used to select continuous pricing"""
 
     cp_quantize: int | None = 0

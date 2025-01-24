@@ -538,6 +538,7 @@ rm_systems:
           kind: path
         - step_type: subbp
           name: optimization
+          bid_price_vector: true
       DAILY:
         - step_type: forecastadjustment
           name: adjust
@@ -545,6 +546,7 @@ rm_systems:
           kind: path
         - step_type: subbp
           name: optimization
+          bid_price_vector: true
 
   rm_lp:
     availability_control: bp

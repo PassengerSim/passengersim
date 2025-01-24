@@ -721,7 +721,7 @@ class Simulation(BaseSimulation, CallbackMixin):
             assert len(leg_market.fares) > 0, f"No fares found for market {leg_market}"
             for fare in leg_market.fares:
                 if fare.carrier_name == leg.carrier_name:
-                    leg.set_bucket_fcst_revenue(fare.booking_class, fare.price)
+                    leg.set_bucket_blank_value(fare.booking_class, fare.price)
 
         self.sim.base_time = config.simulation_controls.reference_epoch()
 

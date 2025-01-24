@@ -103,3 +103,16 @@ class Carrier(Named, extra="forbid"):
     If 3, then the demand is marked as truncated if the bucket or pathclass is closed at
     either of the DCPs that are at the beginning or the end of the timeframe.
     """
+
+    proration_rule: Literal["distance", "sqrt_distance"] = "distance"
+    """How to prorate revenue to legs and buckets for connecting paths.
+
+    If "distance", then the revenue is prorated based on the relatives distance
+    of the legs.  So if the first leg is 100 miles and the second leg is 400 miles,
+    then the first leg gets 20% of the revenue and the second leg gets 80%.
+
+    If "sqrt_distance", then the revenue is prorated based on the relative square
+    root of distance of the legs.  So if the first leg is 100 miles and the
+    second leg is 400 miles, then the first leg gets 1/3 of the revenue and the
+    second leg gets 2/3.
+    """

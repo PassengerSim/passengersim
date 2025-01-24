@@ -1,7 +1,7 @@
 include:
-  - 3MKT/01-base.yaml
-  - 3MKT/02-buyup.yaml
-  - 3MKT/03-ap.yaml
+  - 3mkt/01-base.yaml
+  - 3mkt/02-buyup.yaml
+  - 3mkt/03-ap.yaml
 
 simulation_controls:
   demand_multiplier: 1.0

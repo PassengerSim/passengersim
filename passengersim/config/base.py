@@ -58,6 +58,7 @@ if typing.TYPE_CHECKING:
 
 logger = logging.getLogger("passengersim.config")
 
+_warn_skips = (os.path.dirname(__file__),)
 
 TConfig = typing.TypeVar("TConfig", bound="YamlConfig")
 
@@ -123,6 +124,13 @@ class YamlConfig(PrettyModel):
                     content = addicty.Dict.load(
                         f, freeze=False, Loader=yaml.CSafeLoader
                     )
+                    if content is None:
+                        warnings.warn(
+                            f"Empty file {filename}",
+                            skip_file_prefixes=_warn_skips,
+                            stacklevel=1,
+                        )
+                        continue
                     include = content.pop("include", None)
                     if include is not None:
                         if isinstance(include, str):

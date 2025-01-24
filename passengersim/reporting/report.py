@@ -111,7 +111,7 @@ class Report(xmle.Reporter):
           font-family: "Roboto", Arial, Helvetica, sans-serif;
           font-weight: 300;
           font-style: normal;
-          color: goldenrod;
+          color: #6a3d9a;
         }
 
         .table_of_contents {
@@ -139,7 +139,7 @@ class Report(xmle.Reporter):
           padding-top: 6px;
           padding-bottom: 6px;
           text-align: left;
-          background-color: goldenrod;
+          background-color: #cab2d6;
           color: white;
         }
 
@@ -152,15 +152,21 @@ class Report(xmle.Reporter):
         """
         if timestamp:
             filename = str(filename_with_timestamp(filename))
+        toc_font = """font-family: Roboto, Arial, Helvetica, sans-serif; }
+        .table_of_contents a:link { color: #6a3d9a; }
+		.table_of_contents a:visited { color: #6a5681; }
+		.table_of_contents a:hover { color: #6800d6; }
+		.table_of_contents a:active { color: #6800d6;
+        """
         return super().save(
             filename=filename,
             overwrite=overwrite,
             archive_dir=archive_dir,
             metadata=metadata,
             # branding=branding,
-            toc_color="goldenrod",
+            toc_color="#cab2d6",
             extra_css=extra_css,
-            toc_font="font-family: Roboto, Arial, Helvetica, sans-serif;",
+            toc_font=toc_font,
             **kwargs,
         )
 

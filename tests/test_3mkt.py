@@ -13,6 +13,7 @@ def test_3mkt(data_regression):
     config.simulation_controls.num_trials = 1
     config.simulation_controls.num_samples = 10
     config.simulation_controls.burn_samples = 9
+    config.simulation_controls.allow_unused_restrictions = True
     print(config.db.filename)
     if config.db.filename:
         f = pathlib.Path(config.db.filename)
@@ -68,6 +69,7 @@ def test_3mkt_db_detail(fast):
         config.db.write_items.remove("demand_final")
     config.db.dcp_write_hooks.append(save_demand_to_database)
     config.simulation_controls.write_raw_files = False
+    config.simulation_controls.allow_unused_restrictions = True
     sim = Simulation(config, output_dir=None)
     summary = sim.run(log_reports=False)
     assert summary.demands.shape == (6, 9)

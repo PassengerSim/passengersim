@@ -78,6 +78,7 @@ rm_systems:
           name: untruncation
           algorithm: em
           kind: path
+          which_data: yieldable
         - step_type: forecast
           name: path_forecast
           algorithm: additive_pickup
@@ -105,6 +106,7 @@ rm_systems:
           name: untruncation
           algorithm: em
           kind: path
+          which_data: yieldable
         - step_type: forecast
           name: path_forecast
           algorithm: additive_pickup
@@ -135,6 +137,7 @@ rm_systems:
           name: untruncation
           algorithm: em
           kind: path
+          which_data: yieldable
         - step_type: forecast
           name: path_forecast
           algorithm: additive_pickup

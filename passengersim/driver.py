@@ -471,7 +471,7 @@ class Simulation(BaseSimulation, CallbackMixin):
             self.carriers_dict[carrier_name] = carrier
             carrier.rm_system = self.rm_systems[carrier_config.rm_system]
             carrier.truncation_rule = carrier_config.truncation_rule
-            carrier.continuous_pricing = carrier_config.continuous_pricing
+            carrier.cp_algorithm = carrier_config.cp_algorithm
             carrier.cp_quantize = carrier_config.cp_quantize
             carrier.cp_scale = carrier_config.cp_scale
             carrier.cp_record = carrier_config.cp_record
@@ -690,8 +690,13 @@ class Simulation(BaseSimulation, CallbackMixin):
 
         # Go through and make sure things are linked correctly
         fares_dict = defaultdict(list)
+        lowest_fare_dict = defaultdict(lambda: 9e9)
+        highest_fare_dict = defaultdict(float)
         for f in self.sim.fares:
-            fares_dict[(f.orig, f.dest)].append(f)
+            od_key = (f.orig, f.dest)
+            fares_dict[od_key].append(f)
+            lowest_fare_dict[od_key] = min(lowest_fare_dict[od_key], f.price)
+            highest_fare_dict[od_key] = max(highest_fare_dict[od_key], f.price)
         for dmd in self.sim.demands:
             tmp_fares = fares_dict[(dmd.orig, dmd.dest)]
             tmp_fares = sorted(tmp_fares, reverse=True, key=lambda p: p.price)
@@ -699,6 +704,9 @@ class Simulation(BaseSimulation, CallbackMixin):
                 dmd.add_fare(fare)
 
             # Now set upper and lower bounds, these are used in continuous pricing
+            # CP can never go lower than the lowest published fare
+            lowest_published = lowest_fare_dict[(dmd.orig, dmd.dest)]
+            highest_published = highest_fare_dict[(dmd.orig, dmd.dest)]
             for cxr in self.sim.carriers:
                 cp_bounds = self.config.carriers[cxr.name].cp_bounds
                 prev_fare = None
@@ -708,14 +716,15 @@ class Simulation(BaseSimulation, CallbackMixin):
                     if prev_fare is not None:
                         diff = prev_fare.price - fare.price
                         prev_fare.price_lower_bound = max(
-                            fare.price - diff * cp_bounds, 0
+                            fare.price - diff * cp_bounds,
+                            lowest_published
                         )
-                        fare.price_upper_bound = fare.price + diff * cp_bounds
+                        fare.price_upper_bound = min(fare.price + diff * cp_bounds, highest_published)
                         # This provides a price floor, but will be overwritten
                         # each time through the loop EXCEPT for the lowest fare
-                        fare.price_lower_bound = fare.price - diff * cp_bounds
+                        fare.price_lower_bound = max(fare.price - diff * cp_bounds, lowest_published)
                     else:
-                        fare.price_upper_bound = fare.price
+                        fare.price_upper_bound = min(fare.price, highest_published)
                     prev_fare = fare
 
         logger.info("Initializing bucket decision fares")

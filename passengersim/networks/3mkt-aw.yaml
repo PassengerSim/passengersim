@@ -538,6 +538,7 @@ rm_systems:
           kind: path
         - step_type: subbp
           name: optimization
+          bid_price_vector: true
       DAILY:
         - step_type: forecastadjustment
           name: adjust
@@ -545,6 +546,7 @@ rm_systems:
           kind: path
         - step_type: subbp
           name: optimization
+          bid_price_vector: true
 
   rm_lp:
     availability_control: bp
@@ -804,7 +806,7 @@ choice_models:
     r1: 2.0
     r2: 0.35
     r3: 0.50
-#    hhi: [0.0, 0.0001]
+    hhi: [0.0, 0.0001]
 #    anc1_relevance: 0.8
 #    anc2_relevance: 0.5
 #    anc3_relevance: 0.8
@@ -841,14 +843,16 @@ choice_models:
 
 carriers:
   - name: AL1
-    rm_system: rm_leg
+    rm_system: rm_udp
     truncation_rule: 1
-#    frat5: curve_G
+    frat5: curve_C
 #    fare_adjustment_scale: 0.3
 #    load_factor_curve: lf_curve1
-#    continuous_pricing: CBC
-#    cp_bounds: 0.95
+    cp_algorithm: CBC
+    cp_bounds: 0.95
 #    cp_quantize: 5
+    cp_scale: 0.2
+    cp_record: lowest_open
     classes:
       - (Y0, Y)
       - (Y1, Y)
@@ -862,7 +866,7 @@ carriers:
 #    frat5: curve_C
 #    fare_adjustment_scale: 0.5
 #    load_factor_curve: lf_curve1
-#    continuous_pricing: BP
+#    cp_algorithm: BP
 #    ancillaries:
 #      ANC1: 75.0
 #      ANC2: 40.0

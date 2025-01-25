@@ -48,7 +48,7 @@ from passengersim.utils.nested_dict import from_nested_dict  # noqa: F401
 from passengersim.utils.si import si_units  # noqa: F401
 
 from . import database
-from .callbacks import CallbackMixin
+from .callbacks import CallbackData, CallbackMixin
 from .progressbar import DummyProgressBar, ProgressBar
 
 if TYPE_CHECKING:
@@ -224,6 +224,13 @@ class Simulation(BaseSimulation, CallbackMixin):
             database.tables.create_table_path_defs(self.cnx._connection, self.sim.paths)
             if config.db != ":memory:":
                 self.cnx.save_configs(config)
+
+        self.callback_data = CallbackData()
+        """Data stored from callbacks.
+
+        This allows a user to store arbitrary data during a simulation using callbacks,
+        and access it later.
+        """
 
     @property
     def _sim(self) -> SimulationEngine:
@@ -1165,10 +1172,16 @@ class Simulation(BaseSimulation, CallbackMixin):
         try:
             event_type = info[0]
 
-            if callable(event_type):
+            if event_type.startswith("callback_"):
                 # This is a callback function, not a string event type
                 # so, call it with the remaining arguments
-                event_type(self, *info[1:])
+                callback_t = event_type[9:]
+                callback_f = info[1]
+                result = callback_f(self, *info[2:])
+                if isinstance(result, dict):
+                    self.callback_data.update_data(
+                        callback_t, self.sim.trial, self.sim.sample, *info[2:], **result
+                    )
                 return
 
             recording_day = info[

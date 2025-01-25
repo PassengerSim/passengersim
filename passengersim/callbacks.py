@@ -76,20 +76,69 @@ class CallbackMixin:
             # we want these callbacks to be triggered after the first DCP
             # but before any customers can arrive, so we add one second.
             event_time = int(self.sim.base_time - dcp * 86400 + 3600 * dcp_hour) + 1
-            rm_event = Event((callback,), event_time)
+            rm_event = Event(
+                (
+                    "callback_begin_sample",
+                    callback,
+                ),
+                event_time,
+            )
             self.sim.add_event(rm_event)
 
         for callback in getattr(self, "end_sample_callbacks", []):
             # we want these callbacks to be triggered after the last DCP
             # so we add one second.
             event_time = int(self.sim.base_time + 3600 * dcp_hour) + 1
-            rm_event = Event((callback,), event_time)
+            rm_event = Event(
+                (
+                    "callback_end_sample",
+                    callback,
+                ),
+                event_time,
+            )
             self.sim.add_event(rm_event)
 
         for callback in getattr(self, "daily_callbacks", []):
             day = self.dcp_list[0]
             while day >= 0:
                 event_time = int(self.sim.base_time - day * 86400 + 3600 * dcp_hour)
-                rm_event = Event((callback, day), event_time)
+                rm_event = Event(("callback_daily", callback, day), event_time)
                 self.sim.add_event(rm_event)
                 day -= 1
+
+
+class CallbackData:
+    """Data collected during callbacks."""
+
+    def __init__(self):
+        self.data = {}
+
+    def get_data(
+        self, label: str, trial: int, sample: int, days_prior: int | None = None
+    ):
+        key_match = {"trial": trial, "sample": sample}
+        if days_prior is not None:
+            key_match["days_prior"] = days_prior
+        if label not in self.data:
+            self.data[label] = [key_match]
+        store = self.data[label][-1]
+        if any(store.get(k) != v for k, v in key_match.items()):
+            self.data[label].append(key_match)
+            store = self.data[label][-1]
+        return store
+
+    def update_data(
+        self,
+        label: str,
+        trial: int,
+        sample: int,
+        days_prior: int | None = None,
+        **kwargs,
+    ):
+        store = self.get_data(label, trial, sample, days_prior)
+        store.update(kwargs)
+
+    def __getattr__(self, item):
+        if item in self.data:
+            return self.data[item]
+        raise AttributeError(f"{self.__class__.__name__}" f" has no attribute '{item}'")

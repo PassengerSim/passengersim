@@ -18,6 +18,7 @@ import pandas as pd
 from passengersim.callbacks import CallbackData
 from passengersim.config import Config
 from passengersim.utils.filenaming import filename_with_timestamp
+from passengersim.utils.kvstore import KVStore
 
 if TYPE_CHECKING:
     from passengersim import Simulation
@@ -78,6 +79,14 @@ class SimulationTableItem:
         if instance is None:
             return self
         try:
+            # if we don't have the data we want but we have a file_store,
+            # try to load it from there
+            if self.name not in instance._data and instance._file_store is not None:
+                try:
+                    instance._data[self.name] = instance._file_store[self.name]
+                except KeyError:
+                    pass
+            # now work with what we have
             df = instance._data[self.name]
             if isinstance(df, Exception):
                 raise df
@@ -213,6 +222,9 @@ class GenericSimulationTables:
         items: Collection[str] = (),
         callback_data: CallbackData | None = None,
     ):
+        self._file_store = None
+        """File store for loading data when it is otherwise missing."""
+
         self._data = data or {}
         """Dataframes that summarize a Simulation run."""
 
@@ -246,8 +258,10 @@ class GenericSimulationTables:
         """Data collected during callbacks."""
 
     __writable_attrs = {
+        "_file_store",
         "_data",
         "config",
+        "_config",
         "cnx",
         "sim",
         "n_total_samples",
@@ -257,6 +271,7 @@ class GenericSimulationTables:
         "_items",
         "_metadata",
         "callback_data",
+        "_callback_data",
     }
 
     def __setattr__(self, item, value):
@@ -419,12 +434,14 @@ class GenericSimulationTables:
             self.cnx = None
         if "sim" not in self.__dict__:
             self.sim = None
-        if "config" not in self.__dict__:
-            self.config = None
+        if "_config" not in self.__dict__:
+            self._config = None
         if "n_total_samples" not in self.__dict__:
             self.n_total_samples = 0
         if "_metadata" not in self.__dict__:
             self._metadata = {}
+        if "_callback_data" not in self.__dict__:
+            self._callback_data = CallbackData()
 
     def to_pickle(
         self,
@@ -567,6 +584,94 @@ class GenericSimulationTables:
                 result._metadata["loaded.time"] = datetime.now(timezone.utc).isoformat()
             return result
 
+    def to_file(
+        self,
+        filename: str | pathlib.Path,
+        add_timestamp_ext: bool = True,
+        *,
+        preserve_config: bool = True,
+        make_dirs: Literal[True, False, "git"] = True,
+    ) -> None:
+        """Write simulation tables to a file.
+
+        Parameters
+        ----------
+        filename : Path-like
+            The file to write.
+        add_timestamp_ext : bool, default True
+            Add a timestamp extension to the filename.
+        preserve_config : bool, default True
+            Preserve the config attribute in the saved object.  This includes
+            the entire network, and can potentially be a lot of data.
+        make_dirs : bool or "git", default True
+            If True, create the parent directory for the file if it does
+            not already exist.  If the directory is created, it will be created
+            with a `.gitignore` file to prevent accidental inclusion of output
+            in Git repositories, unless the value is "git", in which case
+            no `.gitignore` file is created and the results will be eligible for
+            inclusion in Git.
+        """
+        if add_timestamp_ext:
+            filename = filename_with_timestamp(filename, suffix=".pxsim")
+        else:
+            filename = pathlib.Path(filename)
+        if make_dirs:
+            if not filename.parent.exists():
+                filename.parent.mkdir(parents=True, exist_ok=True)
+                if make_dirs != "git":
+                    with open(filename.parent / ".gitignore", "w") as f:
+                        f.write(".gitignore\n")  # ignore this file itself
+                        f.write("*.pxsim\n")  # ignore pxsim files
+        kvs = KVStore(filename)
+        for k, v in self._data.items():
+            kvs[k] = v
+        if preserve_config:
+            kvs["_config_"] = self.config
+        kvs["_metadata_"] = self._metadata
+        kvs["_n_total_samples_"] = self.n_total_samples
+        kvs["_callback_data_"] = self.callback_data
+        kvs.close()
+
+    @classmethod
+    def from_file(
+        cls, filename: str | pathlib.Path, read_latest: bool = True, lazy: bool = True
+    ):
+        """Load the object from a file.
+
+        Parameters
+        ----------
+        filename : str or Path-like
+            The filename to load the object from.
+        read_latest : bool, default True
+            If True, read the latest file matching the pattern.
+        lazy : bool, default True
+            If True, load the data lazily (as needed).  Otherwise, load the data
+            immediately.
+        """
+        if read_latest:
+            filename_glob = pathlib.Path(filename).with_suffix(".*.pxsim")
+            files = sorted(glob.glob(str(filename_glob)))
+            if not files:
+                if not os.path.exists(filename):
+                    raise FileNotFoundError(filename)
+            else:
+                filename = files[-1]
+
+        result = cls()
+        result._file_store = KVStore(filename)
+        result._metadata = result._file_store["_metadata_"]
+        result.n_total_samples = result._file_store["_n_total_samples_"]
+        result._metadata["store.filename"] = filename
+        if not lazy:
+            for k in result._file_store:
+                if not (k.startswith("_") and k.endswith("_")):
+                    result._data[k] = result._file_store[k]
+                if k == "_callback_data_":
+                    result._callback_data = result._file_store[k]
+                if k == "_config_":
+                    result._config = result._file_store[k]
+        return result
+
     def to_xlsx(self, filename: str | pathlib.Path) -> None:
         """Write simulation tables to excel.
 
@@ -625,3 +730,37 @@ class GenericSimulationTables:
         if not matches:
             raise KeyError(key)
         return matches
+
+    @property
+    def config(self):
+        if self._config is None and self._file_store is not None:
+            try:
+                self._config = self._file_store["_config_"]
+            except KeyError:
+                pass
+        return self._config
+
+    @config.setter
+    def config(self, value):
+        self._config = value
+
+    @config.deleter
+    def config(self):
+        self._config = None
+
+    @property
+    def callback_data(self):
+        if self._callback_data is None and self._file_store is not None:
+            try:
+                self._callback_data = self._file_store["_callback_data_"]
+            except KeyError:
+                pass
+        return self._callback_data
+
+    @callback_data.setter
+    def callback_data(self, value):
+        self._callback_data = value
+
+    @callback_data.deleter
+    def callback_data(self):
+        self._callback_data = CallbackData()

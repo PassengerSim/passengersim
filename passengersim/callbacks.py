@@ -115,6 +115,23 @@ class CallbackMixin:
                 day -= 1
 
 
+def _flatten_dict_keys(d):
+    for k, v in d.items():
+        if isinstance(v, dict):
+            for sub_k, sub_v in _flatten_dict_keys(v):
+                yield f"{k}.{sub_k}", sub_v
+        elif isinstance(v, list | tuple):
+            for i, sub_v in enumerate(v):
+                yield f"{k}[{i}]", sub_v
+        else:
+            yield k, v
+
+
+def _flatten_iter_of_dict(i):
+    for item in i:
+        yield dict(_flatten_dict_keys(item))
+
+
 class CallbackData:
     """Data collected during callbacks."""
 
@@ -145,6 +162,14 @@ class CallbackData:
     ):
         store = self.get_data(label, trial, sample, days_prior)
         store.update(kwargs)
+
+    def to_dataframe(self, item: str):
+        import pandas as pd
+
+        if item in self._data:
+            return pd.DataFrame(_flatten_iter_of_dict(self._data[item]))
+        else:
+            raise KeyError(f"{item} not found in callback data")
 
     def __getattr__(self, item):
         if not item.startswith("_") and item in self._data:

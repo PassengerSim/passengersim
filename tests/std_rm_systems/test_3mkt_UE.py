@@ -18,6 +18,8 @@ def config(request) -> pax.Config:
         cfg.carriers.AL2.frat5 = "curve_C"
     cfg.carriers.AL2.rm_system = "E"
     cfg.simulation_controls.num_trials = 1
+    cfg.simulation_controls.num_samples = 75
+    cfg.simulation_controls.burn_samples = 40
     return cfg
 
 

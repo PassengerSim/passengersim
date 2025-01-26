@@ -102,7 +102,7 @@ class BaseSimulation(ABC):
         if output_dir is None:
             import tempfile
 
-            self._tempdir = tempfile.TemporaryDirectory()
+            self._tempdir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
             output_dir = os.path.join(self._tempdir.name, "test1")
         self.cnx = None
         self.output_dir = output_dir
@@ -716,13 +716,16 @@ class Simulation(BaseSimulation, CallbackMixin):
                     if prev_fare is not None:
                         diff = prev_fare.price - fare.price
                         prev_fare.price_lower_bound = max(
-                            fare.price - diff * cp_bounds,
-                            lowest_published
+                            fare.price - diff * cp_bounds, lowest_published
                         )
-                        fare.price_upper_bound = min(fare.price + diff * cp_bounds, highest_published)
+                        fare.price_upper_bound = min(
+                            fare.price + diff * cp_bounds, highest_published
+                        )
                         # This provides a price floor, but will be overwritten
                         # each time through the loop EXCEPT for the lowest fare
-                        fare.price_lower_bound = max(fare.price - diff * cp_bounds, lowest_published)
+                        fare.price_lower_bound = max(
+                            fare.price - diff * cp_bounds, lowest_published
+                        )
                     else:
                         fare.price_upper_bound = min(fare.price, highest_published)
                     prev_fare = fare

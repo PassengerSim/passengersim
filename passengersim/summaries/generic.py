@@ -750,7 +750,7 @@ class GenericSimulationTables:
 
     @property
     def callback_data(self):
-        if self._callback_data is None and self._file_store is not None:
+        if not self._callback_data and self._file_store is not None:
             try:
                 self._callback_data = self._file_store["_callback_data_"]
             except KeyError:

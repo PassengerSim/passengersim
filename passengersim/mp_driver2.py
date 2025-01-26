@@ -64,7 +64,7 @@ def _subprocess_run_trial(
     if output_dir is None:
         import tempfile
 
-        _tempdir = tempfile.TemporaryDirectory()
+        _tempdir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         output_dir = os.path.join(_tempdir.name, f"passengersim-trial-{trial_id:02}")
 
     sim = Simulation(cfg, output_dir)

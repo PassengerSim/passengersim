@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Literal, Self
 
 import pandas as pd
 
+from passengersim.callbacks import CallbackData
 from passengersim.config import Config
 from passengersim.utils.filenaming import filename_with_timestamp
 
@@ -210,7 +211,7 @@ class GenericSimulationTables:
         sim: Simulation | None = None,
         n_total_samples: int = 0,
         items: Collection[str] = (),
-        callback_data: Any = None,
+        callback_data: CallbackData | None = None,
     ):
         self._data = data or {}
         """Dataframes that summarize a Simulation run."""
@@ -241,7 +242,7 @@ class GenericSimulationTables:
         self._metadata = initialize_metadata()
         """Metadata for the summary."""
 
-        self.callback_data = callback_data
+        self.callback_data = callback_data or CallbackData()
         """Data collected during callbacks."""
 
     __writable_attrs = {
@@ -298,7 +299,7 @@ class GenericSimulationTables:
             config=sim.config,
             cnx=sim.cnx,
             n_total_samples=num_samples,
-            callback_data=sim.callback_data or None,
+            callback_data=sim.callback_data,
         )
 
     def _extract(self: Self, sim: Simulation) -> Self:

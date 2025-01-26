@@ -66,6 +66,14 @@ class CallbackMixin:
         self.daily_callbacks.append(callback)
         return callback
 
+    def callback_functions(self) -> dict[str, list[Callable]]:
+        """Get all callback functions."""
+        cb = {}
+        for k in ["begin_sample", "end_sample", "daily"]:
+            if hasattr(self, f"{k}_callbacks"):
+                cb[f"{k}_callbacks"] = getattr(self, f"{k}_callbacks", [])
+        return cb
+
     def add_callback_events(self):
         """Add callback events to the simulation event queue."""
         dcp_hour = self.sim.config.simulation_controls.dcp_hour

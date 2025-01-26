@@ -15,6 +15,7 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 
+from .callbacks import CallbackMixin
 from .config import Config
 from .core import SimulationEngine
 from .driver import BaseSimulation, Simulation
@@ -49,6 +50,7 @@ def _subprocess_run_trial(
     output_dir: pathlib.Path | None = None,
     *,
     summarizer=SimulationTables,
+    callbacks=None,
 ):
     cfg = Config.model_validate(json.loads(cfg_json))
     if (
@@ -66,6 +68,13 @@ def _subprocess_run_trial(
         output_dir = os.path.join(_tempdir.name, f"passengersim-trial-{trial_id:02}")
 
     sim = Simulation(cfg, output_dir)
+    if callbacks is not None:
+        for cb in callbacks.get("begin_sample_callbacks", []):
+            sim.begin_sample_callback(cb)
+        for cb in callbacks.get("end_sample_callbacks", []):
+            sim.end_sample_callback(cb)
+        for cb in callbacks.get("daily_callbacks", []):
+            sim.daily_callback(cb)
     sim.sample_done_callback = ThrottledUpdater(progress_queue, trial_id, 0.5)
     summary = sim.run(single_trial=trial_id, summarizer=summarizer)
     sim.sample_done_callback.flush()
@@ -83,7 +92,7 @@ def _subprocess_run_trial(
     return summary
 
 
-class MultiSimulation(BaseSimulation):
+class MultiSimulation(BaseSimulation, CallbackMixin):
     def __init__(
         self,
         config: Config,
@@ -100,7 +109,11 @@ class MultiSimulation(BaseSimulation):
             print("starting trial", trial_id)
             results.append(
                 _subprocess_run_trial(
-                    trial_id, cfg_json, self.output_dir, summarizer=summarizer
+                    trial_id,
+                    cfg_json,
+                    self.output_dir,
+                    summarizer=summarizer,
+                    callbacks=self.callback_functions(),
                 )
             )
             print("finished trial", trial_id)
@@ -202,7 +215,10 @@ class MultiSimulation(BaseSimulation):
                         p = multiprocessing.Process(
                             target=_subprocess_run_trial,
                             args=(task_id, cfg_json, progress_queue, output_dir),
-                            kwargs={"summarizer": summarizer},
+                            kwargs={
+                                "summarizer": summarizer,
+                                "callbacks": self.callback_functions(),
+                            },
                         )
                         processes.append(p)
 

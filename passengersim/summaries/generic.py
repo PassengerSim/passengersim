@@ -210,6 +210,7 @@ class GenericSimulationTables:
         sim: Simulation | None = None,
         n_total_samples: int = 0,
         items: Collection[str] = (),
+        callback_data: Any = None,
     ):
         self._data = data or {}
         """Dataframes that summarize a Simulation run."""
@@ -240,6 +241,9 @@ class GenericSimulationTables:
         self._metadata = initialize_metadata()
         """Metadata for the summary."""
 
+        self.callback_data = callback_data
+        """Data collected during callbacks."""
+
     __writable_attrs = {
         "_data",
         "config",
@@ -251,6 +255,7 @@ class GenericSimulationTables:
         "_preserve_config",
         "_items",
         "_metadata",
+        "callback_data",
     }
 
     def __setattr__(self, item, value):
@@ -288,7 +293,12 @@ class GenericSimulationTables:
                 if func is not None:
                     data[name] = func(sim)
         return cls(
-            data, sim=sim, config=sim.config, cnx=sim.cnx, n_total_samples=num_samples
+            data,
+            sim=sim,
+            config=sim.config,
+            cnx=sim.cnx,
+            n_total_samples=num_samples,
+            callback_data=sim.callback_data or None,
         )
 
     def _extract(self: Self, sim: Simulation) -> Self:
@@ -366,6 +376,7 @@ class GenericSimulationTables:
                 result._data[name] = func(summaries)
         result.meta_summaries = summaries
         result.n_total_samples = sum(s.n_total_samples for s in summaries)
+        result.callback_data = sum(s.callback_data for s in summaries)
         return result
 
     def __getstate__(self):

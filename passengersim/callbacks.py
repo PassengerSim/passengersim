@@ -111,7 +111,7 @@ class CallbackData:
     """Data collected during callbacks."""
 
     def __init__(self):
-        self.data = {}
+        self._data = {}
 
     def get_data(
         self, label: str, trial: int, sample: int, days_prior: int | None = None
@@ -119,12 +119,12 @@ class CallbackData:
         key_match = {"trial": trial, "sample": sample}
         if days_prior is not None:
             key_match["days_prior"] = days_prior
-        if label not in self.data:
-            self.data[label] = [key_match]
-        store = self.data[label][-1]
+        if label not in self._data:
+            self._data[label] = [key_match]
+        store = self._data[label][-1]
         if any(store.get(k) != v for k, v in key_match.items()):
-            self.data[label].append(key_match)
-            store = self.data[label][-1]
+            self._data[label].append(key_match)
+            store = self._data[label][-1]
         return store
 
     def update_data(
@@ -139,6 +139,49 @@ class CallbackData:
         store.update(kwargs)
 
     def __getattr__(self, item):
-        if item in self.data:
-            return self.data[item]
+        if not item.startswith("_") and item in self._data:
+            return self._data[item]
         raise AttributeError(f"{self.__class__.__name__}" f" has no attribute '{item}'")
+
+    def __repr__(self):
+        if self._data:
+            keys = ", ".join(self._data.keys())
+            return (
+                f"<{self.__class__.__module__}.{self.__class__.__name__} from {keys}>"
+            )
+        else:
+            return (
+                f"<{self.__class__.__module__}.{self.__class__.__name__} with no data>"
+            )
+
+    def __bool__(self):
+        return bool(self._data)
+
+    def __add__(self, other):
+        if isinstance(other, CallbackData):
+            new = CallbackData()
+            for k in self._data:
+                new._data[k] = self._data[k]
+                if k in other._data:
+                    new._data[k] += other._data[k]
+            for k in other._data:
+                if k not in self._data:
+                    new._data[k] = other._data[k]
+            return new
+        elif isinstance(other, int) and other == 0:
+            return self
+        elif other is None:
+            return self
+        else:
+            return NotImplemented
+
+    def __radd__(self, other):
+        if isinstance(other, int) and other == 0:
+            return self
+        elif other is None:
+            return self
+        else:
+            return NotImplemented
+
+    def __dir__(self):
+        return self._data.keys()

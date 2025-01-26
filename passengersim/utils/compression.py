@@ -53,3 +53,21 @@ def smart_open(filename: str, mode: str = "r"):
 
         return gzip.open(filename, mode)
     return open(filename, mode)
+
+
+def serialize_to_file(filename: str, obj):
+    """Dumps an object to a file."""
+
+    import pickle
+
+    with smart_open(filename, "wb") as f:
+        pickle.dump(obj, f)
+
+
+def deserialize_from_file(filename: str):
+    """Loads an object from a file."""
+
+    import pickle
+
+    with smart_open(filename, "rb") as f:
+        return pickle.load(f)

@@ -26,7 +26,12 @@ from pydantic import (
 )
 
 from passengersim.pseudonym import random_label
-from passengersim.utils.compression import smart_open
+from passengersim.utils.compression import (
+    deserialize_from_file,
+    serialize_to_file,
+    smart_open,
+)
+from passengersim.utils.file_freshness import check_modification_times
 
 from .blf_curves import BlfCurve
 from .booking_curves import BookingCurve
@@ -97,6 +102,7 @@ class YamlConfig(PrettyModel):
             filenames = [filenames]
         raw_config = addicty.Dict()
         for filename in filenames:
+            t = time.time()
             if isinstance(filename, str) and "\n" in filename:
                 # explicit YAML content cannot have include statements
                 content = addicty.Dict.load(
@@ -140,13 +146,15 @@ class YamlConfig(PrettyModel):
                             inclusions = [filename.parent.joinpath(i) for i in include]
                         raw_config.update(cls._load_unformatted_yaml(inclusions))
                     raw_config.update(content)
-            logger.info("loaded config from %s", filename)
+            logger.info("loaded config from %s in %.2f secs", filename, time.time() - t)
         return raw_config
 
     @classmethod
     def from_yaml(
         cls: type[TConfig],
         filenames: pathlib.Path | list[pathlib.Path],
+        *,
+        cache_file: pathlib.Path | None = None,
     ) -> TConfig:
         """
         Read from YAML.
@@ -157,13 +165,37 @@ class YamlConfig(PrettyModel):
             If multiple filenames are provided, they are loaded in order
             and values with matching keys defined in later files will overwrite
             the ones found in earlier files.
+        cache_file : path-like, optional
+            If provided, the validated config will be cached to this file in
+            binary format using pickle.  If the cache file exists and is
+            newer than the YAML files, the cached config will be loaded
+            instead of reloading and revalidating the YAML files, which can be
+            considerably faster.
 
         Returns
         -------
         Config
         """
-        raw_config = cls._load_unformatted_yaml(filenames)
-        return cls.model_validate(raw_config.to_dict())
+        cache_is_outdated = True
+        if cache_file:
+            cache_is_outdated = check_modification_times(filenames, cache_file)
+            if cache_is_outdated:
+                logger.info("cache file is outdated, will reload YAML files")
+        if not cache_file or cache_is_outdated:
+            raw_config = cls._load_unformatted_yaml(filenames)
+            t = time.time()
+            result = cls.model_validate(raw_config.to_dict())
+            logger.info("validated config in %.2f secs", time.time() - t)
+            if cache_file:
+                t = time.time()
+                serialize_to_file(cache_file, result)
+                logger.info("cached config in %.2f secs", time.time() - t)
+            return result
+        else:
+            t = time.time()
+            result = deserialize_from_file(cache_file)
+            logger.info("loaded config from cache in %.2f secs", time.time() - t)
+            return result
 
     @classmethod
     def from_raw_yaml(cls, content: str | bytes) -> Self:

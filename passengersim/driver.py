@@ -1075,8 +1075,6 @@ class Simulation(BaseSimulation, CallbackMixin):
                     for leg in self.sim.legs:
                         leg.capacity = leg.capacity / 2.0
 
-            if progress is not None:
-                progress.tick(refresh=(sample == 0))
             self.sim.sample = sample
             if self.sim.config.simulation_controls.random_seed is not None:
                 self.reseed(
@@ -1127,6 +1125,8 @@ class Simulation(BaseSimulation, CallbackMixin):
             n_samples_done += 1
             self.sample_done_callback(n_samples_done, n_samples_total)
             self.end_sample()
+            if progress is not None:
+                progress.tick(refresh=(sample == 0))
 
         self.sim.num_trials_completed += 1
         self.end_trial()

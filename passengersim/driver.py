@@ -1064,6 +1064,7 @@ class Simulation(BaseSimulation, CallbackMixin):
 
         self.begin_trial(trial)
         for sample in range(self.sim.num_samples):
+            t = time.time()
             if self.sim.config.simulation_controls.double_capacity_until:
                 # Just trying this, PODS has something similar during burn phase
                 if sample == 0:
@@ -1127,6 +1128,7 @@ class Simulation(BaseSimulation, CallbackMixin):
             self.end_sample()
             if progress is not None:
                 progress.tick(refresh=(sample == 0))
+            logger.info("completed sample %i in %.2f secs", sample, time.time() - t)
 
         self.sim.num_trials_completed += 1
         self.end_trial()

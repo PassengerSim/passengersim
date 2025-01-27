@@ -109,6 +109,7 @@ nav:
       - user-guide/database/distance.md
     - Outputs:
       - user-guide/processing-outputs/basic-usage.nbconvert.ipynb
+      - user-guide/processing-outputs/callbacks.nbconvert.ipynb
       - user-guide/viz/carriers.nbconvert.ipynb
     - Experiments: user-guide/experiments.nbconvert.ipynb
   - Tutorials:

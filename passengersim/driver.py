@@ -844,12 +844,9 @@ class Simulation(BaseSimulation, CallbackMixin):
                 for pth in self.sim.paths:
                     if pth.carrier != carrier.name:
                         continue
-                    for fare in self.sim.fares:
-                        if (
-                            fare.carrier_name == pth.carrier
-                            and fare.orig == pth.orig
-                            and fare.dest == pth.dest
-                        ):
+                    mkt = self.sim.markets[f"{pth.orig}~{pth.dest}"]
+                    for fare in mkt.fares:
+                        if fare.carrier_name == pth.carrier:
                             pthcls = pth.add_booking_class(
                                 fare.booking_class, if_not_found=True
                             )

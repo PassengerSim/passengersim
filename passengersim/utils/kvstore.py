@@ -51,7 +51,7 @@ class KVStore(MutableMapping):
             compressed_value = row[0]
             serialized_value = lz4.frame.decompress(compressed_value)
             return pickle.loads(serialized_value)
-        return None
+        raise KeyError(key)
 
     def __delitem__(self, key):
         with self.conn:

@@ -13,6 +13,7 @@ each module, the SimulationTableItem instance is created using the
 
 from __future__ import annotations
 
+from collections.abc import Sized
 from datetime import datetime
 
 import pandas as pd
@@ -36,6 +37,20 @@ from . import (
 from .generic import GenericSimulationTables
 
 
+def _describe_type(obj):
+    """Return a string describing the type of an object."""
+    if isinstance(obj, pd.DataFrame):
+        typename = f"{len(obj)} row DataFrame"
+    else:
+        try:
+            typename = str(type(obj).__name__)
+        except AttributeError:
+            typename = str(type(obj))
+        if isinstance(obj, Sized):
+            typename = f"{len(obj)} item {typename}"
+    return typename
+
+
 class SimulationTables(*GenericSimulationTables.subclasses()):
     """Container for summary tables and figures extracted from a Simulation.
 
@@ -51,15 +66,19 @@ class SimulationTables(*GenericSimulationTables.subclasses()):
         """Includes information about what data is stored in this summary."""
         table_keys = []
         for k, v in self._data.items():
-            if isinstance(v, pd.DataFrame):
-                table_keys.append(f"* {k} ({len(v)} row DataFrame)")
-            elif v is not None:
-                try:
-                    typename = type(v).__name__
-                except AttributeError:
-                    typename = str(type(v))
-                table_keys.append(f"* {k} ({typename})")
-        table_info = " " + "\n ".join(table_keys)
+            table_keys.append(f"* {k} ({_describe_type(v)})")
+        for k, v in self._callback_data.items():
+            table_keys.append(f"* callback_data.{k} ({_describe_type(v)})")
+        if self._file_store is not None:
+            for k in self._file_store:
+                if not k.startswith("_") and k not in self._data:
+                    table_keys.append(f"* {k} (available in file storage)")
+                if k == "_callback_data_" and not self._callback_data:
+                    table_keys.append("* callback_data (available in file storage)")
+        if table_keys:
+            table_info = " " + "\n ".join(table_keys)
+        else:
+            table_info = " (no tables)"
         try:
             timestamp = self.metadata("time.created")
         except KeyError:

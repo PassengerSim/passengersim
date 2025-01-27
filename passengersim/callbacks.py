@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, MutableMapping
 from typing import TYPE_CHECKING
 
 from passengersim_core import (
@@ -132,7 +132,7 @@ def _flatten_iter_of_dict(i):
         yield dict(_flatten_dict_keys(item))
 
 
-class CallbackData:
+class CallbackData(MutableMapping):
     """Data collected during callbacks."""
 
     def __init__(self):
@@ -170,6 +170,21 @@ class CallbackData:
             return pd.DataFrame(_flatten_iter_of_dict(self._data[item]))
         else:
             raise KeyError(f"{item} not found in callback data")
+
+    def __getitem__(self, item):
+        return self._data[item]
+
+    def __setitem__(self, key, value):
+        self._data[key] = value
+
+    def __delitem__(self, key):
+        del self._data[key]
+
+    def __iter__(self):
+        return iter(self._data)
+
+    def __len__(self):
+        return len(self._data)
 
     def __getattr__(self, item):
         if not item.startswith("_") and item in self._data:

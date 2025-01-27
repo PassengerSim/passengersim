@@ -629,7 +629,8 @@ class GenericSimulationTables:
             kvs["_config_"] = self.config
         kvs["_metadata_"] = self._metadata
         kvs["_n_total_samples_"] = self.n_total_samples
-        kvs["_callback_data_"] = self.callback_data
+        if self.callback_data:
+            kvs["_callback_data_"] = self.callback_data
         kvs.close()
 
     @classmethod

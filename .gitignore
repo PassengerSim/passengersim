@@ -166,6 +166,7 @@ sandbox.py
 *.sqlite-journal
 *.csv
 *.csv.gz
+*.pxsim
 
 # notebooks executed for documentation
 *.nbconvert.ipynb

@@ -83,6 +83,7 @@ rm_systems:
           name: path_forecast
           algorithm: additive_pickup
           kind: conditional
+          max_cap: 10
         - step_type: probp
           name: optimization
       DAILY:
@@ -114,6 +115,7 @@ rm_systems:
           fare_adjustment: mr
           fare_adjustment_scale: 0.25
           weighted_by_ratio: true
+          max_cap: 10
         - step_type: probp
           name: optimization
       DAILY:
@@ -145,6 +147,7 @@ rm_systems:
           fare_adjustment: ki
           fare_adjustment_scale: 0.25
           weighted_by_ratio: true
+          max_cap: 10
         - step_type: probp
           name: optimization
       DAILY:

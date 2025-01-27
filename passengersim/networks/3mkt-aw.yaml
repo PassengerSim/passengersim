@@ -861,7 +861,7 @@ carriers:
       - (Y4, Y)
       - (Y5, Y)
   - name: AL2
-    rm_system: rm_leg
+    rm_system: rm_sub_bp
     truncation_rule: 1
 #    frat5: curve_C
 #    fare_adjustment_scale: 0.5

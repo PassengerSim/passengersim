@@ -21,6 +21,7 @@ from .core import SimulationEngine
 from .driver import BaseSimulation, Simulation
 from .summaries import GenericSimulationTables, SimulationTables
 from .summary import SummaryTables
+from .utils import multiproc
 from .utils.caffeine import keep_awake
 
 
@@ -212,7 +213,7 @@ class MultiSimulation(BaseSimulation, CallbackMixin):
 
                 try:
                     for task_id in task_ids:
-                        p = multiprocessing.Process(
+                        p = multiproc.Process(
                             target=_subprocess_run_trial,
                             args=(task_id, cfg_json, progress_queue, output_dir),
                             kwargs={

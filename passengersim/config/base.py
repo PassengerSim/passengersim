@@ -913,7 +913,7 @@ class Config(YamlConfig, extra="forbid"):
         self,
     ) -> typing.Self:
         """Revalidate the passengersim Config instance."""
-        return self.__class__.model_validate(self)
+        return self.as_reloaded.model_validate(self.model_dump(serialize_as_any=True))
 
     @classmethod
     @property

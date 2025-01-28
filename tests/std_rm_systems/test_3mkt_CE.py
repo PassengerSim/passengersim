@@ -7,13 +7,16 @@ from pytest import fixture, mark
 import passengersim as pax
 
 
-@fixture(scope="module")
-def config() -> pax.Config:
+@fixture(scope="module", params=[10, 0])
+def config(request) -> pax.Config:
+    max_cap = request.param
     cfg = pax.Config.from_yaml(pax.demo_network("3MKT"))
     cfg.carriers.AL1.rm_system = "C"
     cfg.carriers.AL2.rm_system = "E"
     cfg.simulation_controls.num_trials = 1
     cfg.simulation_controls.num_samples = 250
+    cfg = cfg.model_revalidate()
+    cfg.rm_systems.C.processes.DCP.forecast.max_cap = max_cap
     return cfg
 
 
@@ -51,7 +54,10 @@ def test_table_list(summary):
 def test_summary_tables(summary, dataframe_regression, table_name: str):
     assert isinstance(summary, pax.SimulationTables)
     df = getattr(summary, table_name)
-    dataframe_regression.check(df, basename=table_name)
+    max_cap = summary.config.rm_systems.C.processes.DCP.forecast.max_cap
+    dataframe_regression.check(
+        df, basename=table_name if not max_cap else table_name + f"_max_cap_{max_cap}"
+    )
 
 
 FIGURES = [
@@ -88,4 +94,7 @@ def test_summary_figures(summary, dataframe_regression, fig: tuple[str, dict]):
         s = json.dumps(kwargs, sort_keys=True)
         h = hashlib.md5(s.encode()).hexdigest()[:12]
         fig_name = f"{fig_name}_{h}"
-    dataframe_regression.check(df, basename=fig_name)
+    max_cap = summary.config.rm_systems.C.processes.DCP.forecast.max_cap
+    dataframe_regression.check(
+        df, basename=fig_name if not max_cap else fig_name + f"_max_cap_{max_cap}"
+    )

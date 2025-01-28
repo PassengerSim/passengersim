@@ -38,6 +38,8 @@ class DictAttr(dict):
     def __getattr__(self, item):
         if item in self:
             return self[item]
+        if item.lower() in self:
+            return self[item.lower()]
         raise AttributeError(f"no key {item}")
 
     @classmethod

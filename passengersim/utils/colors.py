@@ -23,6 +23,8 @@ DarkBlue = "#1f78b4"
 LightBlue = "#a6cee3"
 DarkRed = "#e31a1c"
 LightRed = "#fb9a99"
+DarkYellow = "#b15928"
+LightYellow = "#e3d086"
 
 passengersim_colors = [
     "#6a3d9a",  # dark purple
@@ -35,6 +37,8 @@ passengersim_colors = [
     "#a6cee3",  # light blue
     "#e31a1c",  # dark red
     "#fb9a99",  # light red
+    "#b15928",  # dark yellow
+    "#e3d086",  # light yellow
 ]
 
 

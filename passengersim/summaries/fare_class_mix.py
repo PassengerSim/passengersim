@@ -79,6 +79,11 @@ def _fig_fare_class_mix(df: pd.DataFrame, label_threshold: float = 0.06, title=N
             alt.value(1),
         ),
         order=alt.Order("booking_class:N", sort="descending"),
+        tooltip=[
+            "carrier",
+            "booking_class",
+            alt.Tooltip("avg_sold", format=".2f"),
+        ],
     )
     return (
         (bars + text)

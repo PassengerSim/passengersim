@@ -68,6 +68,7 @@ FIGURES = [
         "fig_segmentation_by_timeframe",
         dict(metric="bookings", by_carrier="AL1", by_class=True),
     ),
+    ("fig_carrier_rasm", {}),
 ]
 
 

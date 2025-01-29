@@ -118,6 +118,7 @@ class SimTabCarriers(GenericSimulationTables):
         computed_fields={
             "avg_price": "avg_rev / avg_sold",
             "yield": "avg_rev / rpm",
+            "rasm": "avg_rev / asm",
             "sys_lf": "100.0 * rpm / asm",
             "local_pct_leg_pax": "100.0 * avg_local_leg_pax / avg_total_leg_pax",
             "local_pct_bookings": "100.0 * avg_local_leg_pax / avg_sold",
@@ -235,6 +236,16 @@ class SimTabCarriers(GenericSimulationTables):
     def fig_carrier_yields(self, *, raw_df=False):
         return self._fig_carrier_attribute(
             raw_df, "yield", "Average Yield", "$.4f", title="Carrier Yields"
+        )
+
+    @report_figure
+    def fig_carrier_rasm(self, *, raw_df=False):
+        return self._fig_carrier_attribute(
+            raw_df,
+            "rasm",
+            "Revenue per Available Seat Mile",
+            "$.4f",
+            title="Carrier Revenue per Available Seat Mile (RASM)",
         )
 
     @report_figure

@@ -52,6 +52,7 @@ dependencies = [
     "scipy",
     "typer",
     "dill",
+    "lz4",
 ]
 
 [project.optional-dependencies]
@@ -63,9 +64,6 @@ test = [
 reporting = [
     "altair>=5.0",
     "xmle",
-]
-compression = [
-    "lz4",
 ]
 
 [tool.setuptools.packages.find]

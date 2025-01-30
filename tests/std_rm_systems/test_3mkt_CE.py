@@ -1,9 +1,8 @@
 import hashlib
 import json
-import os
 
 import altair as alt
-from pytest import fixture, mark, skip
+from pytest import fixture, mark
 
 import passengersim as pax
 
@@ -11,8 +10,8 @@ import passengersim as pax
 @fixture(scope="module", params=[10, 0, 2])
 def config(request) -> pax.Config:
     max_cap = request.param
-    if max_cap and os.getenv("GITHUB_ACTIONS") == "true":
-        skip("Skipping on GitHub Actions")
+    # if max_cap and os.getenv("GITHUB_ACTIONS") == "true":
+    #     skip("Skipping on GitHub Actions")
     cfg = pax.Config.from_yaml(pax.demo_network("3MKT"))
     cfg.carriers.AL1.rm_system = "C"
     cfg.carriers.AL2.rm_system = "E"

@@ -369,26 +369,26 @@ def test_3mkt_08_detrunc_bookings_by_timeframe(summary1, summary2, summary3):
     sim3 = summary3.sim
     assert len(sim1.paths) == 12
     for p in sim1.paths:
-        if p.carrier == "AL1":
+        if p.carrier_name == "AL1":
             assert p.truncation_rule == 1
-        elif p.carrier == "AL2":
+        elif p.carrier_name == "AL2":
             assert p.truncation_rule == 1
         else:
-            raise AssertionError(f"Unexpected carrier {p.carrier}")
+            raise AssertionError(f"Unexpected carrier {p.carrier_name}")
     for p in sim2.paths:
-        if p.carrier == "AL1":
+        if p.carrier_name == "AL1":
             assert p.truncation_rule == 2
-        elif p.carrier == "AL2":
+        elif p.carrier_name == "AL2":
             assert p.truncation_rule == 2
         else:
-            raise AssertionError(f"Unexpected carrier {p.carrier}")
+            raise AssertionError(f"Unexpected carrier {p.carrier_name}")
     for p in sim3.paths:
-        if p.carrier == "AL1":
+        if p.carrier_name == "AL1":
             assert p.truncation_rule == 3
-        elif p.carrier == "AL2":
+        elif p.carrier_name == "AL2":
             assert p.truncation_rule == 3
         else:
-            raise AssertionError(f"Unexpected carrier {p.carrier}")
+            raise AssertionError(f"Unexpected carrier {p.carrier_name}")
 
 
 def test_truncation_rule_1() -> SummaryTables:

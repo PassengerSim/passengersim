@@ -18,7 +18,7 @@ def extract_paths(sim: Simulation) -> pd.DataFrame | None:
         path_data.append(
             {
                 "path_id": pth.path_id,
-                "carrier": pth.carrier,
+                "carrier": pth.carrier_name,
                 "orig": pth.orig,
                 "dest": pth.dest,
                 "gt_sold": pth.gt_sold,

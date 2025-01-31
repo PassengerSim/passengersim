@@ -837,6 +837,7 @@ class Simulation(BaseSimulation, CallbackMixin):
         if num_paths and self.cnx.is_open:
             database.tables.create_table_path_defs(self.cnx._connection, self.sim.paths)
         logger.debug(f"Connections done, num_paths = {num_paths}")
+        self.sim.initialize_bucket_ap_rules()
         self.sim.initialize_pathclasses()
 
         # Airlines using Q-forecasting need to have pathclasses set up for all paths

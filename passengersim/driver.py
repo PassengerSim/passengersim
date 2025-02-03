@@ -1151,7 +1151,7 @@ class Simulation(BaseSimulation, CallbackMixin):
         self.sim.num_trials_completed += 1
         self.end_trial()
 
-    def _run_sim(self):
+    def _run_sim(self, rich_progress: ProgressBar | None = None):
         update_freq = self.update_frequency
         logger.debug(
             f"run_sim, num_trials = {self.sim.num_trials}, "
@@ -1161,10 +1161,13 @@ class Simulation(BaseSimulation, CallbackMixin):
         n_samples_total = self.sim.num_trials * self.sim.num_samples
         n_samples_done = 0
         self.sample_done_callback(n_samples_done, n_samples_total)
-        if self.sim.config.simulation_controls.show_progress_bar:
-            progress = ProgressBar(total=n_samples_total)
+        if rich_progress is None:
+            if self.sim.config.simulation_controls.show_progress_bar:
+                progress = ProgressBar(total=n_samples_total)
+            else:
+                progress = DummyProgressBar()
         else:
-            progress = DummyProgressBar()
+            progress = rich_progress
         with progress:
             for trial in range(self.sim.num_trials):
                 self._run_single_trial(
@@ -1175,18 +1178,18 @@ class Simulation(BaseSimulation, CallbackMixin):
                     update_freq,
                 )
 
-    def _run_sim_single_trial(self, trial: int):
+    def _run_sim_single_trial(
+        self, trial: int, *, rich_progress: ProgressBar | None = None
+    ):
         update_freq = self.update_frequency
         self.db_writer.update_db_write_flags()
         n_samples_total = self.sim.num_samples
         n_samples_done = 0
         self.sample_done_callback(n_samples_done, n_samples_total)
-        # if self.sim.config.simulation_controls.show_progress_bar:
-        #     progress = ProgressBar(total=n_samples_total)
-        # else:
-        #     progress = DummyProgressBar()
-        # with progress:
-        progress = DummyProgressBar()
+        if rich_progress is None:
+            progress = DummyProgressBar()
+        else:
+            progress = rich_progress
         with progress:
             self._run_single_trial(
                 trial,

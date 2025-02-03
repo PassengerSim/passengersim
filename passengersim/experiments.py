@@ -228,6 +228,7 @@ class Experiments:
         check_versions: bool = True,
         check_content: bool = True,
         single_process: bool = False,
+        retain_sims: bool = False,
     ):
         """
         Run the experiments.
@@ -253,6 +254,13 @@ class Experiments:
             If True, check the content of the loaded summary (if any), and
             re-run the simulation if the config has changed. If False, do not
             check the content of the loaded summary.
+        single_process : bool, default False
+            If True, force all the simulations to run in single process mode. If
+            False, run allow each experiment's simulation to run multi-process,
+            unless that individual experiment is set to run in single process mode.
+        retain_sims : bool, default False
+            If True, retain the simulation objects in the `sims` attribute after
+            running each simulation. This is primarily useful for debugging.
 
         Returns
         -------
@@ -260,6 +268,9 @@ class Experiments:
         """
 
         results = contrast.Contrast()
+
+        if retain_sims:
+            self.sims = {}
 
         # validate that all experiments have unique tags
         tags = set()
@@ -392,10 +403,14 @@ class Experiments:
                     if e.multi and not single_process:
                         sim = MultiSimulation(config)
                         summary = sim.run(rich_progress=rich_progress)
+                        if retain_sims:
+                            self.sims[e.tag] = sim
                         del sim
                     else:
                         sim = Simulation(config)
                         summary = sim.run()
+                        if retain_sims:
+                            self.sims[e.tag] = sim
                         del sim
 
                 results[e.tag] = summary

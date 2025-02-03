@@ -474,6 +474,7 @@ class Simulation(BaseSimulation, CallbackMixin):
             self.carriers_dict[carrier_name] = carrier
             carrier.rm_system = self.rm_systems[carrier_config.rm_system]
             carrier.truncation_rule = carrier_config.truncation_rule
+            carrier.history_length = carrier_config.history_length
             carrier.cp_algorithm = carrier_config.cp_algorithm
             carrier.cp_quantize = carrier_config.cp_quantize
             carrier.cp_scale = carrier_config.cp_scale
@@ -807,18 +808,19 @@ class Simulation(BaseSimulation, CallbackMixin):
                 print(f"Added leg: {leg}, dist = {leg.distance}")
             self.legs[leg.leg_id] = leg
 
-    def set_classes(self, _leg, _cabin, debug=False):
-        if len(self.classes) == 0:
+    def set_classes(self, leg: passengersim.core.Leg, _cabin, debug=False):
+        leg_classes = self.config.carriers[leg.carrier.name].classes
+        if len(leg_classes) == 0:
             return
-        cap = float(_leg.capacity)
+        cap = float(leg.capacity)
         if debug:
-            print(_leg, "Capacity = ", cap)
-        for bkg_class in self.classes:
+            print(leg, "Capacity = ", cap)
+        history_def = leg.carrier.get_history_def()
+        for bkg_class in leg_classes:
             # Input as a percentage
             auth = int(cap * self.init_rm.get(bkg_class, 100.0) / 100.0)
-            b = passengersim.core.Bucket(bkg_class, alloc=auth)
-            # print("adding bucket", b)
-            _leg.add_bucket(b)
+            b = passengersim.core.Bucket(bkg_class, alloc=auth, history=history_def)
+            leg.add_bucket(b)
             if debug:
                 print("    Bucket", bkg_class, auth)
 
@@ -838,7 +840,16 @@ class Simulation(BaseSimulation, CallbackMixin):
             database.tables.create_table_path_defs(self.cnx._connection, self.sim.paths)
         logger.debug(f"Connections done, num_paths = {num_paths}")
         self.sim.initialize_bucket_ap_rules()
-        self.sim.initialize_pathclasses()
+
+        # start with default number of timeframes
+        num_timeframes_default = len(self.config.dcps)
+        if self.config.dcps[-1] == 0:
+            num_timeframes_default -= 1
+
+        # initialize pathclasses for each carrier, using settings from the carrier
+        # to size the history buffers
+        for carrier in self.sim.carriers:
+            self.sim.initialize_pathclasses(carrier.get_history_def(), carrier.name)
 
         # Airlines using Q-forecasting need to have pathclasses set up for all paths
         # so Q-demand can be forecasted by pathclass even in the absence of bookings

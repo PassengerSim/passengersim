@@ -116,3 +116,6 @@ class Carrier(Named, extra="forbid"):
     second leg is 400 miles, then the first leg gets 1/3 of the revenue and the
     second leg gets 2/3.
     """
+
+    history_length: int = 26
+    """The number of samples to keep in the carrier's history buffers."""

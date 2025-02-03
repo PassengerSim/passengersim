@@ -843,7 +843,7 @@ class Simulation(BaseSimulation, CallbackMixin):
 
         # start with default number of timeframes
         num_timeframes_default = len(self.config.dcps)
-        if self.config.dcps[-1] == 0:
+        if len(self.config.dcps) and self.config.dcps[-1] == 0:
             num_timeframes_default -= 1
 
         # initialize pathclasses for each carrier, using settings from the carrier

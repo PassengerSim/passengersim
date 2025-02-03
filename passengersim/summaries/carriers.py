@@ -52,6 +52,7 @@ def extract_carriers(sim: Simulation) -> pd.DataFrame:
         tot_anc_rev = 0.0
         for anc in carrier.ancillaries:
             tot_anc_rev += anc.price * anc.sold
+        gt_cp_revenue = carrier.gt_cp_revenue
         carrier_data.append(
             {
                 "carrier": carrier.name,
@@ -65,6 +66,7 @@ def extract_carriers(sim: Simulation) -> pd.DataFrame:
                 "ancillary_rev": tot_anc_rev,
                 "avg_local_leg_pax": carrier_local_leg_pax[carrier.name] / num_samples,
                 "avg_total_leg_pax": carrier_total_leg_pax[carrier.name] / num_samples,
+                "cp_revenue": gt_cp_revenue / num_samples
             }
         )
     if len(carrier_data) == 0:

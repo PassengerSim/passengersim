@@ -853,6 +853,9 @@ carriers:
 #    cp_quantize: 5
     cp_scale: 0.2
     cp_record: lowest_open
+    cp_elasticity:
+      accuracy: 0.9
+      multiplier: 0.5
     classes:
       - (Y0, Y)
       - (Y1, Y)

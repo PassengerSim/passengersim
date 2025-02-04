@@ -845,13 +845,13 @@ carriers:
   - name: AL1
     rm_system: rm_udp
     truncation_rule: 1
-    frat5: curve_C
+    frat5: curve_G
 #    fare_adjustment_scale: 0.3
 #    load_factor_curve: lf_curve1
     cp_algorithm: CBC
     cp_bounds: 0.95
 #    cp_quantize: 5
-    cp_scale: 0.2
+    cp_scale: 0.3
     cp_record: lowest_open
     cp_elasticity:
       accuracy: 0.9

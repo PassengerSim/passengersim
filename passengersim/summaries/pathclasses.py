@@ -22,7 +22,7 @@ def extract_pathclasses(sim: Simulation) -> pd.DataFrame | None:
             this_pc = {
                 "path_id": pth.path_id,
                 "booking_class": pc.booking_class,
-                "carrier": pth.carrier,
+                "carrier": pth.carrier_name,
                 "orig": pth.orig,
                 "dest": pth.dest,
                 "gt_sold": pc.gt_sold,

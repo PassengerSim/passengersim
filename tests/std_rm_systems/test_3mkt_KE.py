@@ -54,10 +54,7 @@ def test_table_list(summary):
 def test_summary_tables(summary, dataframe_regression, table_name: str):
     assert isinstance(summary, pax.SimulationTables)
     df = getattr(summary, table_name)
-    max_cap = summary.config.rm_systems.K.processes.DCP.forecast.max_cap
-    dataframe_regression.check(
-        df, basename=table_name if not max_cap else table_name + f"_max_cap_{max_cap}"
-    )
+    dataframe_regression.check(df, basename=table_name)
 
 
 FIGURES = [
@@ -94,7 +91,4 @@ def test_summary_figures(summary, dataframe_regression, fig: tuple[str, dict]):
         s = json.dumps(kwargs, sort_keys=True)
         h = hashlib.md5(s.encode()).hexdigest()[:12]
         fig_name = f"{fig_name}_{h}"
-    max_cap = summary.config.rm_systems.K.processes.DCP.forecast.max_cap
-    dataframe_regression.check(
-        df, basename=fig_name if not max_cap else fig_name + f"_max_cap_{max_cap}"
-    )
+    dataframe_regression.check(df, basename=fig_name)

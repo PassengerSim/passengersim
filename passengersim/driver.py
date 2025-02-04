@@ -137,7 +137,7 @@ class BaseSimulation(ABC):
     def pathclasses_for_carrier(self, carrier: str):
         """Generator of all path classes for a given carrier."""
         for path in self._sim.paths:
-            if path.carrier == carrier:
+            if path.carrier_name == carrier:
                 yield from path.pathclasses
 
 
@@ -442,7 +442,10 @@ class Simulation(BaseSimulation, CallbackMixin):
         logger.info("Initializing Frat5 curves")
         for f5_name, f5_data in config.frat5_curves.items():
             f5 = Frat5(f5_name)
-            for _dcp, val in f5_data.curve.items():
+            # ensure that the curve is sorted in descending order by days prior
+            sorted_days_prior = reversed(sorted(f5_data.curve.keys()))
+            for days_prior in sorted_days_prior:
+                val = f5_data.curve[days_prior]
                 f5.add_vals(val)
             self.sim.add_frat5(f5)
             self.frat5curves[f5_name] = f5
@@ -538,7 +541,10 @@ class Simulation(BaseSimulation, CallbackMixin):
         for curve_name, curve_config in config.booking_curves.items():
             bc = passengersim.core.BookingCurve(curve_name)
             bc.random_generator = self.random_generator
-            for days_prior, pct in curve_config.curve.items():
+            # ensure that the curve is sorted in descending order by days prior
+            sorted_days_prior = reversed(sorted(curve_config.curve.keys()))
+            for days_prior in sorted_days_prior:
+                pct = curve_config.curve[days_prior]
                 bc.add_dcp(days_prior, pct)
             self.curves[curve_name] = bc
 
@@ -833,6 +839,7 @@ class Simulation(BaseSimulation, CallbackMixin):
         if num_paths and self.cnx.is_open:
             database.tables.create_table_path_defs(self.cnx._connection, self.sim.paths)
         logger.debug(f"Connections done, num_paths = {num_paths}")
+        self.sim.initialize_bucket_ap_rules()
         self.sim.initialize_pathclasses()
 
         # Airlines using Q-forecasting need to have pathclasses set up for all paths
@@ -844,11 +851,11 @@ class Simulation(BaseSimulation, CallbackMixin):
                     "which is using a Frat5 curve"
                 )
                 for pth in self.sim.paths:
-                    if pth.carrier != carrier.name:
+                    if pth.carrier_name != carrier.name:
                         continue
                     mkt = self.sim.markets[f"{pth.orig}~{pth.dest}"]
                     for fare in mkt.fares:
-                        if fare.carrier_name == pth.carrier:
+                        if fare.carrier_name == pth.carrier_name:
                             pthcls = pth.add_booking_class(
                                 fare.booking_class, if_not_found=True
                             )

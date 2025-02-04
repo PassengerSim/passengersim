@@ -26,6 +26,12 @@ def summary(config: pax.Config) -> pax.SimulationTables:
     return sim.run(summarizer=pax.SimulationTables)
 
 
+def _target(basename, maxcap):
+    if maxcap not in {0, 10}:
+        return basename + f"_max_cap_{maxcap}"
+    return basename
+
+
 TABLES = [
     "bid_price_history",
     "carriers",
@@ -55,9 +61,7 @@ def test_summary_tables(summary, dataframe_regression, table_name: str):
     assert isinstance(summary, pax.SimulationTables)
     df = getattr(summary, table_name)
     max_cap = summary.config.rm_systems.M.processes.DCP.forecast.max_cap
-    dataframe_regression.check(
-        df, basename=table_name if not max_cap else table_name + f"_max_cap_{max_cap}"
-    )
+    dataframe_regression.check(df, basename=_target(table_name, max_cap))
 
 
 FIGURES = [
@@ -95,6 +99,4 @@ def test_summary_figures(summary, dataframe_regression, fig: tuple[str, dict]):
         h = hashlib.md5(s.encode()).hexdigest()[:12]
         fig_name = f"{fig_name}_{h}"
     max_cap = summary.config.rm_systems.M.processes.DCP.forecast.max_cap
-    dataframe_regression.check(
-        df, basename=fig_name if not max_cap else fig_name + f"_max_cap_{max_cap}"
-    )
+    dataframe_regression.check(df, basename=_target(fig_name, max_cap))

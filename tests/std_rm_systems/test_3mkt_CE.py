@@ -8,10 +8,10 @@ from pytest import fixture, mark, skip
 import passengersim as pax
 
 
-@fixture(scope="module", params=[10, 0])
+@fixture(scope="module", params=[10, 0, 2])
 def config(request) -> pax.Config:
     max_cap = request.param
-    if max_cap and os.getenv("GITHUB_ACTIONS") == "true":
+    if os.getenv("GITHUB_ACTIONS") == "true":
         skip("Skipping on GitHub Actions")
     cfg = pax.Config.from_yaml(pax.demo_network("3MKT"))
     cfg.carriers.AL1.rm_system = "C"
@@ -21,6 +21,12 @@ def config(request) -> pax.Config:
     cfg = cfg.model_revalidate()
     cfg.rm_systems.C.processes.DCP.forecast.max_cap = max_cap
     return cfg
+
+
+def _target(basename, maxcap):
+    if maxcap not in {0, 10}:
+        return basename + f"_max_cap_{maxcap}"
+    return basename
 
 
 @fixture(scope="module")
@@ -58,9 +64,7 @@ def test_summary_tables(summary, dataframe_regression, table_name: str):
     assert isinstance(summary, pax.SimulationTables)
     df = getattr(summary, table_name)
     max_cap = summary.config.rm_systems.C.processes.DCP.forecast.max_cap
-    dataframe_regression.check(
-        df, basename=table_name if not max_cap else table_name + f"_max_cap_{max_cap}"
-    )
+    dataframe_regression.check(df, basename=_target(table_name, max_cap))
 
 
 FIGURES = [
@@ -98,6 +102,4 @@ def test_summary_figures(summary, dataframe_regression, fig: tuple[str, dict]):
         h = hashlib.md5(s.encode()).hexdigest()[:12]
         fig_name = f"{fig_name}_{h}"
     max_cap = summary.config.rm_systems.C.processes.DCP.forecast.max_cap
-    dataframe_regression.check(
-        df, basename=fig_name if not max_cap else fig_name + f"_max_cap_{max_cap}"
-    )
+    dataframe_regression.check(df, basename=_target(fig_name, max_cap))

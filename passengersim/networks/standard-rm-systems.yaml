@@ -205,7 +205,7 @@ rm_systems:
         - step_type: probp
           name: optimization
 
-  LE:
+  L:
     description: >-
       Leg-based additive pickup conditional forecast,
       EM detruncation of yieldable demand, EMSR-B optimization.

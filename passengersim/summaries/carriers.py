@@ -67,8 +67,8 @@ def extract_carriers(sim: Simulation) -> pd.DataFrame:
                 "ancillary_rev": tot_anc_rev,
                 "avg_local_leg_pax": carrier_local_leg_pax[carrier.name] / num_samples,
                 "avg_total_leg_pax": carrier_total_leg_pax[carrier.name] / num_samples,
-                # "cp_sold": gt_cp_sold / num_samples,
-                # "cp_revenue": gt_cp_revenue / num_samples
+                "avg_cp_sold": gt_cp_sold / num_samples,
+                "avg_cp_rev": gt_cp_revenue / num_samples
             }
         )
     if len(carrier_data) == 0:

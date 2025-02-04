@@ -33,6 +33,13 @@ class Carrier(Named, extra="forbid"):
     cp_record: str = "highest_closed"
     """Do we record the sale in the highest_closed class, lowest_open or nearest?"""
 
+    cp_elasticity: dict | None = None
+    """Parameters to esimate customer price elasticity for CP
+         - Defaults to being off
+         - {'accuracy': 0.8, 'multiplier': 0.5} will guess 80% accurate and multiply
+             the Frat5 value for *leisure* by 0.5
+         - Other algorithms to come in the future :-) """
+
     frat5: str | None = ""
     """Name of the FRAT5 curve to use.
 

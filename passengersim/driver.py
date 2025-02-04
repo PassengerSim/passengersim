@@ -479,6 +479,8 @@ class Simulation(BaseSimulation, CallbackMixin):
             carrier.cp_quantize = carrier_config.cp_quantize
             carrier.cp_scale = carrier_config.cp_scale
             carrier.cp_record = carrier_config.cp_record
+            if carrier_config.cp_elasticity is not None:
+                carrier.cp_elasticity = carrier_config.cp_elasticity
             frat5_name = carrier_config.frat5
             if not frat5_name:
                 frat5_name = config.rm_systems[carrier_config.rm_system].frat5

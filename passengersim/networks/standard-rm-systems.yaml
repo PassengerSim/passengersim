@@ -204,3 +204,25 @@ rm_systems:
           kind: path
         - step_type: probp
           name: optimization
+
+  LE:
+    description: >-
+      Leg-based additive pickup conditional forecast,
+      EM detruncation of yieldable demand, EMSR-B optimization.
+    availability_control: leg
+    frat5: curve_C
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: leg
+          which_data: yieldable
+        - step_type: forecast
+          name: leg_forecast
+          algorithm: additive_pickup
+          kind: leg-conditional
+        - step_type: emsr
+          name: optimization
+          algorithm: emsrb
+          kind: leg

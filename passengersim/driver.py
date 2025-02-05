@@ -372,6 +372,7 @@ class Simulation(BaseSimulation, CallbackMixin):
                 dwm.min_distance = todd.min_distance
             if todd.early_dep:
                 dwm.early_dep_offset = todd.early_dep["offset"]
+                dwm.early_dep_offset = todd.early_dep["offset"]
                 dwm.early_dep_slope = todd.early_dep["slope"]
                 dwm.early_dep_beta = todd.early_dep["beta"]
             if todd.late_arr:
@@ -1296,7 +1297,7 @@ class Simulation(BaseSimulation, CallbackMixin):
                         store_displacements=self.sim.config.db.store_displacements,
                     )
             elif event_type.lower() in {"dcp", "done"}:
-                if (event_type.lower() == "done" and "forecast_accuracy" in self.config.outputs):
+                if (event_type.lower() == "done" and "forecast_accuracy" in self.config.outputs.reports):
                     self.sim.capture_forecast_accuracy();
                 if self.cnx.is_open:
                     self.cnx.save_details(self.db_writer, self.sim, recording_day)

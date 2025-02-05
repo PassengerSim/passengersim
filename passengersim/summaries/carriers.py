@@ -116,7 +116,7 @@ def extract_forecast_accuracy(sim: Simulation) -> pd.DataFrame | None:
     if len(combined_data) == 0:
         return None
     df = pd.DataFrame.from_dict(combined_data)
-    df = df.set_index(["trial", "sample", "carrier", "booking_class", "timeframe"])
+    df = df.set_index(["trial", "sample", "carrier", "booking_class", "timeframe"]).reset_index()
     return df
 
 

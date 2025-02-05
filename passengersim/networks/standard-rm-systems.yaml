@@ -213,6 +213,7 @@ rm_systems:
     frat5: curve_C
     processes:
       DCP:
+        - step_type: legvalue
         - step_type: untruncation
           name: untruncation
           algorithm: em

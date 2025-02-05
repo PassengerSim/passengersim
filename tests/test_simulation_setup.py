@@ -97,3 +97,14 @@ def test_automatic_leg_ids():
         assert leg == leg_id
     assert sim.sim.legs[0].leg_id == 123
     assert sim.sim.legs[1].leg_id == 1
+
+
+def test_rm_system_attribute_editing():
+    cfg = Config.from_yaml(demo_network("3MKT"))
+    cfg.carriers.AL1.rm_system = "L"
+    cfg = cfg.model_revalidate()
+    assert len(cfg.rm_systems["L"].processes["dcp"]) == 4
+    assert cfg.rm_systems.L.processes.dcp[0].step_type == "legvalue"
+    cfg.rm_systems.L.processes.dcp = cfg.rm_systems.L.processes.dcp[1:]
+    assert len(cfg.rm_systems["L"].processes["dcp"]) == 3
+    assert cfg.rm_systems.L.processes.dcp[0].step_type == "untruncation"

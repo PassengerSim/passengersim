@@ -42,6 +42,9 @@ class DictAttr(dict):
             return self[item.lower()]
         raise AttributeError(f"no key {item}")
 
+    def __setattr__(self, item, value):
+        self[item.lower()] = value
+
     @classmethod
     def __get_pydantic_core_schema__(
         cls: Any, source_type: Any, handler: GetCoreSchemaHandler

@@ -3,7 +3,7 @@ import json
 import pytest
 
 from passengersim import demo_network
-from passengersim.config import Config, DatabaseConfig
+from passengersim.config import Config, DatabaseConfig, manipulate
 
 
 @pytest.fixture
@@ -82,3 +82,23 @@ def test_output_serialization(config):
     assert config.outputs.reports == {"*"}
     assert isinstance(z["outputs"]["reports"], list)
     assert z["outputs"]["reports"] == ["*"]
+
+
+def test_restriction_stripping(config):
+    cfg0 = manipulate.strip_all_restrictions(config)
+    assert not cfg0.choice_models.business.restrictions
+    assert not cfg0.choice_models.leisure.restrictions
+    assert config.choice_models.business.restrictions
+    assert config.choice_models.leisure.restrictions
+    for fare in cfg0.fares:
+        assert not fare.restrictions
+
+    cfg1 = manipulate.strip_all_restrictions(config, inplace=True)
+    assert not cfg1.choice_models.business.restrictions
+    assert not cfg1.choice_models.leisure.restrictions
+    assert not config.choice_models.business.restrictions
+    assert not config.choice_models.leisure.restrictions
+    for fare in cfg1.fares:
+        assert not fare.restrictions
+    for fare in config.fares:
+        assert not fare.restrictions

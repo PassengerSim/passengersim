@@ -1,4 +1,5 @@
 import os.path
+from typing import Any
 
 
 def compress_file(input_file: str, chunk_size: int = 65536):
@@ -20,7 +21,7 @@ def compress_file(input_file: str, chunk_size: int = 65536):
         outfile.write(compressor.flush())
 
 
-def decompress_file(input_file: str, chunk_size: int = 65536):
+def decompress_file(input_file: str | os.PathLike, chunk_size: int = 65536):
     """Decompresses a file using LZ4."""
     import lz4.frame
 
@@ -41,7 +42,7 @@ def decompress_file(input_file: str, chunk_size: int = 65536):
             outfile.write(decompressed_chunk)
 
 
-def smart_open(filename: str, mode: str = "r"):
+def smart_open(filename: str | os.PathLike, mode: str = "r"):
     """Opens a file with a compression filter based on the extension."""
     filename = str(filename)
     if filename.endswith(".lz4"):
@@ -55,7 +56,7 @@ def smart_open(filename: str, mode: str = "r"):
     return open(filename, mode)
 
 
-def serialize_to_file(filename: str, obj):
+def serialize_to_file(filename: str | os.PathLike, obj):
     """Dumps an object to a file."""
 
     import pickle
@@ -64,7 +65,7 @@ def serialize_to_file(filename: str, obj):
         pickle.dump(obj, f)
 
 
-def deserialize_from_file(filename: str):
+def deserialize_from_file(filename: str | os.PathLike) -> Any:
     """Loads an object from a file."""
 
     import pickle

@@ -90,3 +90,9 @@ class SimulationTables(*GenericSimulationTables.subclasses()):
             f"<passengersim.summaries.SimulationTables{time_created}>\n"
             f"{table_info}\n<*>"
         )
+
+    def dashboard(self):
+        """Return a dashboard object for this SimulationTables instance."""
+        from .dashboard import default_dashboard
+
+        return default_dashboard(self)

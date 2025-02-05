@@ -854,12 +854,12 @@ carriers:
       accuracy: 0.9
       multiplier: 0.5
     classes:
-      - (Y0, Y)
-      - (Y1, Y)
-      - (Y2, Y)
-      - (Y3, Y)
-      - (Y4, Y)
-      - (Y5, Y)
+      - [Y0, Y]
+      - [Y1, Y]
+      - [Y2, Y]
+      - [Y3, Y]
+      - [Y4, Y]
+      - [Y5, Y]
   - name: AL2
     rm_system: rm_sub_bp
     truncation_rule: 1

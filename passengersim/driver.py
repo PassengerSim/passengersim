@@ -824,6 +824,9 @@ class Simulation(BaseSimulation, CallbackMixin):
         for bkg_class in leg_classes:
             # Input as a percentage
             auth = int(cap * self.init_rm.get(bkg_class, 100.0) / 100.0)
+            if isinstance(bkg_class, tuple):
+                # We are likely using multi-cabin, so unpack it
+                (bkg_class, cabin_code) = bkg_class
             b = passengersim.core.Bucket(bkg_class, alloc=auth, history=history_def)
             leg.add_bucket(b)
             if debug:

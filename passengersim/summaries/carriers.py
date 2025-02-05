@@ -107,6 +107,19 @@ def extract_carrier_history2(sim: Simulation) -> pd.DataFrame | None:
     return df
 
 
+def extract_forecast_accuracy(sim: Simulation) -> pd.DataFrame | None:
+    """Extract forecast accuracy from the Carrier class."""
+    combined_data = []
+    for cxr in sim.sim.carriers:
+        hist = cxr.get_forecast_accuracy()
+        combined_data += hist
+    if len(combined_data) == 0:
+        return None
+    df = pd.DataFrame.from_dict(combined_data)
+    df = df.set_index(["trial", "sample", "carrier", "booking_class", "timeframe"])
+    return df
+
+
 class SimTabCarriers(GenericSimulationTables):
     """Container for summary tables and figures extracted from a Simulation.
 
@@ -141,6 +154,12 @@ class SimTabCarriers(GenericSimulationTables):
         extraction_func=extract_carrier_history2,
         doc="Carrier-level summary data from each sample, "
         "new version with counters in CoreCarrier.",
+    )
+
+    forecast_accuracy: pd.DataFrame | None = SimulationTableItem(
+        aggregation_func=aggregate_by_concat_dataframe("forecast_accuracy"),
+        extraction_func=extract_forecast_accuracy,
+        doc="Summary of forecast history, based on UA's EDGAR approach",
     )
 
     def _fig_carrier_attribute(

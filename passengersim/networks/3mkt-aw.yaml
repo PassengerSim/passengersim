@@ -799,11 +799,11 @@ choice_models:
     emult: 1.6
     basefare_mult: 2.5
     path_quality: [38.30,  0.10]
-#    preferred_carrier:  [-12.29,  0.17]
     r1: 2.0
     r2: 0.35
     r3: 0.50
     airline_pref_hhi: [0.0, 0.0001]
+    airline_pref_pods:  [-12.29,  0.17]
 #    anc1_relevance: 0.8
 #    anc2_relevance: 0.5
 #    anc3_relevance: 0.8

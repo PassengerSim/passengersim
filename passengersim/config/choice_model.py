@@ -150,3 +150,4 @@ Two types of choice models are available in PassengerSim.
 
 Use the `kind` key to select which kind of choice model you wish to parameterize.
 """
+

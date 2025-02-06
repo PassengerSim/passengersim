@@ -1,5 +1,6 @@
 frat5_curves:
   curve_A:
+    max_cap: 10
     curve:
       63: 1.6
       56: 1.6
@@ -18,6 +19,7 @@ frat5_curves:
       3: 3.95
       1: 4.0
   curve_B:
+    max_cap: 10
     curve:
       63: 1.4
       56: 1.4
@@ -36,6 +38,7 @@ frat5_curves:
       3: 3.5
       1: 3.5
   curve_C:
+    max_cap: 10
     curve:
       63: 1.20
       56: 1.20
@@ -54,6 +57,7 @@ frat5_curves:
       3: 3.00
       1: 3.00
   curve_D:
+    max_cap: 10
     curve:
       63: 1.15
       56: 1.15
@@ -72,6 +76,7 @@ frat5_curves:
       3: 2.50
       1: 2.50
   curve_E:
+    max_cap: 10
     curve:
       63: 1.10
       56: 1.10
@@ -90,6 +95,7 @@ frat5_curves:
       3: 2.0
       1: 2.0
   curve_F:
+    max_cap: 10
     curve:
       63: 1.28
       56: 1.29
@@ -108,6 +114,7 @@ frat5_curves:
       3: 1.81
       1: 1.96
   curve_G:
+    max_cap: 10
     curve:
       63: 1.01
       56: 1.04
@@ -126,6 +133,7 @@ frat5_curves:
       3: 1.47
       1: 1.5
   flat_curve:
+    max_cap: 10
     curve:
       63: 1.5
       56: 1.5

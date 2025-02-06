@@ -180,7 +180,7 @@ rm_systems:
           name: path_forecast
           algorithm: additive_pickup
           kind: hybrid
-          max_cap: 10
+          # max_cap: 10 <- set this on the Frat5
         - step_type: probp
           name: optimization
       DAILY:

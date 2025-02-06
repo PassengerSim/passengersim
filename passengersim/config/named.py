@@ -137,3 +137,14 @@ class ListOfNamed(list):
             if getattr(step, "name", None) == item:
                 return step
         raise AttributeError(f"no step with step_type or name {item}")
+
+    def __delattr__(self, item):
+        for i, step in enumerate(self):
+            if getattr(step, "step_type", None) == item:
+                del self[i]
+                return
+        for i, step in enumerate(self):
+            if getattr(step, "name", None) == item:
+                del self[i]
+                return
+        raise AttributeError(f"no step with step_type or name {item}")

@@ -27,9 +27,9 @@ def summary(
     detruncation = request.param
     if detruncation:
         pytest.skip("hybrid with detruncation testing is suspended")
-    config.rm_systems.rm_hybrid.processes.dcp.forecast.detruncation_algorithm = (
-        detruncation
-    )
+    # config.rm_systems.rm_hybrid.processes.dcp.forecast.detruncation_algorithm = (
+    #     detruncation
+    # )
     sim = Simulation(config)
     return detruncation, sim.run(summarizer=SimulationTables)
 
@@ -41,9 +41,9 @@ def summary_mp(
     detruncation = request.param
     if detruncation:
         pytest.skip("hybrid with detruncation testing is suspended")
-    config.rm_systems.rm_hybrid.processes.dcp.forecast.detruncation_algorithm = (
-        detruncation
-    )
+    # config.rm_systems.rm_hybrid.processes.dcp.forecast.detruncation_algorithm = (
+    #     detruncation
+    # )
     sim = MultiSimulation(config)
     return detruncation, sim.run(summarizer=SimulationTables)
 
@@ -71,9 +71,9 @@ def summary_fare_adjustment(
     config.rm_systems.rm_hybrid.processes.dcp.forecast.fare_adjustment_scale = (
         fare_adj_scale
     )
-    config.rm_systems.rm_hybrid.processes.dcp.forecast.detruncation_algorithm = (
-        detruncation
-    )
+    # config.rm_systems.rm_hybrid.processes.dcp.forecast.detruncation_algorithm = (
+    #     detruncation
+    # )
     sim = Simulation(config)
     return fare_adj, detruncation, fare_adj_scale, sim.run(summarizer=SimulationTables)
 
@@ -165,7 +165,6 @@ def test_fare_adj_walk(data_regression, fareadj, adjscale):
     cfg.simulation_controls.num_samples = 40
     cfg.simulation_controls.burn_samples = 30
     cfg.outputs.reports.clear()
-    cfg.rm_systems.rm_hybrid.processes.dcp.forecast.detruncation_algorithm = None
     cfg.rm_systems.rm_hybrid.processes.dcp.forecast.fare_adjustment = fareadj
     cfg.rm_systems.rm_hybrid.processes.dcp.forecast.fare_adjustment_scale = adjscale
 

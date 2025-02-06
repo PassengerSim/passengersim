@@ -574,6 +574,7 @@ class Config(YamlConfig, extra="forbid"):
     snapshot_filters: list[SnapshotFilter] = []
 
     @field_validator("snapshot_filters", mode="before")
+    @classmethod
     def _handle_no_snapshot_filters(cls, v):
         if v is None:
             v = []
@@ -642,9 +643,15 @@ class Config(YamlConfig, extra="forbid"):
         """
         from passengersim import demo_network
 
-        std_cfg = Config.from_yaml(demo_network("standard-rm-systems.yaml"))
-        if std_name in std_cfg.rm_systems:
-            self.rm_systems[std_name] = std_cfg.rm_systems[std_name]
+        raw_std_cfg = Config._load_unformatted_yaml(
+            demo_network("standard-rm-systems.yaml")
+        )
+        raw_rm_systems = raw_std_cfg.get("rm_systems", {})
+        if std_name in raw_rm_systems:
+            rm_sys = Config.model_validate(
+                {"rm_systems": {std_name: raw_rm_systems[std_name]}}
+            )
+            self.rm_systems[std_name] = rm_sys.rm_systems[std_name]
         else:
             raise KeyError(f"Unknown standard RM system {std_name}")
 

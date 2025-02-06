@@ -17,6 +17,7 @@ class Fare(BaseModel, extra="forbid"):
     cabin: str | None = "Y"
 
     @field_validator("restrictions", mode="before")
+    @classmethod
     def allow_unrestricted(cls, v):
         """Allow restrictions to be None or missing."""
         if v is None:
@@ -24,6 +25,7 @@ class Fare(BaseModel, extra="forbid"):
         return v
 
     @field_validator("restrictions", mode="before")
+    @classmethod
     def allow_pipe_sep(cls, v):
         """Allow restrictions to be a string of pipe or slash separated values."""
         if isinstance(v, str):

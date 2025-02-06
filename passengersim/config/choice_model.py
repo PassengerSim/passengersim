@@ -84,8 +84,9 @@ class PodsChoiceModel(CommonChoiceModel, extra="forbid"):
     basefare_mult: float | None = None
     connect_disutility: float | None = None
     path_quality: tuple[float, float] | None = None
-    preferred_carrier: tuple[float, float] | None = None
-    hhi: tuple[float, float] | None = None
+    airline_pref_pods: tuple[float, float] | None = None
+    airline_pref_hhi: tuple[float, float] | None = None
+    airline_pref_seat_share: tuple[float, float] | None = None
     elapsed_time: tuple[float, float] | None = None
     buffer_threshold: int | None = None
     buffer_time: tuple[float, float] | None = None
@@ -149,3 +150,4 @@ Two types of choice models are available in PassengerSim.
 
 Use the `kind` key to select which kind of choice model you wish to parameterize.
 """
+

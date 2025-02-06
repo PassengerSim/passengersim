@@ -726,6 +726,19 @@ class Config(YamlConfig, extra="forbid"):
         return m
 
     @model_validator(mode="after")
+    def _choice_model_airline_preferences(cls, m: Config):
+        """Check that only one way of ciputing airline preference was specified."""
+        for name, cm in m.choice_models.items():
+            a1 = 1 if cm.airline_pref_pods is not None else 0
+            a2 = 1 if cm.airline_pref_hhi is not None else 0
+            a3 = 1 if cm.airline_pref_seat_share is not None else 0
+            if a1 + a2 + a3 > 1:
+                raise ValueError(
+                    f"ChoiceModel '{cm.name}' has more than one airline preference model specified"
+                )
+        return m
+
+    @model_validator(mode="after")
     def _choice_set_sampling(cls, m: Config):
         """Ensure there is a limit on the number of observations in a choice set.
 

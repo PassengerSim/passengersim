@@ -40,11 +40,11 @@ db:
     - demand
     - bookings
     - bucket
-    - pathclass
+#    - pathclass
     - leg_final
     - fare_final
     - demand_final
-    - edgar
+#    - edgar
   fast: true
   engine: sqlite
 #  filename: "AW-3MKT.sqlite"
@@ -59,8 +59,9 @@ outputs:
     - total_demand
     - demand_to_come
     - carrier_history2
-    - carrier_history
-    - edgar
+#    - carrier_history
+#    - edgar
+    - forecast_accuracy
 
 frat5_curves:
   - name: curve_A
@@ -770,10 +771,8 @@ todd_curves:
     min_distance: 0
     max_distance: 25000
     k_factor: 3.0
-    early_dep: [0, 0.1]
-    late_dep: [0, 0.1]
-    early_arr: [0, 0.1]
-    late_arr: [0, 0.1]
+    early_dep: {beta: 0.1, slope: 0.06, offset: 60}
+    late_arr: {beta: 0.1, slope: 0.06, offset: 60}
     replanning: [0.0, 0.0]
     probabilities: {0: 0.28, 1: 0.09, 2: 0.06, 3: 0.04, 4: 0.1, 5: 0.71,
                     6: 2.70, 7: 4.76, 8: 6.01, 9: 6.54, 10: 6.29, 11: 5.88,
@@ -784,10 +783,8 @@ todd_curves:
     min_distance: 0
     max_distance: 25000
     k_factor: 0.3
-    early_dep: [0, 0.05]
-    late_dep: [0, 0.05]
-    early_arr: [0, 0.05]
-    late_arr: [0, 0.05]
+    early_dep: {beta: 0.1, slope: 0.06, offset: 60}
+    late_arr: {beta: 0.1, slope: 0.06, offset: 60}
     replanning: [0.0, 0.0]
     #        probabilities: [0.28, 0.09, 0.06, 0.04, 0.1, 0.71, 2.7, 4.76, 6.01, 6.54, 6.29, 5.88,
     #                        5.71, 5.77, 6.06, 6.57, 7.22, 7.75, 7.94, 7.36, 5.73, 3.67, 1.94, 0.82]
@@ -802,11 +799,11 @@ choice_models:
     emult: 1.6
     basefare_mult: 2.5
     path_quality: [38.30,  0.10]
-#    preferred_carrier:  [-12.29,  0.17]
     r1: 2.0
     r2: 0.35
     r3: 0.50
-    hhi: [0.0, 0.0001]
+    airline_pref_hhi: [0.0, 0.0001]
+#    airline_pref_pods:  [-12.29,  0.17]
 #    anc1_relevance: 0.8
 #    anc2_relevance: 0.5
 #    anc3_relevance: 0.8
@@ -817,14 +814,14 @@ choice_models:
     emult: 1.5
     basefare_mult: 1.0
     path_quality:  [2.02, 0.12]
-#    preferred_carrier:  [-1.98, 0.11]
+#    airline_pref:  [-1.98, 0.11]
     r1: 0.70
     r2: 0.35
     r3: 0.35
 #    anc1_relevance: 0.5
 #    anc2_relevance: 0.8
 #    anc3_relevance: 0.5
-    hhi: [0.0, 0.0001]
+    airline_pref_hhi: [0.0, 0.0001]
 #    elapsed_time: [0, 0.7]
 #    buffer_threshold: 25
 #    buffer_time: [0, 0.1]
@@ -857,12 +854,12 @@ carriers:
       accuracy: 0.9
       multiplier: 0.5
     classes:
-      - (Y0, Y)
-      - (Y1, Y)
-      - (Y2, Y)
-      - (Y3, Y)
-      - (Y4, Y)
-      - (Y5, Y)
+      - [Y0, Y]
+      - [Y1, Y]
+      - [Y2, Y]
+      - [Y3, Y]
+      - [Y4, Y]
+      - [Y5, Y]
   - name: AL2
     rm_system: rm_sub_bp
     truncation_rule: 1

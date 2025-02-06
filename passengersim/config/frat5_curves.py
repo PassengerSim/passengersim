@@ -43,6 +43,14 @@ class Frat5Curve(Named, extra="forbid"):
     ```
     """
 
+    max_cap: float = 10.0
+    """
+    Maximum Q-equivalent demand implied by any unit of demand in any fare class.
+
+    This cap is applied only on the creation of Q-equivalent demand that occurs
+    at the end of each DCP, and is not used in any RM step.
+    """
+
     @field_validator("curve")
     def _frat5_curves_accumulate(cls, v: dict[int, float], info: ValidationInfo):
         """Check that all curve values do not decrease as DCP keys decrease."""

@@ -447,6 +447,7 @@ class Simulation(BaseSimulation, CallbackMixin):
             for days_prior in sorted_days_prior:
                 val = f5_data.curve[days_prior]
                 f5.add_vals(val)
+            f5.max_cap = f5_data.max_cap
             self.sim.add_frat5(f5)
             self.frat5curves[f5_name] = f5
 

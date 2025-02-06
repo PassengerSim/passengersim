@@ -116,7 +116,9 @@ def extract_forecast_accuracy(sim: Simulation) -> pd.DataFrame | None:
     if len(combined_data) == 0:
         return None
     df = pd.DataFrame.from_dict(combined_data)
-    df = df.set_index(["trial", "sample", "carrier", "booking_class", "timeframe"]).reset_index()
+    df = df.set_index(
+        ["trial", "sample", "carrier", "booking_class", "timeframe"]
+    ).reset_index()
     return df
 
 
@@ -390,3 +392,49 @@ class SimTabCarriers(GenericSimulationTables):
             )
         )
         return fig
+
+    def fig_carrier_head_to_head_revenue(
+        self, x_carrier: str, y_carrier: str, *, raw_df=False
+    ):
+        import altair as alt
+
+        df1 = self.carrier_history2.query(f"carrier == '{x_carrier}'")
+        df2 = self.carrier_history2.query(f"carrier == '{y_carrier}'")
+
+        df = pd.concat(
+            [
+                df1["revenue"] / df1["revenue"].mean(),
+                df2["revenue"] / df2["revenue"].mean(),
+            ]
+        )
+        rng = df.min(), df.max()
+        df = df.unstack("carrier").reset_index()
+        if raw_df:
+            return df
+
+        diag = (
+            alt.Chart(pd.DataFrame({x_carrier: rng, "AL2": rng}))
+            .mark_line(color="red", opacity=0.3)
+            .encode(
+                x=x_carrier,
+                y="AL2",
+            )
+        )
+
+        fig = (
+            alt.Chart(df)
+            .mark_circle(opacity=0.3)
+            .encode(
+                x=alt.X(f"{x_carrier}:Q")
+                .axis(format="%")
+                .scale(zero=False)
+                .title(f"{x_carrier} Percentage of Mean Revenue"),
+                y=alt.Y(f"{y_carrier}:Q")
+                .axis(format="%")
+                .scale(zero=False)
+                .title(f"{y_carrier} Percentage of Mean Revenue"),
+            )
+            + diag
+        )
+
+        return fig.interactive()

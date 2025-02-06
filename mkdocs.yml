@@ -114,6 +114,9 @@ nav:
     - Experiments: user-guide/experiments.nbconvert.ipynb
   - Tutorials:
     - Tutorials/index.md
+    - Tutorials/3MKT/gallery/EE.nbconvert.ipynb
+    - Tutorials/3MKT/gallery/PE.nbconvert.ipynb
+    - Tutorials/3MKT/gallery/QC.nbconvert.ipynb
     - Tutorials/3MKT/3mkt-01.nbconvert.ipynb
     - Tutorials/3MKT/3mkt-02.nbconvert.ipynb
     - Tutorials/3MKT/3mkt-03.nbconvert.ipynb

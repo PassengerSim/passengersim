@@ -83,7 +83,8 @@ rm_systems:
           name: path_forecast
           algorithm: additive_pickup
           kind: conditional
-          max_cap: 10
+          regression_weight: sellup
+          max_cap: 0
         - step_type: probp
           name: optimization
       DAILY:
@@ -159,8 +160,9 @@ rm_systems:
 
   Q:
     description: >-
-      Path-based additive pickup PODS-style Q-hybrid forecast,
+      Path-based additive pickup PODS-style Q-hybrid forecast
       (with no fare restrictions this becomes Q-only),
+      EM detruncation of priceable and yieldable demand (separately),
       ProBP optimization.
     availability_control: bp
     frat5: curve_C

@@ -157,10 +157,10 @@ rm_systems:
         - step_type: probp
           name: optimization
 
-  Q_PODS:
+  Q:
     description: >-
-      Path-based additive pickup PODS-style Q forecast,
-      Assume no fare restrictions and thus no yieldable demand,
+      Path-based additive pickup PODS-style Q-hybrid forecast,
+      (with no fare restrictions this becomes Q-only),
       ProBP optimization.
     availability_control: bp
     frat5: curve_C
@@ -227,3 +227,29 @@ rm_systems:
           name: optimization
           algorithm: emsrb
           kind: leg
+
+  J:
+    description: >-
+      Leg-based additive pickup conditional forecast,
+      EM detruncation of yieldable demand, LegDP optimization.
+    availability_control: bp
+    frat5: curve_C
+    processes:
+      DCP:
+        - step_type: legvalue
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: leg
+          which_data: yieldable
+        - step_type: forecast
+          name: leg_forecast
+          algorithm: additive_pickup
+          kind: leg-conditional
+        - step_type: legdp
+          name: optimization
+          reoptimize: once
+          arrivals_per_time_slice: 0.1
+      DAILY:
+        - step_type: udpupdate
+          name: optimization

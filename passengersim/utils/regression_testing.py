@@ -85,7 +85,7 @@ def print_diff(diff, prefix="", file=None):
                 print(f"  does not match {type(v)}", file=file)
 
 
-def _deep_compare_obj(a_: Any, b_: Any):
+def deep_compare_obj(a_: Any, b_: Any):
     diff = nested_comparison(a_, b_)
     if diff:
         buffer = io.StringIO()
@@ -96,7 +96,7 @@ def _deep_compare_obj(a_: Any, b_: Any):
 def deep_compare(a: os.PathLike, b: os.PathLike):
     a_ = deserialize_from_file(str(a))
     b_ = deserialize_from_file(str(b))
-    _deep_compare_obj(a_, b_)
+    deep_compare_obj(a_, b_)
 
 
 class DeepRegressionFixture:
@@ -177,4 +177,4 @@ def deep_regression(
 
 def deep_regression_check(data: Any, filename: Path):
     """Check data against the given filename."""
-    _deep_compare_obj(data, deserialize_from_file(str(filename)))
+    deep_compare_obj(data, deserialize_from_file(str(filename)))

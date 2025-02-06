@@ -641,12 +641,9 @@ class Config(YamlConfig, extra="forbid"):
         std_name : str
             The name of the standard RM system to load.
         """
-        from passengersim import demo_network
+        from .standards import standard_rm_systems_raw
 
-        raw_std_cfg = Config._load_unformatted_yaml(
-            demo_network("standard-rm-systems.yaml")
-        )
-        raw_rm_systems = raw_std_cfg.get("rm_systems", {})
+        raw_rm_systems = standard_rm_systems_raw()
         if std_name in raw_rm_systems:
             rm_sys = Config.model_validate(
                 {"rm_systems": {std_name: raw_rm_systems[std_name]}}
@@ -728,13 +725,14 @@ class Config(YamlConfig, extra="forbid"):
     @model_validator(mode="after")
     def _choice_model_airline_preferences(cls, m: Config):
         """Check that only one way of ciputing airline preference was specified."""
-        for name, cm in m.choice_models.items():
+        for _name, cm in m.choice_models.items():
             a1 = 1 if cm.airline_pref_pods is not None else 0
             a2 = 1 if cm.airline_pref_hhi is not None else 0
             a3 = 1 if cm.airline_pref_seat_share is not None else 0
             if a1 + a2 + a3 > 1:
                 raise ValueError(
-                    f"ChoiceModel '{cm.name}' has more than one airline preference model specified"
+                    f"ChoiceModel '{cm.name}' has more than one "
+                    f"airline preference model specified"
                 )
         return m
 

@@ -20,6 +20,7 @@ import yaml
 from pydantic import (
     Field,
     SerializerFunctionWrapHandler,
+    ValidationError,
     field_serializer,
     field_validator,
     model_validator,
@@ -57,7 +58,7 @@ from .snapshot_filter import SnapshotFilter
 from .todd_curves import ToddCurve
 
 if typing.TYPE_CHECKING:
-    from typing import Self
+    from typing import Literal, Self
 
     from pydantic.main import IncEx
 
@@ -155,7 +156,8 @@ class YamlConfig(PrettyModel):
         filenames: pathlib.Path | list[pathlib.Path],
         *,
         cache_file: pathlib.Path | None = None,
-    ) -> TConfig:
+        on_validation_error: Literal["raise", "warn"] = "raise",
+    ) -> TConfig | addicty.Dict:
         """
         Read from YAML.
 
@@ -171,10 +173,14 @@ class YamlConfig(PrettyModel):
             newer than the YAML files, the cached config will be loaded
             instead of reloading and revalidating the YAML files, which can be
             considerably faster.
+        on_validation_error : {'raise', 'warn'}, default 'raise'
+            Whether to raise an exception or log a warning when a validation
+            error is encountered. If 'warn', the error is logged and the
+            unvalidated raw loaded yaml content (not a Config object) is returned.
 
         Returns
         -------
-        Config
+        Config or addicty.Dict
         """
         cache_is_outdated = True
         if cache_file:
@@ -184,7 +190,13 @@ class YamlConfig(PrettyModel):
         if not cache_file or cache_is_outdated:
             raw_config = cls._load_unformatted_yaml(filenames)
             t = time.time()
-            result = cls.model_validate(raw_config.to_dict())
+            try:
+                result = cls.model_validate(raw_config.to_dict())
+            except ValidationError as e:
+                if on_validation_error == "raise":
+                    raise
+                warnings.warn(str(e), stacklevel=2)
+                return raw_config
             logger.info("validated config in %.2f secs", time.time() - t)
             if cache_file:
                 t = time.time()

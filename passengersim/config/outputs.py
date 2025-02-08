@@ -21,6 +21,9 @@ class HtmlOutputConfig(PrettyModel, extra="forbid", validate_assignment=True):
     carrier_revenues: bool = True
     """Include carrier revenues in the HTML report."""
 
+    carrier_total_bookings: bool = True
+    """Include carrier total bookings in the HTML report."""
+
     carrier_revenue_distribution: bool = False
     """Include carrier revenue distribution in the HTML report."""
 
@@ -29,6 +32,12 @@ class HtmlOutputConfig(PrettyModel, extra="forbid", validate_assignment=True):
 
     carrier_yields: bool = True
     """Include carrier yields in the HTML report."""
+
+    carrier_rasm: bool = True
+    """Include carrier RASM in the HTML report."""
+
+    carrier_local_share: bool = True
+    """Include carrier local share in the HTML report."""
 
     fare_class_mix: bool = True
     """Include fare class mix in the HTML report.
@@ -51,6 +60,9 @@ class HtmlOutputConfig(PrettyModel, extra="forbid", validate_assignment=True):
 
     carrier_table: bool = True
     """Include carrier table in the HTML report."""
+
+    segmentation_by_timeframe_table: bool = True
+    """Include segmentation by timeframe table in the HTML report."""
 
     other: list[str | tuple[str, dict]] = []
 

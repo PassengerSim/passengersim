@@ -90,7 +90,6 @@ class PodsChoiceModel(CommonChoiceModel, extra="forbid"):
     elapsed_time: tuple[float, float] | None = None
     buffer_threshold: int | None = None
     buffer_time: tuple[float, float] | None = None
-    replanning: tuple[float, float] | None = None
     tolerance: float | None = None
     non_stop_multiplier: float | None = None
     connection_multiplier: float | None = None

@@ -1162,8 +1162,8 @@ class Config(YamlConfig, extra="forbid"):
         state = super().__getstate__()
         # do not save a user's license certificate into the state
         if "raw_license_certificate" in state:
-            del state["raw_license_certificate"]
+            state["raw_license_certificate"] = None
         if "__dict__" in state:
             if "raw_license_certificate" in state["__dict__"]:
-                del state["__dict__"]["raw_license_certificate"]
+                state["__dict__"]["raw_license_certificate"] = None
         return state

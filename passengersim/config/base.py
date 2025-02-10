@@ -1017,7 +1017,7 @@ class Config(YamlConfig, extra="forbid"):
         return prefix
 
     @model_validator(mode="after")
-    def _attach_distance_to_legs_without_it(self):
+    def _attach_distance_to_things_without_it(self):
         """Attach distance in nautical miles to legs that are missing distance."""
         for leg in self.legs:
             if leg.distance is None:
@@ -1029,6 +1029,16 @@ class Config(YamlConfig, extra="forbid"):
                     warnings.warn(f"No defined place for {leg.orig}", stacklevel=2)
                 if place_d is None:
                     warnings.warn(f"No defined place for {leg.dest}", stacklevel=2)
+        for dmd in self.demands:
+            if not dmd.distance:
+                place_o = self.places.get(dmd.orig, None)
+                place_d = self.places.get(dmd.dest, None)
+                if place_o is not None and place_d is not None:
+                    dmd.distance = great_circle(place_o, place_d)
+                if place_o is None:
+                    warnings.warn(f"No defined place for {dmd.orig}", stacklevel=2)
+                if place_d is None:
+                    warnings.warn(f"No defined place for {dmd.dest}", stacklevel=2)
         return self
 
     @model_validator(mode="after")

@@ -142,6 +142,8 @@ class SimTabSegByTimeframe(GenericSimulationTables):
                 row=alt.Row("segment:N", title="Passenger Type"),
                 title=title,
             )
+        else:
+            chart = chart.properties(title=title)
         return chart
 
     def fig_bookings_by_timeframe(self, *args, **kwargs):

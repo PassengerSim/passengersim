@@ -626,7 +626,7 @@ class GenericSimulationTables:
         for k, v in self._data.items():
             kvs[k] = v
         if preserve_config:
-            kvs["_config_"] = self.config
+            kvs["_config_"] = self.config.model_dump(serialize_as_any=True)
         kvs["_metadata_"] = self._metadata
         kvs["_n_total_samples_"] = self.n_total_samples
         if self.callback_data:
@@ -670,7 +670,14 @@ class GenericSimulationTables:
                 if k == "_callback_data_":
                     result._callback_data = result._file_store[k]
                 if k == "_config_":
-                    result._config = result._file_store[k]
+                    try:
+                        temp = result._file_store["_config_"]
+                    except KeyError:
+                        pass
+                    else:
+                        if isinstance(temp, dict):
+                            temp = Config.as_reloaded.model_validate(temp)
+                        result._config = temp
         return result
 
     def to_xlsx(self, filename: str | pathlib.Path) -> None:
@@ -736,9 +743,13 @@ class GenericSimulationTables:
     def config(self):
         if self._config is None and self._file_store is not None:
             try:
-                self._config = self._file_store["_config_"]
+                temp = self._file_store["_config_"]
             except KeyError:
                 pass
+            else:
+                if isinstance(temp, dict):
+                    temp = Config.as_reloaded.model_validate(temp)
+                self._config = temp
         return self._config
 
     @config.setter

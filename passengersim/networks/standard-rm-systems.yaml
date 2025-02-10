@@ -43,6 +43,29 @@ rm_systems:
         - step_type: probp
           name: optimization
 
+  S:
+    description: >-
+      Path-based additive pickup forecast, EM detruncation, SubBP optimization.
+    availability_control: bp
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: path
+        - step_type: forecast
+          name: path_forecast
+          algorithm: additive_pickup
+          kind: path
+        - step_type: subbp
+          name: optimization
+      DAILY:
+        - step_type: forecastadjustment
+          algorithm: timeframe
+          kind: path
+        - step_type: subbp
+          name: optimization
+
   U:
     description: >-
       Path-based additive pickup forecast, EM detruncation, UDP optimization.
@@ -125,6 +148,35 @@ rm_systems:
           kind: path
         - step_type: probp
           name: optimization
+
+  V:
+    description: >-
+      Path-based additive pickup conditional forecast,
+      EM detruncation of yieldable demand,
+      MR fare adjustment with 25% scaling,
+      UDP optimization.
+    availability_control: bp
+    frat5: curve_C
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: path
+          which_data: yieldable
+        - step_type: forecast
+          name: path_forecast
+          algorithm: additive_pickup
+          kind: conditional
+          fare_adjustment: mr
+          fare_adjustment_scale: 0.25
+          weighted_by_ratio: true
+        - step_type: udp
+          name: optimization
+          arrivals_per_time_slice: 0.1
+      DAILY:
+        - step_type: udpupdate
+          name: optimization_update
 
   K:
     description: >-
@@ -227,6 +279,43 @@ rm_systems:
           algorithm: timeframe
           kind: path
         - step_type: probp
+          name: optimization
+
+  Z:
+    description: >-
+      Path-based additive pickup PODS-style Q-hybrid forecast
+      (with no fare restrictions this becomes Q-only),
+      EM detruncation of priceable and yieldable demand (separately),
+      MR fare adjustment with 25% scaling, SubBP optimization.
+    availability_control: bp
+    frat5: curve_C
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: q_untruncation
+          algorithm: em
+          kind: path
+          which_data: priceable
+        - step_type: untruncation
+          name: y_untruncation
+          algorithm: em
+          kind: path
+          which_data: yieldable
+        - step_type: forecast
+          name: path_forecast
+          algorithm: additive_pickup
+          kind: hybrid
+          # max_cap: 10 <- set this on the Frat5
+          fare_adjustment: mr
+          fare_adjustment_scale: 0.25
+          weighted_by_ratio: true
+        - step_type: subbp
+          name: optimization
+      DAILY:
+        - step_type: forecastadjustment
+          algorithm: timeframe
+          kind: path
+        - step_type: subbp
           name: optimization
 
   Q_PAX:

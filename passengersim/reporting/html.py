@@ -57,11 +57,17 @@ def to_html(
     if cfg.outputs.html.carrier_revenues:
         rpt.add_figure(summary.fig_carrier_revenues())
 
+    if cfg.outputs.html.carrier_total_bookings:
+        rpt.add_figure(summary.fig_carrier_total_bookings())
+
     if cfg.outputs.html.carrier_load_factors:
         rpt.add_figure(summary.fig_carrier_load_factors())
 
     if cfg.outputs.html.carrier_yields:
         rpt.add_figure(summary.fig_carrier_yields())
+
+    if cfg.outputs.html.carrier_rasm:
+        rpt.add_figure(summary.fig_carrier_rasm())
 
     if cfg.outputs.html.carrier_table:
         rpt.add_table("Carrier Data", summary.carriers.T)
@@ -70,22 +76,38 @@ def to_html(
         rpt.add_figure(summary.fig_fare_class_mix())
 
     if cfg.outputs.html.bookings_by_timeframe:
+        rpt.add_figure(summary.fig_bookings_by_timeframe())
         if cfg.outputs.html.bookings_by_timeframe is True:
             carriers = list(cfg.carriers.keys())
         else:
             carriers = cfg.outputs.html.bookings_by_timeframe
         for c in carriers:
             rpt.add_figure(
+                summary.fig_segmentation_by_timeframe("bookings", by_carrier=c)
+            )
+            rpt.add_figure(
                 summary.fig_segmentation_by_timeframe(
                     "bookings", by_carrier=c, by_class=True
                 )
             )
+
+    if cfg.outputs.html.segmentation_by_timeframe_table:
+        rpt.add_table(
+            "Segmentation by Timeframe Data",
+            Elem.from_string(
+                summary.segmentation_by_timeframe.to_html(max_rows=10_000)
+            ),
+        )
 
     if cfg.outputs.html.carrier_revenue_distribution:
         rpt.add_figure(summary.fig_carrier_revenue_distribution())
 
     if cfg.outputs.html.leg_load_factor_distribution:
         rpt.add_figure(summary.fig_leg_load_factor_distribution())
+
+    if cfg.outputs.html.carrier_local_share:
+        rpt.add_figure(summary.fig_carrier_local_share())
+        rpt.add_figure(summary.fig_carrier_local_share("leg_pax"))
 
     # bid price history is suppressed unless there is some bid price data
     if cfg.outputs.html.bid_price_history:

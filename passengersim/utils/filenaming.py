@@ -1,6 +1,7 @@
 import datetime
 import os
 import pathlib
+import re
 import time
 
 
@@ -16,7 +17,8 @@ def filename_with_timestamp(
 
     The resulting filename will be the original filename with a timestamp added.
     If the stamped filename already exists, the timestamp will be incremented
-    until a unique filename is found.
+    until a unique filename is found. If the provided filename already has a
+    timestamp, it will be replaced.
 
     Parameters
     ----------
@@ -49,7 +51,16 @@ def filename_with_timestamp(
     filename = pathlib.Path(filename)
     if suffix is None:
         suffix = filename.suffix
-    filename = filename.with_suffix(f".{timestamp}" + suffix)
+
+    filename_str = str(filename)
+    # check if the filename already has a timestamp
+    pattern = r"\.\d{8}-\d{6}" + re.escape(suffix) + r"$"
+    match = re.search(pattern, filename_str)
+    if match:
+        filename_str = re.sub(pattern, f".{timestamp}{suffix}", filename_str)
+        filename = pathlib.Path(filename_str)
+    else:
+        filename = filename.with_suffix(f".{timestamp}" + suffix)
 
     while filename.exists():
         t0, t1 = timestamp.split("-")

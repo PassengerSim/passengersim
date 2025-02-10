@@ -1,3 +1,4 @@
+import pathlib
 import warnings
 from collections.abc import Callable
 from functools import partial
@@ -43,6 +44,11 @@ class Contrast(dict):
         x = set(super().__dir__())
         x |= {g for g in globals() if g.startswith("fig_")}
         return sorted(x)
+
+    def write_report(self, filename: str, **kwargs) -> pathlib.Path:
+        from passengersim.reporting.contrast import to_html
+
+        return to_html(self, filename, **kwargs)
 
 
 class MultiContrast(dict):
@@ -196,7 +202,7 @@ def fig_bookings_by_timeframe(
         if isinstance(ratio, str):
             against = ratio
         idx = list(
-            {"source", "carrier", "paxtype", "days_prior", "booking_class"}
+            {"source", "carrier", "segment", "days_prior", "booking_class"}
             & set(df.columns)
         )
         df_ = df.set_index(idx)
@@ -225,13 +231,13 @@ def fig_bookings_by_timeframe(
             .scale(reverse=True)
             .title("Days Prior to Departure"),
             xOffset=alt.XOffset("source:N", title="Source", sort=source_order),
-            y=alt.Y("sold", stack=True),
+            y=alt.Y("bookings", stack=True),
             tooltip=[
                 alt.Tooltip("source:N", title="Source"),
-                alt.Tooltip("paxtype", title="Passenger Type"),
+                alt.Tooltip("segment", title="Passenger Segment"),
                 *tooltips,
                 alt.Tooltip("days_prior", title="DfD"),
-                alt.Tooltip("sold", format=".2f"),
+                alt.Tooltip("bookings", format=".2f"),
                 *ratio_tooltips,
             ],
         )
@@ -249,7 +255,7 @@ def fig_bookings_by_timeframe(
             .title("Days Prior to Departure"),
             xOffset=alt.XOffset("source:N", title="Source", sort=source_order),
             # shape=alt.Shape("source:N", title="Source", sort=source_order),
-            y=alt.Y("sum(sold)", title=None),
+            y=alt.Y("sum(bookings)", title=None),
         )
         return (
             ((chart_1 + chart_2) if source_labels else chart_1)
@@ -258,7 +264,7 @@ def fig_bookings_by_timeframe(
                 height=200,
             )
             .facet(
-                row=alt.Row("paxtype:N", title="Passenger Type"),
+                row=alt.Row("segment:N", title="Passenger Segment"),
                 title=title,
             )
         )
@@ -272,13 +278,13 @@ def fig_bookings_by_timeframe(
                 .scale(reverse=True)
                 .title("Days Prior to Departure"),
                 xOffset=alt.XOffset("source:N", title="Source", sort=source_order),
-                y=alt.Y("sold", stack=True),
+                y=alt.Y("bookings", stack=True),
                 tooltip=[
                     alt.Tooltip("source:N", title="Source"),
-                    alt.Tooltip("paxtype", title="Passenger Type"),
+                    alt.Tooltip("segment", title="Passenger Segment"),
                     alt.Tooltip("carrier", title="Carrier"),
                     alt.Tooltip("days_prior", title="DfD"),
-                    alt.Tooltip("sold", format=".2f"),
+                    alt.Tooltip("bookings", format=".2f"),
                     *ratio_tooltips,
                 ],
             )
@@ -287,7 +293,7 @@ def fig_bookings_by_timeframe(
                 height=200,
             )
             .facet(
-                row=alt.Row("paxtype:N", title="Passenger Type"),
+                row=alt.Row("segment:N", title="Passenger Segment"),
                 title=title,
             )
         )
@@ -300,16 +306,16 @@ def fig_bookings_by_timeframe(
                 x=alt.X("days_prior:O")
                 .scale(reverse=True)
                 .title("Days Prior to Departure"),
-                y="sold",
-                strokeDash=alt.StrokeDash("paxtype").title("Passenger Type"),
+                y="bookings",
+                strokeDash=alt.StrokeDash("segment").title("Passenger Segment"),
                 strokeWidth=alt.StrokeWidth(
                     "source:N", title="Source", sort=source_order
                 ),
                 tooltip=[
                     alt.Tooltip("source:N", title="Source"),
-                    alt.Tooltip("paxtype", title="Passenger Type"),
+                    alt.Tooltip("segment", title="Passenger Segment"),
                     alt.Tooltip("days_prior", title="DfD"),
-                    alt.Tooltip("sold", format=".2f"),
+                    alt.Tooltip("bookings", format=".2f"),
                     *ratio_tooltips,
                 ],
             )

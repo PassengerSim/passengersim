@@ -2289,9 +2289,11 @@ class Simulation(BaseSimulation, CallbackMixin):
         # write output files if designated
         if isinstance(summary, GenericSimulationTables):
             if self.config.outputs.html:
-                summary.to_html(self.config.outputs.html.filename)
+                out_filename = summary.to_html(self.config.outputs.html.filename)
+                summary._metadata["outputs.html_filename"] = out_filename
             if self.config.outputs.pickle:
-                summary.to_pickle(self.config.outputs.pickle)
+                pkl_filename = summary.to_pickle(self.config.outputs.pickle)
+                summary._metadata["outputs.pickle_filename"] = pkl_filename
             if self.config.outputs.excel:
                 summary.to_xlsx(self.config.outputs.excel)
 

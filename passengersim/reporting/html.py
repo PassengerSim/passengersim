@@ -7,9 +7,10 @@ import pandas as pd
 import yaml
 
 from passengersim.config import Config
+from passengersim.utils.bootstrap import BootstrapHtml
 from passengersim.utils.filenaming import filename_with_timestamp
 
-from .report import Elem, Report
+from .report import Elem
 
 if TYPE_CHECKING:
     from passengersim.summaries import SimulationTables
@@ -21,7 +22,7 @@ def to_html(
     *,
     cfg: Config | None = None,
     make_dirs: bool = True,
-) -> None:
+) -> pathlib.Path:
     """
     Write a summary to an HTML file.
 
@@ -50,9 +51,9 @@ def to_html(
         if filename is None:
             raise ValueError("No filename provided")
 
-    rpt = Report(title=cfg.outputs.html.title or cfg.scenario)
+    rpt = BootstrapHtml(title=cfg.outputs.html.title or cfg.scenario)
 
-    rpt.add_section("Results")
+    rpt.new_section("Results")
 
     if cfg.outputs.html.carrier_revenues:
         rpt.add_figure(summary.fig_carrier_revenues())
@@ -128,33 +129,33 @@ def to_html(
             rpt.add_figure(summary.fig_displacement_history())
 
     if cfg.outputs.html.configs:
-        rpt.add_section("Run Configuration")
+        rpt.new_section("Configuration")
         cfg_data = cfg.model_dump()
         for item in cfg.outputs.html.configs:
             if item in {"raw_license_certificate"}:
                 # never include these in the HTML report
                 continue
             if item not in cfg_data:
-                rpt.add_section(item, level=2)
-                rpt << Elem.from_string("<pre>Not available</pre>")
+                rpt.new_section(item, level=2)
+                rpt.current_section << Elem.from_string("<pre>Not available</pre>")
                 continue
-            rpt.add_section(f"{item}:", level=2)
+            rpt.new_section(f"{item}:", level=2)
             out = yaml.safe_dump(cfg_data[item]).replace("\n", "\n  ")
-            rpt << Elem.from_string(f"<pre>  {out}</pre>")
+            rpt.current_section << Elem.from_string(f"<pre>  {out}</pre>")
 
     if cfg.outputs.html.metadata:
-        rpt.add_section("Run Metadata")
-        (
-            rpt
-            << pd.Series(summary._metadata, name="value")
+        rpt.new_section("Metadata")
+        metadata_df = (
+            pd.Series(summary._metadata, name="value")
             .rename_axis(index="key")
             .to_frame()
             .reset_index()
         )
+        rpt.current_section.append(metadata_df)
 
     if cfg.outputs.html.other:
         raise NotImplementedError("Other HTML sections not yet implemented")
 
     filename = filename_with_timestamp(filename, suffix=".html", make_dirs=make_dirs)
 
-    rpt.save(str(filename))
+    return rpt.write(str(filename))

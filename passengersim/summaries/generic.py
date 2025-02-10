@@ -451,7 +451,7 @@ class GenericSimulationTables:
         preserve_meta_summaries: bool = False,
         preserve_config: bool = True,
         make_dirs: Literal[True, False, "git"] = True,
-    ):
+    ) -> pathlib.Path:
         """Save to a pickle file.
 
         This method uses lz4 compression if the lz4.frame module is available.
@@ -475,6 +475,11 @@ class GenericSimulationTables:
             output in Git repositories, unless the value is "git", in which case
             no `.gitignore` file is created and the results will be eligible for
             inclusion in Git.
+
+        Returns
+        -------
+        Path-like
+            The resolved filename for the saved outputs.
         """
         if add_timestamp_ext:
             filename = filename_with_timestamp(filename, suffix=".pkl")
@@ -498,15 +503,16 @@ class GenericSimulationTables:
                 pickle.dump(self, f)
                 del self._preserve_meta_summaries
                 del self._preserve_config
+            return filename
         else:
-            with lz4.frame.open(
-                filename.with_suffix(filename.suffix + ".lz4"), "wb"
-            ) as f:
+            use_filename = filename.with_suffix(filename.suffix + ".lz4")
+            with lz4.frame.open(use_filename, "wb") as f:
                 self._preserve_meta_summaries = preserve_meta_summaries
                 self._preserve_config = preserve_config
                 pickle.dump(self, f)
                 del self._preserve_meta_summaries
                 del self._preserve_config
+            return use_filename
 
     @classmethod
     def from_pickle(cls, filename: str | pathlib.Path, read_latest: bool = True):
@@ -702,7 +708,7 @@ class GenericSimulationTables:
         *,
         cfg: Config | None = None,
         make_dirs: bool = True,
-    ) -> None:
+    ) -> pathlib.Path:
         """Write simulation tables report summary to html.
 
         Parameters
@@ -714,10 +720,15 @@ class GenericSimulationTables:
             from the simulation object will be used.
         make_dirs : bool, default True
             If True, create any necessary directories.
+
+        Returns
+        -------
+        Path-like
+            The resolved filename for the saved outputs.
         """
         from passengersim.reporting.html import to_html
 
-        to_html(self, filename, cfg=cfg, make_dirs=make_dirs)
+        return to_html(self, filename, cfg=cfg, make_dirs=make_dirs)
 
     def metadata(self, key: str = ""):
         """Return a metadata value."""

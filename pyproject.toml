@@ -64,6 +64,7 @@ test = [
 reporting = [
     "altair>=5.0",
     "xmle",
+    "docutils",
 ]
 
 [tool.setuptools.packages.find]

@@ -752,7 +752,7 @@ class Config(YamlConfig, extra="forbid"):
     def _todd_curve_s_vs_replanning(cls, m: Config):
         """Check that only one way of inputting airline preference was specified."""
         for _name, tc in m.todd_curves.items():
-            if tc.replanning is not None and (tc.early_dep is not None or tc.late_arr is not none):
+            if tc.replanning is not None and (tc.early_dep is not None or tc.late_arr is not None):
                 raise ValueError(
                     f"ToddCurve '{tc.name}' has replanning and early_dep / late_arr specifid,"
                     f" pick one or the other but not both !!!"

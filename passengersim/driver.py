@@ -791,7 +791,7 @@ class Simulation(BaseSimulation, CallbackMixin):
             if leg_config.distance:
                 leg.distance = leg_config.distance
             elif len(self.airports) > 0:
-                leg.distance = self.get_mileage(leg.orig, leg.dest)
+                leg.distance = get_mileage(self.airports, leg.orig, leg.dest)
             self.sim.add_leg(leg)
 
             # Now we do the cabins and buckets
@@ -1315,8 +1315,11 @@ class Simulation(BaseSimulation, CallbackMixin):
                         store_displacements=self.sim.config.db.store_displacements,
                     )
             elif event_type.lower() in {"dcp", "done"}:
-                if (event_type.lower() == "done" and "forecast_accuracy" in self.config.outputs.reports):
-                    self.sim.capture_forecast_accuracy();
+                if (
+                    event_type.lower() == "done"
+                    and "forecast_accuracy" in self.config.outputs.reports
+                ):
+                    self.sim.capture_forecast_accuracy()
                 if self.cnx.is_open:
                     self.cnx.save_details(self.db_writer, self.sim, recording_day)
                 if self.file_writer is not None:

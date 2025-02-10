@@ -736,7 +736,7 @@ class Config(YamlConfig, extra="forbid"):
 
     @model_validator(mode="after")
     def _choice_model_airline_preferences(cls, m: Config):
-        """Check that only one way of ciputing airline preference was specified."""
+        """Check that only one way of inputting airline preference was specified."""
         for _name, cm in m.choice_models.items():
             a1 = 1 if cm.airline_pref_pods is not None else 0
             a2 = 1 if cm.airline_pref_hhi is not None else 0
@@ -749,9 +749,19 @@ class Config(YamlConfig, extra="forbid"):
         return m
 
     @model_validator(mode="after")
+    def _todd_curve_s_vs_replanning(cls, m: Config):
+        """Check that only one way of inputting airline preference was specified."""
+        for _name, tc in m.todd_curves.items():
+            if tc.replanning is not None and (tc.early_dep is not None or tc.late_arr is not None):
+                raise ValueError(
+                    f"ToddCurve '{tc.name}' has replanning and early_dep / late_arr specifid,"
+                    f" pick one or the other but not both !!!"
+                )
+        return m
+
+    @model_validator(mode="after")
     def _choice_set_sampling(cls, m: Config):
         """Ensure there is a limit on the number of observations in a choice set.
-
         Don't allow a choice set to be created without a specified limit of observations
         as unlimited sampling will run out of storage very quickly"""
         if (

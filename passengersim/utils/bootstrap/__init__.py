@@ -1,6 +1,13 @@
+import pathlib
+
+import xmle
+from altair import LayerChart
+from altair.utils.schemapi import UndefinedType
 from xmle import Elem
 
-from passengersim.utils.colors import DarkPurple
+from passengersim.utils.bootstrap.logo import passengersim_white_green_logo
+from passengersim.utils.colors import DarkPurple, LightPurple
+from passengersim.utils.filenaming import filename_with_timestamp
 
 
 class BootstrapHtml:
@@ -11,6 +18,9 @@ class BootstrapHtml:
             Roboto, system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial,
             "Noto Sans", "Liberation Sans", sans-serif, "Apple Color Emoji",
             "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    }}
+    body {{
+        position: relative;
     }}
     .navbar {{
         background-color: {DarkPurple};
@@ -29,10 +39,19 @@ class BootstrapHtml:
     .sticky-top-offset {{
         top: 65px;
     }}
-
+    .nav-link {{
+        border-radius: 10px;
+    }}
+    .nav-link.active {{
+        background-color: {LightPurple};
+    }}
     """
 
-    def __init__(self, title: str = "Bootstrap Report"):
+    def __init__(self, title: str = "Bootstrap Report", scrollspy: bool = False):
+        self._numbered_figure = xmle.NumberedCaption("Figure", level=2, anchor=True)
+        self._numbered_table = xmle.NumberedCaption("Table", level=2, anchor=True)
+        self._scrollspy = bool(scrollspy)
+
         self.top = Elem("html", lang="en")
         self.head = self.top.elem("head")
         self.head.elem("meta", charset="utf-8")
@@ -48,79 +67,61 @@ class BootstrapHtml:
             crossorigin="anonymous",
         )
         self.head.elem("style", text=self.common_css)
-        self.body = self.top.elem("body")
+        self.body = self.top.elem(
+            "body",
+            {"data-bs-spy": "scroll", "data-bs-target": "#top-nav"}
+            if self._scrollspy
+            else {},
+        )
         self.main = self.body.elem("div", {"class": "container"})
         self.main_row = self.main.elem("div", {"class": "row"})
-        self.sidebar = self.main_row.elem("div", {"class": "col-sm-2"})
-        self.content = self.main_row.elem("div", {"class": "col-sm-10"})
+        self.content = self.main_row.elem("div")
 
         self.sections = {}
-        # self.body.elem("h1", text="Hello, world!")
-        self.head.elem(
+        self.body.elem(
             "script",
             src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js",
         )
-        self.head.elem(
+        self.body.elem(
             "script",
             src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js",
             integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz",
             crossorigin="anonymous",
         )
 
-    def write(self, filename: str):
+    def write(self, filename: str, make_dirs: bool = True):
         self.navbar()
-        self.toc()
+        filename = filename_with_timestamp(
+            filename, suffix=".html", make_dirs=make_dirs
+        )
         with open(filename, "w") as f:
             f.write("<!doctype html>\n")
             f.write(self.top.tostring())
+        print("Wrote", filename)
 
     def new_section(self, title: str):
         if title in self.sections:
             raise ValueError(f"Section {title} already exists")
         section = self.content.elem("div")
         ident = title.lower().replace(" ", "-")
-        section.elem("h2", text=title, id=ident)
+        section.elem("h1", text=title, id=ident)
         self.sections[title] = section
         return section
 
-    def toc(self):
-        """
-                <!-- add after bootstrap.min.css -->
-        <link
-          rel="stylesheet"
-          href="https://cdn.rawgit.com/afeld/bootstrap-toc/v1.0.1/dist/bootstrap-toc.min.css"
-        />
-        <!-- add after bootstrap.min.js or bootstrap.bundle.min.js -->
-        <script src="https://cdn.rawgit.com/afeld/bootstrap-toc/v1.0.1/dist/bootstrap-toc.min.js"></script>
-
-        """
-        self.head.elem(
-            "link",
-            rel="stylesheet",
-            href="https://cdn.rawgit.com/afeld/bootstrap-toc/v1.0.1/dist/bootstrap-toc.min.css",
-        )
-        self.head.elem(
-            "script",
-            src="https://cdn.rawgit.com/afeld/bootstrap-toc/v1.0.1/dist/bootstrap-toc.min.js",
-        )
-        # self.sidebar.insert(0, Elem("b", text="Table of Contents"))
-        self.sidebar.insert(
-            0,
-            Elem(
-                "nav",
-                {
-                    "id": "toc",
-                    "data-toggle": "toc",
-                    "class": "sticky-top sticky-top-offset",
-                },
-            ),
-        )
-        self.body.attrib["data-bs-spy"] = "scroll"
-        self.body.attrib["data-bs-target"] = "#toc"
-
     def navbar(self):
-        nav = Elem("nav", {"class": "navbar sticky-top navbar-expand-lg navbar-light"})
-        nav.elem("a", {"class": "navbar-brand", "href": "#"}, text="PassengerSim")
+        nav = Elem(
+            "nav",
+            {
+                "id": "top-nav",
+                "class": "navbar sticky-top navbar-expand-lg navbar-light",
+            },
+        )
+        nav_brand = nav.elem("a", {"class": "navbar-brand", "href": "#"})
+        nav_brand.append(
+            passengersim_white_green_logo(
+                {"width": "180px", "height": "25px", "style": "margin-top: -7px;"}
+            )
+        )
         nav.elem(
             "button",
             {
@@ -137,9 +138,6 @@ class BootstrapHtml:
             "div", {"class": "collapse navbar-collapse", "id": "navbarSupportedContent"}
         )
         ul = div.elem("ul", {"class": "navbar-nav mr-auto"})
-        ul.elem("li", {"class": "nav-item active"}).elem(
-            "a", {"class": "nav-link", "href": "#"}, text="Home"
-        ).elem("span", {"class": "sr-only"}, text="(current)")
 
         for section in self.sections:
             ident = section.lower().replace(" ", "-")
@@ -149,3 +147,31 @@ class BootstrapHtml:
 
         self.nav = nav
         self.body.insert(0, nav)
+
+    def add_figure(self, title, fig=None):
+        stolen_title = False
+        if fig is None:
+            fig = title
+            try:
+                title = fig.title
+            except AttributeError as err:
+                raise ValueError("figure has no title attribute") from err
+            if isinstance(title, UndefinedType):
+                if isinstance(fig, LayerChart):
+                    title = fig.layer[0].title
+                    for figlayer in fig.layer:
+                        figlayer.title = ""
+            if isinstance(title, UndefinedType):
+                raise ValueError("figure has no title defined")
+            fig.title = ""
+            stolen_title = True
+        self.content.append(self._numbered_figure(title))
+        self.content.append(Elem.from_any(fig))
+        if stolen_title:
+            fig.title = title
+        return fig
+
+    def add_table(self, title, tbl):
+        self.content.append(self._numbered_table(title))
+        self.content.append(tbl)
+        return tbl

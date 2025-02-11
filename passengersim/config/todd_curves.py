@@ -13,9 +13,6 @@ class ToddCurve(PrettyModel, extra="forbid"):
     min_distance: int = 0
     max_distance: int = 25000
     k_factor: float = 3.0
-    early_dep: dict | None = None
-    late_arr: dict | None = None
-    replanning: tuple[float, float] | None = None
 
     probabilities: dict[int, float] | list[float] = None
     """Define a TODD curve.

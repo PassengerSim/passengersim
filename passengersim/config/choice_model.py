@@ -93,8 +93,14 @@ class PodsChoiceModel(CommonChoiceModel, extra="forbid"):
     tolerance: float | None = None
     non_stop_multiplier: float | None = None
     connection_multiplier: float | None = None
-    todd_curve: str | None = None
 
+    # DWM info
+    todd_curve: str | None = None
+    early_dep: dict | None = None
+    late_arr: dict | None = None
+    replanning: tuple[float, float] | None = None
+
+    # Ancillaries
     anc1_relevance: float | None = None
     anc2_relevance: float | None = None
     anc3_relevance: float | None = None

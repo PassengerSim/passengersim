@@ -128,6 +128,13 @@ class SimTabForecasts(GenericSimulationTables):
             "adj_price": "adjusted_price",
         }
         y = of_columns.get(of)
+        y_titles = {
+            "mu": "Mean Demand Forecast",
+            "sigma": "Std Dev Demand Forecast",
+            "closed": "Closed in Timeframe",
+            "adj_price": "Adjusted Price",
+        }
+        y_title = y_titles.get(of)
         columns = [
             "path_id",
             "booking_class",
@@ -147,7 +154,7 @@ class SimTabForecasts(GenericSimulationTables):
         facet_on = None
         if by_path_id is True:
             facet_on = "path_id"
-        return _fig_forecasts(df, facet_on=facet_on, y=y, color=color)
+        return _fig_forecasts(df, facet_on=facet_on, y=y, color=color, y_title=y_title)
 
     @report_figure
     def fig_leg_forecasts(

@@ -29,3 +29,11 @@ div.has-actions details {
     padding: 8px 15px;
     font-size: var(--jp-code-font-size);
 }
+
+.md-header__topic:first-child {
+    display: none;
+}
+
+.md-header__button.md-logo img {
+    margin-top: -0.1rem;
+}

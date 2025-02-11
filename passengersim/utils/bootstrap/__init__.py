@@ -4,11 +4,47 @@ import re
 import xmle
 from altair import LayerChart
 from altair.utils.schemapi import UndefinedType
+from xmle.uid import uid
 
 from passengersim.reporting.report import Elem
 from passengersim.utils.bootstrap.logo import passengersim_white_green_logo
-from passengersim.utils.colors import DarkPurple, LightPurple
+from passengersim.utils.colors import DarkPurple, LightGreen, LightPurple
 from passengersim.utils.filenaming import filename_with_timestamp
+
+
+class NumberedCaption:
+    def __init__(self, kind, level=2, anchor=None):
+        self._kind = kind
+        self._level = level
+        self._anchor = anchor
+
+    def __call__(self, caption, anchor=None, level=None, attrib=None, **extra):
+        unique_id = uid()
+        n = level if level is not None else self._level
+        result = Elem(f"h{n}", {"id": unique_id})
+        if anchor is None:
+            anchor = self._anchor
+        if anchor:
+            result.put(
+                "a",
+                {
+                    "name": unique_id,
+                    "reftxt": anchor if isinstance(anchor, str) else caption,
+                    "class": "toc",
+                    "toclevel": f"{n}",
+                },
+            )
+        lower_kind = self._kind.lower().replace(" ", "_")
+        result.put(
+            "span",
+            {
+                "class": f"xmle_{lower_kind}_caption xmle_caption",
+                "xmle_caption": self._kind,
+            },
+            tail=caption,
+            text=f"{self._kind}: ",
+        )
+        return result
 
 
 class BootstrapHtml:
@@ -31,6 +67,14 @@ class BootstrapHtml:
     .nav-link, .navbar-brand {{
         color: white;
     }}
+    .nav-link-side {{
+        color: black;
+        border-radius: 3px;
+    }}
+    .nav-link-side.active {{
+        color: {DarkPurple};
+        background-color: {LightPurple};
+    }}
     :target::before {{
       content: "";
       display: block;
@@ -44,7 +88,7 @@ class BootstrapHtml:
         border-radius: 10px;
     }}
     .nav-link.active {{
-        background-color: {LightPurple};
+        color: {LightGreen};
     }}
     h1 {{
         margin-top: 1rem;
@@ -58,10 +102,11 @@ class BootstrapHtml:
     }}
     """
 
-    def __init__(self, title: str = "PassengerSim Report", scrollspy: bool = False):
-        self._numbered_figure = xmle.NumberedCaption("Figure", level=2, anchor=True)
-        self._numbered_table = xmle.NumberedCaption("Table", level=2, anchor=True)
+    def __init__(self, title: str = "PassengerSim Report", scrollspy: bool = True):
+        self._numbered_figure = NumberedCaption("Figure", level=2, anchor=True)
+        self._numbered_table = NumberedCaption("Table", level=2, anchor=True)
         self._scrollspy = bool(scrollspy)
+        self._toc_place = "top"
 
         self.top = Elem("html", lang="en")
         self.head = self.top.elem("head")
@@ -82,13 +127,20 @@ class BootstrapHtml:
         self.head.elem("style", text=self.common_css)
         self.body = self.top.elem(
             "body",
-            {"data-bs-spy": "scroll", "data-bs-target": "#top-nav"}
-            if self._scrollspy
-            else {},
+            {
+                "data-bs-spy": "scroll",
+                "data-bs-target": "#top-nav" if self._toc_place == "top" else "#toc",
+            },
+            # if self._scrollspy
+            # else {},
         )
         self.main = self.body.elem("div", {"class": "container"})
         self.main_row = self.main.elem("div", {"class": "row"})
-        self.content = self.main_row.elem("div")
+        if self._toc_place == "sidebar":
+            self.sidebar = self.main_row.elem("div", {"class": "col-md-2"})
+            self.content = self.main_row.elem("div", {"class": "col-md-10"})
+        else:
+            self.content = self.main_row.elem("div")
         self.current_section = self.content
 
         self.sections = {}
@@ -161,12 +213,14 @@ class BootstrapHtml:
                     flags=0,
                 )
 
-    def write(self, filename: str, make_dirs: bool = True) -> pathlib.Path:
+    def write(
+        self, filename: str, *, make_dirs: bool = True, timestamp=None
+    ) -> pathlib.Path:
         self._add_javascript()
         self.renumber_numbered_items()
         self.navbar()
         filename = filename_with_timestamp(
-            filename, suffix=".html", make_dirs=make_dirs
+            filename, suffix=".html", make_dirs=make_dirs, timestamp=timestamp
         )
         with open(filename, "w") as f:
             f.write("<!doctype html>\n")
@@ -179,12 +233,16 @@ class BootstrapHtml:
         if level == 1:
             section = self.content.elem("div")
             ident = title.lower().replace(" ", "-")
-            section.elem("h1", text=title, id=ident)
+            section.elem("h1", text=title, id=ident).anchor(
+                ident, reftxt=ident, cls={}, toclevel=str(level)
+            )
             self.sections[title] = section
         elif level == 2:
             section = self.current_section.elem("div")
             ident = title.lower().replace(" ", "-")
-            section.elem("h2", text=title, id=ident)
+            section.elem("h2", text=title, id=ident).anchor(
+                ident, reftxt=ident, cls={}, toclevel=str(level)
+            )
         else:
             raise ValueError(f"Invalid level {level}")
         self.current_section = section
@@ -210,31 +268,43 @@ class BootstrapHtml:
                 {"width": "180px", "height": "25px", "style": "margin-top: -7px;"}
             )
         )
-        nav.elem(
-            "button",
-            {
-                "class": "navbar-toggler",
-                "type": "button",
-                "data-toggle": "collapse",
-                "data-target": "#navbarSupportedContent",
-                "aria-controls": "navbarSupportedContent",
-                "aria-expanded": "false",
-                "aria-label": "Toggle navigation",
-            },
-        ).elem("span", {"class": "navbar-toggler-icon"})
-        div = nav.elem(
-            "div", {"class": "collapse navbar-collapse", "id": "navbarSupportedContent"}
-        )
-        ul = div.elem("ul", {"class": "navbar-nav mr-auto"})
-
-        for section in self.sections:
-            ident = section.lower().replace(" ", "-")
-            ul.elem("li", {"class": "nav-item"}).elem(
-                "a", {"class": "nav-link", "href": f"#{ident}"}, text=section
+        if self._toc_place == "top":
+            nav.elem(
+                "button",
+                {
+                    "class": "navbar-toggler",
+                    "type": "button",
+                    "data-toggle": "collapse",
+                    "data-target": "#navbarSupportedContent",
+                    "aria-controls": "navbarSupportedContent",
+                    "aria-expanded": "false",
+                    "aria-label": "Toggle navigation",
+                },
+            ).elem("span", {"class": "navbar-toggler-icon"})
+            div = nav.elem(
+                "div",
+                {"class": "collapse navbar-collapse", "id": "navbarSupportedContent"},
             )
+            ul = div.elem("ul", {"class": "navbar-nav mr-auto"})
+            for section in self.sections:
+                ident = section.lower().replace(" ", "-")
+                ul.elem("li", {"class": "nav-item"}).elem(
+                    "a", {"class": "nav-link", "href": f"#{ident}"}, text=section
+                )
 
         self.nav = nav
         self.body.insert(0, nav)
+
+        if self._toc_place == "sidebar":
+            toc = Elem("nav", {"id": "toc", "class": "sticky-top sticky-top-offset"})
+            toc.elem(
+                "div",
+                text="Table of Contents",
+                attrib={"style": "font-weight: bold; margin-top: 1rem;"},
+            )
+            for i in self._rebuild_toc():
+                toc.append(i)
+            self.sidebar.append(toc)
 
     def add_figure(self, title, fig=None):
         stolen_title = False
@@ -263,3 +333,44 @@ class BootstrapHtml:
         self.current_section.append(self._numbered_table(title))
         self.current_section.append(tbl)
         return tbl
+
+    def _rebuild_toc(self):
+        current_toc = Elem("div")
+
+        xtoc_tree = [current_toc.put("nav", {"class": "nav nav-pills flex-column"})]
+
+        min_anchor_lvl = 5
+        for anchor in self.content.findall(".//a[@toclevel]"):
+            anchor_lvl = int(anchor.get("toclevel"))
+            if anchor_lvl < min_anchor_lvl:
+                min_anchor_lvl = anchor_lvl
+
+        print("min_anchor_lvl", min_anchor_lvl)
+        print("searching for anchors")
+        for anchor in self.content.findall(".//a[@toclevel]"):
+            anchor_ref = anchor.get("name")
+            anchor_text = anchor.get("reftxt")
+            anchor_lvl = int(anchor.get("toclevel")) - min_anchor_lvl + 1
+            while anchor_lvl > len(xtoc_tree):
+                xtoc_tree.append(
+                    xtoc_tree[-1].put("nav", {"class": "nav nav-pills flex-column"})
+                )
+            while anchor_lvl < len(xtoc_tree):
+                xtoc_tree = xtoc_tree[:-1]
+            print(
+                "anchor_lvl",
+                anchor_lvl,
+                "len(xtoc_tree)",
+                len(xtoc_tree),
+                "anchor_text",
+                anchor_text,
+            )
+            xtoc_tree[-1].append(
+                Elem(
+                    "a",
+                    text=anchor_text,
+                    attrib={"class": "nav-link-side ms-3", "href": f"#{anchor_ref}"},
+                )
+            )
+
+        return list(current_toc)

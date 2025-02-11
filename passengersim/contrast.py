@@ -771,6 +771,105 @@ def fig_carrier_yields(
 
 
 @report_figure
+def fig_carrier_rasm(
+    summaries,
+    raw_df=False,
+    orient: Literal["h", "v"] = "h",
+    ratio: str | bool = "all",
+    *,
+    width: int = 500,
+):
+    """
+    Generate a figure contrasting carrier RASM for one or more runs.
+
+    Parameters
+    ----------
+    summaries : dict[str, SummaryTables]
+    raw_df : bool, default False
+    orient : {'h', 'v'}, default 'h'
+    ratio : bool or str, default True
+        Add tooltip(s) giving the percentage change of each carrier's yield
+        to the yield of the same carrier in the other summaries.  Can be
+        the key giving a specific summary to compare against, or 'all' to
+        compare against all other summaries.
+
+    Returns
+    -------
+    alt.Chart or pd.DataFrame
+    """
+    df = _assemble(summaries, "carrier_rasm")
+    source_order = list(summaries.keys())
+    if raw_df:
+        df.attrs["title"] = "Carrier RASM"
+        return df
+    return _fig_carrier_measure(
+        df,
+        source_order,
+        load_measure="rasm",
+        measure_name="Revenue per Available Seat Mile",
+        measure_format="$.4f",
+        orient=orient,
+        title="Carrier Revenue per Available Seat Mile (RASM)",
+        ratio=ratio,
+        ratio_all=(ratio == "all"),
+        width=width,
+    )
+
+
+@report_figure
+def fig_carrier_local_share(
+    summaries,
+    load_measure: "Literal['bookings', 'leg_pax']" = "bookings",
+    raw_df=False,
+    orient: Literal["h", "v"] = "h",
+    ratio: str | bool = "all",
+    *,
+    width: int = 500,
+):
+    """
+    Generate a figure contrasting carrier local shares for one or more runs.
+
+    Parameters
+    ----------
+    summaries : dict[str, SummaryTables]
+    raw_df : bool, default False
+    orient : {'h', 'v'}, default 'h'
+    ratio : bool or str, default True
+        Add tooltip(s) giving the percentage change of each carrier's local share
+        to the local share of the same carrier in the other summaries.  Can be
+        the key giving a specific summary to compare against, or 'all' to
+        compare against all other summaries.
+
+    Returns
+    -------
+    alt.Chart or pd.DataFrame
+    """
+    measure_name = (
+        "Local Percent of Bookings"
+        if load_measure == "bookings"
+        else "Local Percent of Leg Passengers"
+    )
+    m = "local_pct_bookings" if load_measure == "bookings" else "local_pct_leg_pax"
+    df = _assemble(summaries, "carrier_local_share", load_measure=load_measure)
+    source_order = list(summaries.keys())
+    if raw_df:
+        df.attrs["title"] = "Carrier RASM"
+        return df
+    return _fig_carrier_measure(
+        df,
+        source_order,
+        load_measure=m,
+        measure_name=measure_name,
+        measure_format=".2f",
+        orient=orient,
+        title=f"Carrier {measure_name}",
+        ratio=ratio,
+        ratio_all=(ratio == "all"),
+        width=width,
+    )
+
+
+@report_figure
 def fig_carrier_total_bookings(
     summaries,
     raw_df=False,

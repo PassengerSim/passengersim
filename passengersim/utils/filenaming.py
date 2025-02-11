@@ -46,6 +46,8 @@ def filename_with_timestamp(
         timestamp = time.strftime("%Y%m%d-%H%M%S", timestamp)
     elif isinstance(timestamp, datetime.datetime):
         timestamp = timestamp.strftime("%Y%m%d-%H%M%S")
+    elif timestamp is False:
+        timestamp = "no-timestamp"
     else:
         raise ValueError(f"Invalid timestamp type: {type(timestamp)}")
     filename = pathlib.Path(filename)
@@ -62,7 +64,7 @@ def filename_with_timestamp(
     else:
         filename = filename.with_suffix(f".{timestamp}" + suffix)
 
-    while filename.exists():
+    while filename.exists() and timestamp != "no-timestamp":
         t0, t1 = timestamp.split("-")
         t1 = str(int(t1) + 1)
         timestamp = f"{t0}-{t1}"

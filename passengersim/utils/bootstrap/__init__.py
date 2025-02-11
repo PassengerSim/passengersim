@@ -102,13 +102,20 @@ class BootstrapHtml:
         font-size: 120%;
         font-weight: 300;
     }}
+    .scrolly-sidebar {{
+        position: -webkit-sticky;
+        position: sticky;
+        height: calc(100vh - 65px);
+        overflow-y: auto;
+        font-size: 85%;
+    }}
     """
 
     def __init__(self, title: str = "PassengerSim Report", scrollspy: bool = True):
         self._numbered_figure = NumberedCaption("Figure", level=2, anchor=True)
         self._numbered_table = NumberedCaption("Table", level=2, anchor=True)
         self._scrollspy = bool(scrollspy)
-        self._toc_place = "top"
+        self._toc_place = "sidebar"
 
         self.top = Elem("html", lang="en")
         self.head = self.top.elem("head")
@@ -139,8 +146,14 @@ class BootstrapHtml:
         self.main = self.body.elem("div", {"class": "container"})
         self.main_row = self.main.elem("div", {"class": "row"})
         if self._toc_place == "sidebar":
-            self.sidebar = self.main_row.elem("div", {"class": "col-md-2"})
-            self.content = self.main_row.elem("div", {"class": "col-md-10"})
+            self.sidebar = self.main_row.elem(
+                "div",
+                {
+                    "class": "col-lg-3 scrolly-sidebar sticky-top "
+                    "sticky-top-offset d-none d-lg-inline-flex"
+                },
+            )
+            self.content = self.main_row.elem("div", {"class": "col-12 col-lg-9"})
         else:
             self.content = self.main_row.elem("div")
         self.current_section = self.content
@@ -236,14 +249,14 @@ class BootstrapHtml:
             section = self.content.elem("div")
             ident = title.lower().replace(" ", "-")
             section.elem("h1", text=title, id=ident).anchor(
-                ident, reftxt=ident, cls={}, toclevel=str(level)
+                ident, reftxt=title, cls={}, toclevel=str(level)
             )
             self.sections[title] = section
         elif level == 2:
             section = self.current_section.elem("div")
             ident = title.lower().replace(" ", "-")
             section.elem("h2", text=title, id=ident).anchor(
-                ident, reftxt=ident, cls={}, toclevel=str(level)
+                ident, reftxt=title, cls={}, toclevel=str(level)
             )
         else:
             raise ValueError(f"Invalid level {level}")
@@ -257,14 +270,17 @@ class BootstrapHtml:
         return self.current_section
 
     def navbar(self):
-        nav = Elem(
+        nav_top = Elem(
             "nav",
             {
                 "id": "top-nav",
                 "class": "navbar sticky-top navbar-expand-lg navbar-light",
             },
         )
-        nav_brand = nav.elem("a", {"class": "navbar-brand", "href": "#"})
+        nav = nav_top
+        nav_brand = nav.elem(
+            "a", {"class": "navbar-brand", "href": "https://www.passengersim.com"}
+        )
         nav_brand.append(
             passengersim_white_green_logo(
                 {"width": "180px", "height": "25px", "style": "margin-top: -7px;"}
@@ -293,16 +309,21 @@ class BootstrapHtml:
                 ul.elem("li", {"class": "nav-item"}).elem(
                     "a", {"class": "nav-link", "href": f"#{ident}"}, text=section
                 )
+        else:
+            ul = nav.elem("ul", {"class": "navbar-nav mr-auto"})
+            ul.elem("li", {"class": "nav-item"}).elem(
+                "a", {"class": "nav-link pt-1", "href": "#"}, text=self.title.text
+            )
 
-        self.nav = nav
-        self.body.insert(0, nav)
+        self.nav = nav_top
+        self.body.insert(0, nav_top)
 
         if self._toc_place == "sidebar":
-            toc = Elem("nav", {"id": "toc", "class": "sticky-top sticky-top-offset"})
+            toc = Elem("nav", {"id": "toc"})
             toc.elem(
                 "div",
                 text="Table of Contents",
-                attrib={"style": "font-weight: bold; margin-top: 1rem;"},
+                attrib={"class": "fw-bold mt-3 ms-2"},
             )
             for i in self._rebuild_toc():
                 toc.append(i)
@@ -331,10 +352,12 @@ class BootstrapHtml:
             fig.title = title
         return fig
 
-    def add_table(self, title, tbl):
+    def add_table(self, title, tbl, collapsible: bool | None = None):
         self.current_section.append(self._numbered_table(title))
         unique_id = uid()
-        if isinstance(tbl, pd.DataFrame) and len(tbl) > 9:
+        if collapsible is None:
+            collapsible = isinstance(tbl, pd.DataFrame) and len(tbl) > 9
+        if collapsible:
             tbl_eye = Elem(
                 "button",
                 {
@@ -362,7 +385,9 @@ class BootstrapHtml:
     def _rebuild_toc(self):
         current_toc = Elem("div")
 
-        xtoc_tree = [current_toc.put("nav", {"class": "nav nav-pills flex-column"})]
+        xtoc_tree = [
+            current_toc.put("nav", {"class": "nav nav-pills flex-column pb-3"})
+        ]
 
         min_anchor_lvl = 5
         for anchor in self.content.findall(".//a[@toclevel]"):
@@ -370,31 +395,23 @@ class BootstrapHtml:
             if anchor_lvl < min_anchor_lvl:
                 min_anchor_lvl = anchor_lvl
 
-        print("min_anchor_lvl", min_anchor_lvl)
-        print("searching for anchors")
         for anchor in self.content.findall(".//a[@toclevel]"):
             anchor_ref = anchor.get("name")
             anchor_text = anchor.get("reftxt")
             anchor_lvl = int(anchor.get("toclevel")) - min_anchor_lvl + 1
             while anchor_lvl > len(xtoc_tree):
                 xtoc_tree.append(
-                    xtoc_tree[-1].put("nav", {"class": "nav nav-pills flex-column"})
+                    xtoc_tree[-1].put(
+                        "nav", {"class": "nav nav-pills flex-column ms-2"}
+                    )
                 )
             while anchor_lvl < len(xtoc_tree):
                 xtoc_tree = xtoc_tree[:-1]
-            print(
-                "anchor_lvl",
-                anchor_lvl,
-                "len(xtoc_tree)",
-                len(xtoc_tree),
-                "anchor_text",
-                anchor_text,
-            )
             xtoc_tree[-1].append(
                 Elem(
                     "a",
                     text=anchor_text,
-                    attrib={"class": "nav-link-side ms-3", "href": f"#{anchor_ref}"},
+                    attrib={"class": "nav-link-side ms-2", "href": f"#{anchor_ref}"},
                 )
             )
 

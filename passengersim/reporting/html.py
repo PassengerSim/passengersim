@@ -98,6 +98,7 @@ def to_html(
             Elem.from_string(
                 summary.segmentation_by_timeframe.to_html(max_rows=10_000)
             ),
+            collapsible=True,
         )
 
     if cfg.outputs.html.carrier_revenue_distribution:

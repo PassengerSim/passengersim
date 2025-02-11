@@ -35,14 +35,18 @@
       background-color: rgba(0,0,0,0);
   }
   .md-header__button.md-logo img{
-      filter: hue-rotate(160deg);
-      height: 36px;
-      margin-top: 0.3rem;
+      display: none;
+  }
+  .big-logo {
+      padding-top: 50vh;
+      height: 40px;
+      margin-bottom: 20px;
   }
   </style>
   <div class="parallax">
     <section class="mdx-container">
       <div class="md-grid md-typeset">
+          <img src="assets/logo.svg" alt="logo" class="big-logo">
           <h1>Passenger travel simulation for revenue management.</h1>
           <a href="{{ page.next_page.url | url }}" title="{{ page.next_page.title | e }}" class="md-button md-button--primary">
             Get Started

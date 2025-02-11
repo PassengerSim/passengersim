@@ -417,16 +417,16 @@ class Simulation(BaseSimulation, CallbackMixin):
                     tmp_dwm = self.todd_curves[pvalue]
                     x.add_dwm(tmp_dwm)
                 elif pname == "early_dep" and pvalue is not None:
-                    dwm.early_dep_offset = pvalue.early_dep["offset"]
-                    dwm.early_dep_slope = pvalue.early_dep["slope"]
-                    dwm.early_dep_beta = pvalue.early_dep["beta"]
+                    x.early_dep_offset = pvalue["offset"]
+                    x.early_dep_slope = pvalue["slope"]
+                    x.early_dep_beta = pvalue["beta"]
                 elif pname == "late_arr" and pvalue is not None:
-                    dwm.late_arr_offset = pvalue.late_arr["offset"]
-                    dwm.late_arr_slope = pvalue.late_arr["slope"]
-                    dwm.late_arr_beta = pvalue.late_arr["beta"]
+                    x.late_arr_offset = pvalue["offset"]
+                    x.late_arr_slope = pvalue["slope"]
+                    x.late_arr_beta = pvalue["beta"]
                 elif pname == "replanning" and pvalue is not None:
-                    dwm.replanning_alpha = pvalue.replanning[0]
-                    dwm.replanning_beta = pvalue.replanning[1]
+                    x.replanning_alpha = pvalue[0]
+                    x.replanning_beta = pvalue[1]
                 elif pname == "restrictions":
                     for rname, rvalue in pvalue.items():
                         restriction_num = self._get_fare_restriction_num(rname)

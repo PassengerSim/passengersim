@@ -1,6 +1,7 @@
 import pathlib
 import re
 
+import pandas as pd
 import xmle
 from altair import LayerChart
 from altair.utils.schemapi import UndefinedType
@@ -50,6 +51,7 @@ class NumberedCaption:
 class BootstrapHtml:
     common_css = f"""
     @import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,300;0,400;0,700;1,400&display=swap');
+    @import url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css");
     :root {{
       --bs-font-sans-serif:
             Roboto, system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial,
@@ -155,7 +157,7 @@ class BootstrapHtml:
             crossorigin="anonymous",
         )
 
-    def _add_javascript(self, vega: bool = True, floating_tablehead: bool = True):
+    def _add_javascript(self, vega: bool = True, floating_tablehead: bool = False):
         if vega:
             self.head.elem(
                 "script",
@@ -331,7 +333,30 @@ class BootstrapHtml:
 
     def add_table(self, title, tbl):
         self.current_section.append(self._numbered_table(title))
-        self.current_section.append(tbl)
+        unique_id = uid()
+        if isinstance(tbl, pd.DataFrame) and len(tbl) > 9:
+            tbl_eye = Elem(
+                "button",
+                {
+                    "class": "btn btn-default btn-xs",
+                    "type": "button",
+                    "data-bs-toggle": "collapse",
+                    "data-bs-target": f"#{unique_id}",
+                    "aria-expanded": "false",
+                    "aria-controls": f"{unique_id}",
+                },
+            )
+            tbl_eye.elem(
+                "i",
+                {"class": "bi bi-eye mr-2", "aria-hidden": "true"},
+                tail="View Table",
+            )
+            tbl_collapser = Elem("div", {"class": "collapse", "id": unique_id})
+            tbl_collapser.append(tbl)
+            self.current_section.append(tbl_eye)
+            self.current_section.append(tbl_collapser)
+        else:
+            self.current_section.append(tbl)
         return tbl
 
     def _rebuild_toc(self):

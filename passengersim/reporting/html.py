@@ -22,6 +22,7 @@ def to_html(
     *,
     cfg: Config | None = None,
     make_dirs: bool = True,
+    extra_figs: tuple = (),
 ) -> pathlib.Path:
     """
     Write a summary to an HTML file.
@@ -36,6 +37,8 @@ def to_html(
         If not provided, the configuration will be taken from the summary
     make_dirs : bool, optional
         If True, create any necessary directories.
+    extra_figs : tuple, optional
+        Additional figures to include in the report.
 
     Returns
     -------
@@ -44,12 +47,15 @@ def to_html(
     if cfg is None:
         cfg = summary.config
         if cfg is None:
-            raise ValueError("No configuration provided")
+            # no config provided, so use a default one
+            cfg = Config()
+            cfg.outputs.html.filename = None
+            cfg.outputs.html.configs = []
 
     if filename is None:
-        filename = pathlib.Path(cfg.outputs.html.filename)
-        if filename is None:
+        if cfg.outputs.html.filename is None:
             raise ValueError("No filename provided")
+        filename = pathlib.Path(cfg.outputs.html.filename)
 
     rpt = BootstrapHtml(title=cfg.outputs.html.title or cfg.scenario)
 
@@ -128,6 +134,10 @@ def to_html(
             dh = None
         if dh is not None and dh["displacement_mean"].max() > 0:
             rpt.add_figure(summary.fig_displacement_history())
+
+    for fig in extra_figs:
+        rpt.new_section("Additional Figures")
+        rpt.add_figure(fig)
 
     if cfg.outputs.html.configs:
         rpt.new_section("Configuration")

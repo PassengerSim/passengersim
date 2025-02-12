@@ -114,6 +114,7 @@ class SimTabLegs(GenericSimulationTables):
         cat_attr: str,
         by_carrier: bool | str = True,
         breakpoints: Collection[int] = None,
+        normalize: bool = False,
         *,
         raw_df=False,
     ) -> alt.Chart | pd.DataFrame:
@@ -140,6 +141,9 @@ class SimTabLegs(GenericSimulationTables):
             bounded to 0 and 101, respectively; these bounds can be included explicitly
             or omitted to be included implicitly. Setting the top value to 101 ensures
             that the highest load factor value (100) is included in the last bin.
+        normalize : bool, default False
+            If True, normalize the frequency by the total number of legs for each
+            carrier, so that the sum of the frequencies for each carrier is 1.
         raw_df : bool, default False
             Return the raw data for this figure as a pandas DataFrame, instead
             of generating the figure itself.
@@ -168,15 +172,29 @@ class SimTabLegs(GenericSimulationTables):
             .reset_index()
         )
 
-        if not by_carrier:
+        if normalize and by_carrier:
+            df_for_chart["frequency"] = df_for_chart.groupby("carrier")[
+                "frequency"
+            ].transform(lambda x: x / x.sum())
+        elif not by_carrier:
             df_for_chart = (
                 df_for_chart.groupby([leg_cat], observed=False)
                 .frequency.sum()
                 .reset_index()
             )
+            if normalize:
+                df_for_chart["frequency"] = (
+                    df_for_chart["frequency"] / df_for_chart["frequency"].sum()
+                )
         elif isinstance(by_carrier, str):
             df_for_chart = df_for_chart[df_for_chart["carrier"] == by_carrier]
             df_for_chart = df_for_chart.drop(columns=["carrier"])
+            if normalize:
+                df_for_chart["frequency"] = (
+                    df_for_chart["frequency"] / df_for_chart["frequency"].sum()
+                )
+
+        freq_label = "Relative Frequency" if normalize else "Count"
 
         if raw_df:
             return df_for_chart
@@ -189,13 +207,13 @@ class SimTabLegs(GenericSimulationTables):
                 .mark_bar()
                 .encode(
                     x=alt.X(leg_cat, title=cat_attr),
-                    y=alt.Y("frequency:Q", title="Count"),
+                    y=alt.Y("frequency:Q", title=freq_label),
                     color=alt.Color("carrier:N", title="Carrier"),
                     facet=alt.Facet("carrier:N", columns=2, title="Carrier"),
                     tooltip=[
                         alt.Tooltip("carrier", title="Carrier"),
                         alt.Tooltip(leg_cat, title=cat_attr),
-                        alt.Tooltip("frequency", title="Count"),
+                        alt.Tooltip("frequency", title=freq_label),
                     ],
                 )
                 .properties(width=300, height=250, title=f"{title} by Carrier")
@@ -206,11 +224,11 @@ class SimTabLegs(GenericSimulationTables):
                 .mark_bar()
                 .encode(
                     x=alt.X(leg_cat, title=cat_attr),
-                    y=alt.Y("frequency:Q", title="Count"),
+                    y=alt.Y("frequency:Q", title=freq_label),
                     tooltip=[
                         alt.Tooltip("carrier", title="Carrier"),
                         alt.Tooltip(leg_cat, title=cat_attr),
-                        alt.Tooltip("frequency", title="Count"),
+                        alt.Tooltip("frequency", title=freq_label),
                     ],
                 )
                 .properties(
@@ -227,6 +245,7 @@ class SimTabLegs(GenericSimulationTables):
         self,
         by_carrier: bool | str = True,
         breakpoints: Collection[int] = None,
+        normalize: bool = False,
         *,
         raw_df=False,
     ) -> alt.Chart | pd.DataFrame:
@@ -245,6 +264,9 @@ class SimTabLegs(GenericSimulationTables):
             bounded to 0 and 101, respectively; these bounds can be included explicitly
             or omitted to be included implicitly. Setting the top value to 101 ensures
             that the highest load factor value (100) is included in the last bin.
+        normalize : bool, default False
+            If True, normalize the frequency by the total number of legs for each
+            carrier, so that the sum of the frequencies for each carrier is 1.
         raw_df : bool, default False
             Return the raw data for this figure as a pandas DataFrame, instead
             of generating the figure itself.
@@ -253,12 +275,18 @@ class SimTabLegs(GenericSimulationTables):
         -------
         altair.Chart or pd.DataFrame
         """
+        title = "Load Factor Frequency"
+        if normalize:
+            title = "Load Factor Relative Frequency"
+        if isinstance(by_carrier, str):
+            title += f" ({by_carrier})"
         return self._fig_leg_factor_distribution(
-            title="Load Factor Frequency",
+            title=title,
             leg_attr="avg_load_factor",
             cat_attr="Load Factor Range",
             by_carrier=by_carrier,
             breakpoints=breakpoints,
+            normalize=normalize,
             raw_df=raw_df,
         )
 
@@ -267,6 +295,7 @@ class SimTabLegs(GenericSimulationTables):
         self,
         by_carrier: bool | str = True,
         breakpoints: Collection[int] = None,
+        normalize: bool = False,
         *,
         raw_df=False,
     ) -> alt.Chart | pd.DataFrame:
@@ -288,6 +317,9 @@ class SimTabLegs(GenericSimulationTables):
             bounded to 0 and 101, respectively; these bounds can be included explicitly
             or omitted to be included implicitly. Setting the top value to 101 ensures
             that the highest load factor value (100) is included in the last bin.
+        normalize : bool, default False
+            If True, normalize the frequency by the total number of legs for each
+            carrier, so that the sum of the frequencies for each carrier is 1.
         raw_df : bool, default False
             Return the raw data for this figure as a pandas DataFrame, instead
             of generating the figure itself.
@@ -298,12 +330,18 @@ class SimTabLegs(GenericSimulationTables):
         """
         if breakpoints is None:
             breakpoints = range(0, 100, 10)
+        title = "Local Share Frequency"
+        if normalize:
+            title = "Local Share Relative Frequency"
+        if isinstance(by_carrier, str):
+            title += f" ({by_carrier})"
         return self._fig_leg_factor_distribution(
-            title="Local Share Frequency",
+            title=title,
             leg_attr="avg_local",
             cat_attr="Local Share Range",
             by_carrier=by_carrier,
             breakpoints=breakpoints,
+            normalize=normalize,
             raw_df=raw_df,
         )
 

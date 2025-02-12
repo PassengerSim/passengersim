@@ -370,18 +370,6 @@ class Simulation(BaseSimulation, CallbackMixin):
                 dwm.k_factor = todd.k_factor
             if todd.min_distance:
                 dwm.min_distance = todd.min_distance
-            if todd.early_dep:
-                dwm.early_dep_offset = todd.early_dep["offset"]
-                dwm.early_dep_offset = todd.early_dep["offset"]
-                dwm.early_dep_slope = todd.early_dep["slope"]
-                dwm.early_dep_beta = todd.early_dep["beta"]
-            if todd.late_arr:
-                dwm.late_arr_offset = todd.late_arr["offset"]
-                dwm.late_arr_slope = todd.late_arr["slope"]
-                dwm.late_arr_beta = todd.late_arr["beta"]
-            if todd.replanning:
-                dwm.replanning_alpha = todd.replanning[0]
-                dwm.replanning_beta = todd.replanning[1]
             if todd.probabilities:
                 dwm.dwm_tod = list(todd.probabilities.values())
             self.todd_curves[todd_name] = dwm
@@ -428,6 +416,17 @@ class Simulation(BaseSimulation, CallbackMixin):
                 if pname == "todd_curve":
                     tmp_dwm = self.todd_curves[pvalue]
                     x.add_dwm(tmp_dwm)
+                elif pname == "early_dep" and pvalue is not None:
+                    x.early_dep_offset = pvalue["offset"]
+                    x.early_dep_slope = pvalue["slope"]
+                    x.early_dep_beta = pvalue["beta"]
+                elif pname == "late_arr" and pvalue is not None:
+                    x.late_arr_offset = pvalue["offset"]
+                    x.late_arr_slope = pvalue["slope"]
+                    x.late_arr_beta = pvalue["beta"]
+                elif pname == "replanning" and pvalue is not None:
+                    x.replanning_alpha = pvalue[0]
+                    x.replanning_beta = pvalue[1]
                 elif pname == "restrictions":
                     for rname, rvalue in pvalue.items():
                         restriction_num = self._get_fare_restriction_num(rname)

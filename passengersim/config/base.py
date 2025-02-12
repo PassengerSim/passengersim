@@ -749,12 +749,12 @@ class Config(YamlConfig, extra="forbid"):
         return m
 
     @model_validator(mode="after")
-    def _todd_curve_s_vs_replanning(cls, m: Config):
+    def _choice_model_curve_s_vs_replanning(cls, m: Config):
         """Check that only one way of inputting airline preference was specified."""
-        for _name, tc in m.todd_curves.items():
-            if tc.replanning is not None and (tc.early_dep is not None or tc.late_arr is not None):
+        for _name, cm in m.choice_models.items():
+            if cm.replanning is not None and (cm.early_dep is not None or cm.late_arr is not None):
                 raise ValueError(
-                    f"ToddCurve '{tc.name}' has replanning and early_dep / late_arr specifid,"
+                    f"ChoiceModel '{cm.name}' has replanning and early_dep / late_arr specified,"
                     f" pick one or the other but not both !!!"
                 )
         return m

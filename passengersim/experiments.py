@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import pathlib
 import warnings
 from collections.abc import Callable
@@ -24,6 +23,7 @@ from passengersim.core import __version__ as _passengersim_core_version
 from . import MultiSimulation, Simulation
 from .config import Config
 from .summaries import SimulationTables
+from .types import PathLike
 
 if TYPE_CHECKING:
     UseExistingT = Literal[True, False, "ignore", "raise"]
@@ -36,7 +36,7 @@ class Experiment:
         tag: str | None = None,
         multiprocess: bool = True,
         *,
-        external: str | os.PathLike | None = None,
+        external: PathLike | None = None,
     ):
         """
         Parameters
@@ -111,7 +111,7 @@ class Experiments:
         tag: str | None = None,
         multiprocess: bool = True,
         *,
-        external: str | os.PathLike | None = None,
+        external: PathLike | None = None,
     ):
         if not isinstance(title, str):
             # called as a decorator, so the first argument is the function
@@ -229,6 +229,7 @@ class Experiments:
         check_content: bool = True,
         single_process: bool = False,
         retain_sims: bool = False,
+        write_report: PathLike | bool | None = None,
     ):
         """
         Run the experiments.
@@ -261,6 +262,8 @@ class Experiments:
         retain_sims : bool, default False
             If True, retain the simulation objects in the `sims` attribute after
             running each simulation. This is primarily useful for debugging.
+        write_report : path-like, optional
+            If provided, write a report of the experiments to the given file.
 
         Returns
         -------
@@ -408,7 +411,7 @@ class Experiments:
                         del sim
                     else:
                         sim = Simulation(config)
-                        summary = sim.run()
+                        summary = sim.run(rich_progress=rich_progress)
                         if retain_sims:
                             self.sims[e.tag] = sim
                         del sim
@@ -421,6 +424,17 @@ class Experiments:
                 refresh=True,
                 visible=False,
             )
+
+        if write_report:
+            if isinstance(write_report, PathLike):
+                write_report = pathlib.Path(write_report)
+            else:
+                write_report = pathlib.Path("experiments-summary.html")
+            # if output directory is set, write the report there,
+            # unless the path is absolute (then write it to the given path)
+            if self.output_dir is not None and not write_report.is_absolute():
+                write_report = self.output_dir / write_report
+            results.write_report(write_report)
 
         if tag is not None and len(selected_experiments) == 1:
             return results[selected_experiments[0].tag]

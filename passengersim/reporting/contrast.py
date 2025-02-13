@@ -4,6 +4,7 @@ import pathlib
 from typing import TYPE_CHECKING
 
 from passengersim.contrast import Contrast
+from passengersim.types import PathLike
 from passengersim.utils.bootstrap import BootstrapHtml
 
 if TYPE_CHECKING:
@@ -12,7 +13,7 @@ if TYPE_CHECKING:
 
 def to_html(
     summaries: Contrast,
-    filename: str | None = None,
+    filename: PathLike | None = None,
     *,
     base_config: Config | None = None,
     make_dirs: bool = True,

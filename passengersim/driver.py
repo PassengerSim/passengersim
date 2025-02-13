@@ -25,6 +25,7 @@ import pandas as pd
 import psutil  # noqa: F401
 from passengersim_core import Ancillary, DbWriter
 from passengersim_core.utils.airsim_utils import get_mileage
+from rich.progress import Progress
 from scipy.stats import gamma
 
 import passengersim.config.rm_systems
@@ -1174,8 +1175,17 @@ class Simulation(BaseSimulation, CallbackMixin):
                 progress = ProgressBar(total=n_samples_total)
             else:
                 progress = DummyProgressBar()
+        elif isinstance(rich_progress, Progress):
+            if self.sim.config.simulation_controls.show_progress_bar:
+                # if an external Progress object is provided, generate a
+                # ProgressBar object from it
+                progress = ProgressBar(
+                    total=n_samples_total, external_progress=rich_progress
+                )
+            else:
+                progress = DummyProgressBar()
         else:
-            progress = rich_progress
+            raise TypeError("rich_progress must be a Progress object")
         with progress:
             for trial in range(self.sim.num_trials):
                 self._run_single_trial(
@@ -1187,7 +1197,7 @@ class Simulation(BaseSimulation, CallbackMixin):
                 )
 
     def _run_sim_single_trial(
-        self, trial: int, *, rich_progress: ProgressBar | None = None
+        self, trial: int, *, rich_progress: Progress | None = None
     ):
         update_freq = self.update_frequency
         self.db_writer.update_db_write_flags()
@@ -1196,8 +1206,12 @@ class Simulation(BaseSimulation, CallbackMixin):
         self.sample_done_callback(n_samples_done, n_samples_total)
         if rich_progress is None:
             progress = DummyProgressBar()
+        elif isinstance(rich_progress, Progress):
+            progress = ProgressBar(
+                total=n_samples_total, external_progress=rich_progress
+            )
         else:
-            progress = rich_progress
+            raise TypeError("rich_progress must be a Progress object")
         with progress:
             self._run_single_trial(
                 trial,
@@ -2229,6 +2243,7 @@ class Simulation(BaseSimulation, CallbackMixin):
         summarizer: type[SimulationTablesT]
         | SimulationTablesT
         | None = SimulationTables,
+        rich_progress: Progress | None = None,
     ) -> SummaryTables | SimulationTablesT:
         """
         Run the simulation and compute reports.
@@ -2243,6 +2258,10 @@ class Simulation(BaseSimulation, CallbackMixin):
             Use this summarizer to compute the reports.  If None, the
             reports are computed in the SummaryTables object; this option
             is deprecated and will eventually be removed.
+        rich_progress : Progress, optional
+            A rich Progress object to use for displaying progress.  If not
+            provided, a new Progress object will be created unless the
+            simulation configuration specifies not to show progress.
 
         Returns
         -------
@@ -2259,9 +2278,9 @@ class Simulation(BaseSimulation, CallbackMixin):
         start_time = time.time()
         self.setup_scenario()
         if single_trial is not None:
-            self._run_sim_single_trial(single_trial)
+            self._run_sim_single_trial(single_trial, rich_progress=rich_progress)
         else:
-            self._run_sim()
+            self._run_sim(rich_progress=rich_progress)
         if self.choice_set_file is not None:
             self.choice_set_file.close()
         logger.info("Computing reports")

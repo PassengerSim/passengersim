@@ -11,6 +11,7 @@ import pandas as pd
 from .reporting import report_figure
 from .summaries.demand_to_come import SimTabDemandToCome
 from .summary import SummaryTables
+from .types import PathLike
 
 
 class Contrast(dict):
@@ -45,7 +46,7 @@ class Contrast(dict):
         x |= {g for g in globals() if g.startswith("fig_")}
         return sorted(x)
 
-    def write_report(self, filename: str, **kwargs) -> pathlib.Path:
+    def write_report(self, filename: PathLike, **kwargs) -> pathlib.Path:
         from passengersim.reporting.contrast import to_html
 
         return to_html(self, filename, **kwargs)

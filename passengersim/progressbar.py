@@ -33,7 +33,13 @@ class ProgressBar:
     A progress bar that uses rich if available, otherwise does nothing.
     """
 
-    def __init__(self, label="samples", total=100, refresh_per_second=10):
+    def __init__(
+        self,
+        label="samples",
+        total=100,
+        refresh_per_second=10,
+        external_progress: Progress | None = None,
+    ):
         """
         A progress bar that uses rich if available, otherwise does nothing.
 
@@ -52,29 +58,43 @@ class ProgressBar:
         self.total = total
         self.last_update = 0
         self.refresh_freq = 1.0 / refresh_per_second
-        self.progress = Progress(transient=True)
+        self.external_progress = external_progress
+        if self.external_progress is not None:
+            self.progress = self.external_progress
+        else:
+            self.progress = Progress(transient=True)
         self.task = self.progress.add_task(self.label, total=self.total)
 
     def start(self) -> "ProgressBar":
         """
         Start the progress bar.
+
+        Do not do anything if an external progress object was provided.
         """
-        self.progress.start()
+        if self.external_progress is None:
+            self.progress.start()
         return self
 
     def stop(self) -> None:
         """
         Stop the progress bar.
+
+        Do not do anything if an external progress object was provided.
         """
-        self.progress.stop()
+        if self.external_progress is None:
+            self.progress.stop()
 
     def __enter__(self) -> "ProgressBar":
-        self.progress.start()
+        if self.external_progress is None:
+            self.progress.start()
         self.start_time = self.progress.get_time()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        self.progress.stop()
+        if self.external_progress is None:
+            self.progress.stop()
+        else:
+            self.external_progress.remove_task(self.task)
         current_time = self.progress.get_time()
         elapsed_time = current_time - self.start_time
         happened = "Completed"

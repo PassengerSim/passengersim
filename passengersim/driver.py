@@ -45,6 +45,7 @@ from passengersim.core import (
 from passengersim.summaries import SimulationTables
 from passengersim.summaries.generic import GenericSimulationTables
 from passengersim.summary import SummaryTables
+from passengersim.tracers.generic import GenericTracer
 from passengersim.utils.nested_dict import from_nested_dict  # noqa: F401
 from passengersim.utils.si import si_units  # noqa: F401
 
@@ -2303,6 +2304,17 @@ class Simulation(BaseSimulation, CallbackMixin):
                     "summarizer must be an instance or subclass of "
                     "GenericSimulationTables"
                 )
+
+        # check all callbacks for tracers, and if any are found, write their
+        # finalized data to callback_data
+        for cb_group in [
+            "daily_callbacks",
+            "begin_sample_callbacks",
+            "end_sample_callbacks",
+        ]:
+            for cb in getattr(self, cb_group, []):
+                if isinstance(cb, GenericTracer):
+                    summary.callback_data[cb.name] = cb.finalize()
 
         # write output files if designated
         if isinstance(summary, GenericSimulationTables):

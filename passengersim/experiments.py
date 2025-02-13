@@ -18,6 +18,7 @@ from rich.progress import (
 
 from passengersim import __version__ as _passengersim_version
 from passengersim import contrast
+from passengersim.callbacks import CallbackMixin
 from passengersim.core import __version__ as _passengersim_core_version
 
 from . import MultiSimulation, Simulation
@@ -70,7 +71,7 @@ class Experiment:
                 )
 
 
-class Experiments:
+class Experiments(CallbackMixin):
     def __init__(
         self,
         config: Config,
@@ -408,12 +409,14 @@ class Experiments:
                     # Initialize the simulation
                     if e.multi and not single_process:
                         sim = MultiSimulation(config)
+                        self.apply_callback_functions(sim)
                         summary = sim.run(rich_progress=rich_progress)
                         if retain_sims:
                             self.sims[e.tag] = sim
                         del sim
                     else:
                         sim = Simulation(config)
+                        self.apply_callback_functions(sim)
                         summary = sim.run(rich_progress=rich_progress)
                         if retain_sims:
                             self.sims[e.tag] = sim

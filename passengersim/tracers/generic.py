@@ -10,8 +10,14 @@ if TYPE_CHECKING:
 
 
 class GenericTracer(ABC):
+    name: str = "generic_tracer"
+
     @abstractmethod
     def reset(self) -> None:
+        raise NotImplementedError()
+
+    @abstractmethod
+    def fresh(self) -> GenericTracer:
         raise NotImplementedError()
 
     @abstractmethod

@@ -107,7 +107,10 @@ class SimulationTableItem:
             raise MissingDataError(self.name) from None
 
     def __set__(self, instance, value):
-        instance._data[self.name] = value
+        if isinstance(value, pd.DataFrame):
+            instance._data[self.name] = value
+        else:
+            raise TypeError(f"expected DataFrame, got {type(value)}")
 
     @property
     def __doc__(self):

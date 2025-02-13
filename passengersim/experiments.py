@@ -229,7 +229,7 @@ class Experiments:
         check_content: bool = True,
         single_process: bool = False,
         retain_sims: bool = False,
-        write_report: PathLike | bool | None = None,
+        write_report: PathLike | bool | None = True,
     ):
         """
         Run the experiments.
@@ -262,8 +262,11 @@ class Experiments:
         retain_sims : bool, default False
             If True, retain the simulation objects in the `sims` attribute after
             running each simulation. This is primarily useful for debugging.
-        write_report : path-like, optional
+        write_report : path-like or bool, default True
             If provided, write a report of the experiments to the given file.
+            This will be relative to the output directory if that is set, and the
+            filename given here is a relative path. If True, the report filename
+            will be "experiments-summary.html". If False, do not write a report.
 
         Returns
         -------
@@ -434,7 +437,7 @@ class Experiments:
             # unless the path is absolute (then write it to the given path)
             if self.output_dir is not None and not write_report.is_absolute():
                 write_report = self.output_dir / write_report
-            results.write_report(write_report)
+            results.write_report(write_report, base_config=self.base_config)
 
         if tag is not None and len(selected_experiments) == 1:
             return results[selected_experiments[0].tag]

@@ -789,6 +789,7 @@ choice_models:
     r2: 0.35
     r3: 0.50
     airline_pref_hhi: [0.0, 0.0001]
+#    airline_pref_seat_share: [0.0, 0.0]
 #    airline_pref_pods:  [-12.29,  0.17]
 #    anc1_relevance: 0.8
 #    anc2_relevance: 0.5

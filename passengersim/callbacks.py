@@ -58,7 +58,7 @@ class CallbackMixin:
         Parameters
         ----------
         callback : Callable[[Simulation, int], None]
-            The callback function to register.  It should accept a two argument,
+            The callback function to register.  It should accept two arguments,
             which will be the Simulation object and the days_prior, and return None.
         """
         if not hasattr(self, "daily_callbacks"):

@@ -62,3 +62,30 @@ class SimTabPaths(GenericSimulationTables):
         extraction_func=extract_paths,
         doc="Path-level summary data.",
     )
+
+    def path_identifier(self, path_id: int) -> str:
+        """
+        Get a human-readable identifying string for a path.
+
+        Parameters
+        ----------
+        path_id : int
+            The path_id to look up.
+
+        Returns
+        -------
+        str
+        """
+
+        def q(attribute):
+            return self.paths.loc[path_id, attribute]
+
+        s = f"Path {path_id}: {q('orig')}~{q('dest')},"
+        leg_ids = self.path_legs.query("path_id == @path_id")["leg_id"]
+        legs = self.legs.query("leg_id in @leg_ids")
+        for i in leg_ids:
+            s += (
+                f" ({legs.loc[i, 'carrier']}:{legs.loc[i, 'flt_no']}"
+                f" {legs.loc[i, 'orig']}-{legs.loc[i, 'dest']})"
+            )
+        return s

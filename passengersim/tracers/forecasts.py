@@ -6,6 +6,7 @@ if TYPE_CHECKING:
     import altair as alt
 
     from passengersim import Simulation, SimulationTables
+    from passengersim.contrast import Contrast
 
 
 import pandas as pd
@@ -107,20 +108,50 @@ def _combine_data_by_panel(d: dict[str, dict[str, pd.DataFrame]]):
     return combined
 
 
-def _base_dashboard_figures(summaries: dict[str, SimulationTables], path_id: int):
+def _base_dashboard_figures(
+    summaries: dict[str, SimulationTables],
+    path_id: int,
+    include: tuple[str] | None = None,
+):
+    if include is not None:
+        summaries = {k: v for k, v in summaries.items() if k in include}
     figures = {
         k: fig_path_forecast_dashboard(v, path_id=path_id) for k, v in summaries.items()
     }
     return figures
 
 
-def fig_path_forecast_dashboard(summary: SimulationTables, path_id: int):
+def fig_path_forecast_dashboard(
+    summary: SimulationTables | Contrast,
+    path_id: int,
+    *,
+    include: tuple[str] | None = None,
+) -> alt.Chart:
+    """
+    Create a dashboard of path forecasts.
+
+    Parameters
+    ----------
+    summary : SimulationTables | Contrast
+        The summary data.
+    path_id : int
+        The path_id to display.
+    include : tuple[str], optional
+        If provided, only include the specified sources.  This is only used
+        when the summary is a Contrast, and it it ignored otherwise, as
+        there is only one source in that case.
+
+    Returns
+    -------
+    alt.Chart
+        The dashboard figure.
+    """
     from passengersim_core.forecast_tools import ForecastData
 
     from passengersim.contrast import Contrast  # prevent circular import
 
     if isinstance(summary, Contrast):
-        figs = _base_dashboard_figures(summary, path_id)
+        figs = _base_dashboard_figures(summary, path_id, include=include)
         figd_panel = _collect_multiple_data_by_panel(figs)
         dfs_p = _combine_data_by_panel(figd_panel)
 

@@ -72,6 +72,8 @@ class Experiment:
 
 
 class Experiments(CallbackMixin):
+    _report_filename = None
+
     def __init__(
         self,
         config: Config,
@@ -441,10 +443,26 @@ class Experiments(CallbackMixin):
             # unless the path is absolute (then write it to the given path)
             if self.output_dir is not None and not write_report.is_absolute():
                 write_report = self.output_dir / write_report
-            results.write_report(
+            self._report_filename = results.write_report(
                 write_report, base_config=self.base_config, extra=self.extra_reporting
             )
 
         if tag is not None and len(selected_experiments) == 1:
             return results[selected_experiments[0].tag]
         return results
+
+    @property
+    def report_filename(self) -> pathlib.Path:
+        """Filename of the written report.
+
+        Unless disabled, a report is written to a file after running the experiments.
+        The report filename is stored here for reference.
+
+        Raises
+        ------
+        ValueError
+            If no report has been written.
+        """
+        if self._report_filename is None:
+            raise ValueError("no report has been written")
+        return self._report_filename

@@ -711,7 +711,7 @@ class GenericSimulationTables:
         *,
         cfg: Config | None = None,
         make_dirs: bool = True,
-        extra_figs: tuple = (),
+        extra: tuple = (),
     ) -> pathlib.Path:
         """Write simulation tables report summary to html.
 
@@ -724,8 +724,14 @@ class GenericSimulationTables:
             from the simulation object will be used.
         make_dirs : bool, default True
             If True, create any necessary directories.
-        extra_figs : tuple, optional
-            Additional figures to include in the report.
+        extra : tuple, optional
+            Additional data to include in the report.  Each item in the tuple should
+            either a section or subsection title, or a tuple of (title, func), or
+            just a function.  If a function is provided, it should take the summary
+            as its only argument and return a figure (altair.Chart or xmle.Elem) or
+            table (pandas.DataFrame).  The function will be called with the summary
+            as its only argument. To use a function that requires other arguments,
+            use `functools.partial` provide the other arguments.
 
         Returns
         -------
@@ -734,9 +740,7 @@ class GenericSimulationTables:
         """
         from passengersim.reporting.html import to_html
 
-        return to_html(
-            self, filename, cfg=cfg, make_dirs=make_dirs, extra_figs=extra_figs
-        )
+        return to_html(self, filename, cfg=cfg, make_dirs=make_dirs, extra=extra)
 
     def metadata(self, key: str = ""):
         """Return a metadata value."""

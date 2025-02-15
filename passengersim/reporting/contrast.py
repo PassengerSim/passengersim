@@ -3,8 +3,6 @@ from __future__ import annotations
 import pathlib
 from typing import TYPE_CHECKING
 
-import pandas as pd
-
 from passengersim.contrast import Contrast
 from passengersim.types import PathLike
 from passengersim.utils.bootstrap import BootstrapHtml
@@ -96,27 +94,6 @@ def to_html(
             )
 
     if extra is not None:
-        for item in extra:
-            if isinstance(item, str) and item.startswith("# "):
-                rpt.new_section(item[2:])
-                continue
-            if isinstance(item, str) and item.startswith("## "):
-                rpt.new_section(item[3:], level=2)
-                continue
-
-            if (
-                isinstance(item, tuple | list)
-                and len(item) == 2
-                and isinstance(item[0], str)
-            ):
-                title, item = item
-                fig = item(summaries)
-                if isinstance(fig, pd.DataFrame):
-                    rpt.add_table(title, fig)
-                else:
-                    rpt.add_figure(title, fig)
-            else:
-                fig = item(summaries)
-                rpt.add_figure(fig)
+        rpt.add_extra(summaries, *extra)
 
     return rpt.write(filename, make_dirs=make_dirs)

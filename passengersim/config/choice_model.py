@@ -82,6 +82,7 @@ class PodsChoiceModel(CommonChoiceModel, extra="forbid"):
     emult: float | None = None
 
     basefare_mult: float | None = None
+    basefare_mult2: float | None = 1.0
     connect_disutility: float | None = None
     path_quality: tuple[float, float] | None = None
     airline_pref_pods: tuple[float, float] | None = None

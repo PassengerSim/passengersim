@@ -9,7 +9,7 @@ from xmle.uid import uid
 
 from passengersim.reporting.report import Elem
 from passengersim.utils.bootstrap.logo import passengersim_white_green_logo
-from passengersim.utils.colors import DarkPurple, LightGreen, LightPurple
+from passengersim.utils.colors import DarkGreen, DarkPurple, LightGreen, LightPurple
 from passengersim.utils.filenaming import filename_with_timestamp
 
 
@@ -69,13 +69,19 @@ class BootstrapHtml:
     .nav-link, .navbar-brand {{
         color: white;
     }}
+    .nav-link:hover {{
+        color: {LightGreen};
+    }}
     .nav-link-side {{
         color: black;
         border-radius: 3px;
     }}
+    .nav-link-side:hover {{
+        color: {DarkGreen};
+    }}
     .nav-link-side.active {{
         color: {DarkPurple};
-        background-color: {LightPurple};
+        background-color: #f8ebff;
     }}
     :target::before {{
       content: "";
@@ -323,7 +329,7 @@ class BootstrapHtml:
             toc.elem(
                 "div",
                 text="Table of Contents",
-                attrib={"class": "fw-bold mt-3 ms-2"},
+                attrib={"class": "fw-bold mt-3 ms-1 ps-1"},
             )
             for i in self._rebuild_toc():
                 toc.append(i)
@@ -402,7 +408,7 @@ class BootstrapHtml:
             while anchor_lvl > len(xtoc_tree):
                 xtoc_tree.append(
                     xtoc_tree[-1].put(
-                        "nav", {"class": "nav nav-pills flex-column ms-2"}
+                        "nav", {"class": "nav nav-pills flex-column ms-1 ps-1"}
                     )
                 )
             while anchor_lvl < len(xtoc_tree):
@@ -411,7 +417,10 @@ class BootstrapHtml:
                 Elem(
                     "a",
                     text=anchor_text,
-                    attrib={"class": "nav-link-side ms-2", "href": f"#{anchor_ref}"},
+                    attrib={
+                        "class": "nav-link-side ms-1 ps-1",
+                        "href": f"#{anchor_ref}",
+                    },
                 )
             )
 

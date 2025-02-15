@@ -62,11 +62,17 @@ class LegBidPriceTracer(GenericTracer):
 
 
 def fig_leg_bid_prices(
-    summary: SimulationTables, *, std_dev: bool = True, raw_df: bool = False
+    summary: SimulationTables,
+    *,
+    std_dev: bool = True,
+    include: tuple[str] | None = None,
+    raw_df: bool = False,
 ) -> alt.Chart:
     from passengersim.contrast import Contrast  # prevent circular import
 
     if isinstance(summary, Contrast):
+        if include is not None:
+            summary = {k: v for k, v in summary.items() if k in include}
         dfs = {k: fig_leg_bid_prices(v, raw_df=True) for k, v in summary.items()}
         df = pd.concat(dfs, names=["source"]).reset_index()
     else:

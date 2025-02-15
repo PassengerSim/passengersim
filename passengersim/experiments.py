@@ -84,6 +84,7 @@ class Experiments(CallbackMixin):
         self.experiments: list[Experiment] = []
         self.base_config = config
         self.output_dir = output_dir if output_dir is None else pathlib.Path(output_dir)
+        self.extra_reporting = None
         if self.output_dir is not None and hide_from_git:
             if not self.output_dir.exists():
                 self.output_dir.mkdir(parents=True)
@@ -440,7 +441,9 @@ class Experiments(CallbackMixin):
             # unless the path is absolute (then write it to the given path)
             if self.output_dir is not None and not write_report.is_absolute():
                 write_report = self.output_dir / write_report
-            results.write_report(write_report, base_config=self.base_config)
+            results.write_report(
+                write_report, base_config=self.base_config, extra=self.extra_reporting
+            )
 
         if tag is not None and len(selected_experiments) == 1:
             return results[selected_experiments[0].tag]

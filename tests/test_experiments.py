@@ -1,5 +1,8 @@
 import os
+import pathlib
 import re
+
+import altair as alt
 
 import passengersim as pax
 from passengersim.contrast import Contrast
@@ -34,6 +37,40 @@ def test_experiments_interface(tmp_path):
     assert all(
         isinstance(summary, pax.SimulationTables) for summary in summaries.values()
     )
+
+    # experiments.run should have written a report to the output directory
+    assert isinstance(experiments.report_filename, pathlib.Path)
+    filename1 = experiments.report_filename
+    raw_report = experiments.report_filename.read_text()
+    assert re.search(r"Figure 1: </span>Carrier Revenues</h2>", raw_report)
+
+    # test the write_report method
     outfile = summaries.write_report("demo-output-1/meta.html", base_config=cfg)
     raw_output = outfile.read_text()
     assert re.search(r"Figure 1: </span>Carrier Revenues</h2>", raw_output)
+
+    def nothing_to_see_here(summary):
+        return (
+            alt.Chart()
+            .mark_text(
+                text="these are not the droids you are looking for\nmove along",
+                lineBreak="\n",
+            )
+            .properties(title="Jedi Mind Trick")
+        )
+
+    # test report after adding extra output sections
+    experiments.extra_reporting = [
+        "# Bonus Section",
+        ("Bonus Figure", nothing_to_see_here),
+        nothing_to_see_here,
+    ]
+
+    experiments.run()
+    assert experiments.report_filename != filename1
+    assert experiments.report_filename.exists()
+    raw_report = experiments.report_filename.read_text()
+    assert re.search(r"Figure 1: </span>Carrier Revenues</h2>", raw_report)
+    assert re.search(r"<h1 id=\"bonus-section\">Bonus Section", raw_report)
+    assert re.search(r"Figure [1-9]+: </span>Bonus Figure</h2>", raw_report)
+    assert re.search(r"Figure [1-9]+: </span>Jedi Mind Trick</h2>", raw_report)

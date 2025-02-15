@@ -410,17 +410,17 @@ class Experiments(CallbackMixin):
                     # Initialize the simulation
                     if e.multi and not single_process:
                         sim = MultiSimulation(config)
-                        self.apply_callback_functions(sim)
-                        summary = sim.run(rich_progress=rich_progress)
                         if retain_sims:
                             self.sims[e.tag] = sim
+                        self.apply_callback_functions(sim)
+                        summary = sim.run(rich_progress=rich_progress)
                         del sim
                     else:
                         sim = Simulation(config)
-                        self.apply_callback_functions(sim)
-                        summary = sim.run(rich_progress=rich_progress)
                         if retain_sims:
                             self.sims[e.tag] = sim
+                        self.apply_callback_functions(sim)
+                        summary = sim.run(rich_progress=rich_progress)
                         del sim
 
                 results[e.tag] = summary

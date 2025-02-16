@@ -114,8 +114,10 @@ def filenames_with_timestamp(
 
     Returns
     -------
-    pathlib.Path
-        The new filename with the timestamp added.
+    dict[str, pathlib.Path]
+        The new filenames with the timestamp added.  The keys are the suffixes,
+        and the values are the new filenames with that suffix. The keys will
+        also include "timestamp" with the timestamp value.
     """
     # ensure all suffixes are strings that start with a period
     suffix = [s if s.startswith(".") else f".{s}" for s in suffix]
@@ -151,6 +153,7 @@ def filenames_with_timestamp(
     if make_dirs:
         filename.parent.mkdir(parents=True, exist_ok=True)
 
+    filename["timestamp"] = timestamp
     return filenames
 
 

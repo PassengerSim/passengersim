@@ -2318,9 +2318,21 @@ class Simulation(BaseSimulation, CallbackMixin):
 
         # write output files if designated
         if isinstance(summary, GenericSimulationTables):
-            if self.config.outputs.html:
-                out_filename = summary.to_html(self.config.outputs.html.filename)
-                summary._metadata["outputs.html_filename"] = out_filename
+            if self.config.outputs.html and (
+                self.config.outputs.disk is True
+                or self.config.outputs.html.filename == self.config.outputs.disk
+            ):
+                # this will ensure the html and disk files have the same timestamp
+                filenames = summary.save(self.config.outputs.html.filename)
+                summary._metadata["outputs.html_filename"] = filenames[".html"]
+                summary._metadata["outputs.disk_filename"] = filenames[".pxsim"]
+            else:
+                if self.config.outputs.html:
+                    out_filename = summary.to_html(self.config.outputs.html.filename)
+                    summary._metadata["outputs.html_filename"] = out_filename
+                if isinstance(self.config.outputs.disk, str | pathlib.Path):
+                    out_filename = summary.to_file(self.config.outputs.disk)
+                    summary._metadata["outputs.disk_filename"] = out_filename
             if self.config.outputs.pickle:
                 pkl_filename = summary.to_pickle(self.config.outputs.pickle)
                 summary._metadata["outputs.pickle_filename"] = pkl_filename

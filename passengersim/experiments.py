@@ -104,6 +104,8 @@ class Experiments(CallbackMixin):
             self.base_config.outputs.html.filename = pathlib.Path(html)
 
     def _rename_file(self, tag: str, filename: pathlib.Path):
+        if not isinstance(filename, str | pathlib.Path):
+            return filename
         if self.output_dir is None:
             return pathlib.Path(tag) / filename
         else:

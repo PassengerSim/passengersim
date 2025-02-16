@@ -605,7 +605,7 @@ class GenericSimulationTables:
         *,
         preserve_config: bool = True,
         make_dirs: Literal[True, False, "git"] = True,
-    ) -> None:
+    ) -> pathlib.Path:
         """Write simulation tables to a file.
 
         Parameters
@@ -624,6 +624,11 @@ class GenericSimulationTables:
             in Git repositories, unless the value is "git", in which case
             no `.gitignore` file is created and the results will be eligible for
             inclusion in Git.
+
+        Returns
+        -------
+        Path-like
+            The resolved filename for the saved outputs.
         """
         if add_timestamp_ext:
             filename = filename_with_timestamp(filename, suffix=".pxsim")
@@ -642,6 +647,7 @@ class GenericSimulationTables:
         if self.callback_data:
             kvs["_callback_data_"] = self.callback_data
         kvs.close()
+        return filename
 
     @classmethod
     def from_file(

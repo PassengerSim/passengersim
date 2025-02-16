@@ -7,6 +7,7 @@ import os
 import pathlib
 import pickle
 import platform
+import time
 import warnings
 from collections.abc import Callable, Collection
 from datetime import datetime, timezone
@@ -17,7 +18,11 @@ import pandas as pd
 
 from passengersim.callbacks import CallbackData
 from passengersim.config import Config
-from passengersim.utils.filenaming import filename_with_timestamp
+from passengersim.utils.filenaming import (
+    filename_with_timestamp,
+    filenames_with_timestamp,
+    make_parent_directory,
+)
 from passengersim.utils.kvstore import KVStore
 
 if TYPE_CHECKING:
@@ -625,12 +630,8 @@ class GenericSimulationTables:
         else:
             filename = pathlib.Path(filename)
         if make_dirs:
-            if not filename.parent.exists():
-                filename.parent.mkdir(parents=True, exist_ok=True)
-                if make_dirs != "git":
-                    with open(filename.parent / ".gitignore", "w") as f:
-                        f.write(".gitignore\n")  # ignore this file itself
-                        f.write("*.pxsim\n")  # ignore pxsim files
+            git_ignores = ["*.pxsim"] if make_dirs != "git" else False
+            make_parent_directory(filename, git_ignores)
         kvs = KVStore(filename)
         for k, v in self._data.items():
             kvs[k] = v
@@ -741,6 +742,60 @@ class GenericSimulationTables:
         from passengersim.reporting.html import to_html
 
         return to_html(self, filename, cfg=cfg, make_dirs=make_dirs, extra=extra)
+
+    def save(
+        self,
+        filename: str | pathlib.Path,
+        *,
+        timestamp: float | time.struct_time | datetime | None = None,
+        make_dirs: Literal[True, False, "git"] = True,
+        cfg: Config | None = None,
+        extra_html: tuple = (),
+    ) -> dict[str, pathlib.Path]:
+        """Save the object to a set of files.
+
+        This method will write both an HTML report on this simulation tables
+        object and a ".pxsim" file allowing the content to be restored.
+
+        Parameters
+        ----------
+        filename : Path-like
+            The file stem to use for writing files.
+        timestamp : float or time.struct_time or datetime, optional
+            The timestamp to use for the filenames.  If not provided, the current
+            time will be used.
+        make_dirs : bool or "git", default True
+            If True, create the parent directory for the files if it does not
+            already exist.  If the directory is created, it will be created with
+            a `.gitignore` file to prevent accidental inclusion of output in Git
+            repositories, unless the value is "git", in which case no `.gitignore`
+            file is created and the results will be eligible for inclusion in Git.
+        cfg : Config, optional
+            The configuration to use for the HTML report.  If None, the configuration
+            from the simulation object will be used if available.
+        extra_html : tuple, optional
+            Additional data to include in the HTML report. This argument is passed
+            to `to_html`, see that function for more details.
+
+        Returns
+        -------
+        dict
+            A dictionary of filenames written, including the timestamp added.
+        """
+        if make_dirs:
+            make_parent_directory(
+                filename,
+                git_ignore_things=False
+                if make_dirs == "git"
+                else ["*.pxsim", "*.html"],
+            )
+        filename = pathlib.Path(filename)
+        filenames = filenames_with_timestamp(
+            filename, timestamp=timestamp, suffix=[".pxsim", ".html"]
+        )
+        self.to_html(filenames[".html"], cfg=cfg, make_dirs=False, extra=extra_html)
+        self.to_file(filenames[".pxsim"], make_dirs=False, add_timestamp_ext=False)
+        return filenames
 
     def metadata(self, key: str = ""):
         """Return a metadata value."""

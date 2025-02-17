@@ -89,7 +89,7 @@ def filenames_with_timestamp(
     *,
     timestamp: float | time.struct_time | datetime.datetime | None = None,
     make_dirs: bool = False,
-) -> dict[str, pathlib.Path]:
+) -> dict[str, pathlib.Path | str]:
     """
     Add a consistent timestamp to multiple filenames sharing a common stem.
 
@@ -153,7 +153,7 @@ def filenames_with_timestamp(
     if make_dirs:
         filename.parent.mkdir(parents=True, exist_ok=True)
 
-    filename["timestamp"] = timestamp
+    filenames["timestamp"] = timestamp
     return filenames
 
 

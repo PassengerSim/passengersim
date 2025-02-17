@@ -320,6 +320,7 @@ class Simulation(BaseSimulation, CallbackMixin):
                 "timeframe_demand_allocation",
                 "tot_z_factor",
                 "allow_unused_restrictions",
+                "additional_settings",
             ]:
                 pass
             else:
@@ -327,6 +328,10 @@ class Simulation(BaseSimulation, CallbackMixin):
         for pname, pvalue in config.simulation_controls.model_extra.items():
             print(f"extra simulation setting: {pname} = ", float(pvalue))
             self.sim.set_parm(pname, float(pvalue))
+        if config.simulation_controls.additional_settings:
+            self.sim.additional_settings(
+                **config.simulation_controls.additional_settings
+            )
 
         # There is a default array of DCPs, we'll override it with the data from the
         # input file (if available)

@@ -36,7 +36,7 @@ def test_db_serialization(config: Config):
     ]
     assert z["db"]["engine"] == "sqlite"
 
-    # when explicity setting the database to None in the Config object,
+    # when explicitly setting the database to None in the Config object,
     # the value of the 'db' key in the object stays as None and is not
     # converted to a null database, and also the serialized form
     # should be None, not a null database
@@ -73,6 +73,7 @@ def test_output_serialization(config):
     assert "outputs" in z
     assert isinstance(z["outputs"], dict)
     assert sorted(z["outputs"].keys()) == [
+        "disk",
         "excel",
         "html",
         "log_reports",

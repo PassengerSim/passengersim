@@ -106,7 +106,7 @@ class OutputConfig(PrettyModel, extra="forbid", validate_assignment=True):
     pickle: pathlib.Path | None = None
     """Write a pickle of the SimulationTables output to this file after a run."""
 
-    disk: pathlib.Path | bool | None = True
+    disk: bool | pathlib.Path | None = True
     """Write the SimulationTables output to this file after a run.
 
     This will use pxsim format, an efficient binary file that allows "lazy" file

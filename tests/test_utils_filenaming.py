@@ -18,6 +18,7 @@ def test_filenaming_consistent_timestamps():
             assert f1 == {
                 ".html": pathlib.Path("subdir/hello-world.20090213-173130.html"),
                 ".log": pathlib.Path("subdir/hello-world.20090213-173130.log"),
+                "timestamp": "20090213-173130",
             }
             f1[".html"].write_text("*")
             f2 = filenames_with_timestamp(
@@ -27,4 +28,5 @@ def test_filenaming_consistent_timestamps():
             assert f2 == {
                 ".html": pathlib.Path("subdir/hello-world.20090213-173131.html"),
                 ".log": pathlib.Path("subdir/hello-world.20090213-173131.log"),
+                "timestamp": "20090213-173131",
             }

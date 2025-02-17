@@ -269,11 +269,16 @@ class BootstrapHtml:
         self.current_section = section
         return section
 
+    add_section = new_section
+
     def set_section(self, title: str):
         if title not in self.sections:
             return self.new_section(title)
         self.current_section = self.sections[title]
         return self.current_section
+
+    def append(self, *args):
+        self.current_section.append(*args)
 
     def navbar(self):
         nav_top = Elem(

@@ -112,7 +112,7 @@ class MultiSimulation(BaseSimulation, CallbackMixin):
                 _subprocess_run_trial(
                     trial_id,
                     cfg_json,
-                    self.output_dir,
+                    output_dir=self.output_dir,
                     summarizer=summarizer,
                     callbacks=self.callback_functions(),
                 )

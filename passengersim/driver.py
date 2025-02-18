@@ -143,6 +143,13 @@ class BaseSimulation(ABC):
             if path.carrier_name == carrier:
                 yield from path.pathclasses
 
+    @property
+    def demands(self):
+        """Generator of all demands in the simulation."""
+        from .iterators.demand import DemandIterator
+
+        return DemandIterator(self._sim)
+
 
 class Simulation(BaseSimulation, CallbackMixin):
     def __init__(

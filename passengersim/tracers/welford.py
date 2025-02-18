@@ -111,3 +111,42 @@ class MultiWelford:
     @property
     def n(self) -> int:
         return self._n
+
+
+class WeightedWelford:
+    def __init__(self):
+        self._w_sum = 0
+        self._w_sum2 = 0
+        self._mean = 0
+        self._S = 0
+
+    def update(self, x: np.typing.ArrayLike, w: np.typing.ArrayLike) -> None:
+        self._w_sum += w
+        self._w_sum2 += w**2
+        mean_old = self.mean
+        self._mean = mean_old + (w / self._w_sum) * (x - mean_old)
+        self.S = self._S + w * (x - mean_old) * (x - self.mean)
+
+    @property
+    def mean(self) -> np.typing.ArrayLike:
+        return self._mean
+
+    @property
+    def variance(self) -> np.typing.ArrayLike:
+        return self._S / self._w_sum
+
+    @property
+    def std_dev(self) -> np.typing.ArrayLike:
+        return np.sqrt(self.variance)
+
+    @property
+    def sample_variance(self) -> np.typing.ArrayLike:
+        return self._S / (self._w_sum - 1)
+
+    @property
+    def sample_std_dev(self) -> np.typing.ArrayLike:
+        return np.sqrt(self.sample_variance)
+
+    @property
+    def n(self) -> int:
+        return self._w_sum

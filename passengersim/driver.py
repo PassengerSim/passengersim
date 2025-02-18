@@ -55,6 +55,7 @@ from .progressbar import DummyProgressBar, ProgressBar
 
 if TYPE_CHECKING:
     from passengersim.config.rm_systems import RmSystem as RmSystemConfig
+    from passengersim.core import ChoiceModel
 
 logger = logging.getLogger("passengersim")
 
@@ -2390,3 +2391,37 @@ class Simulation(BaseSimulation, CallbackMixin):
         dst : Path-like or sqlite3.Connection
         """
         return self.cnx.backup(dst)
+
+    def get_choice_parameters(self, choicemodel: str | ChoiceModel):
+        """Get the parameters for a choice model."""
+        if isinstance(choicemodel, str):
+            choicemodel = self.choice_models[choicemodel]
+        raw = choicemodel.get_parameters()
+        r = raw.pop("restrictions", ())
+        rsigma = raw.pop("restriction_sigmas", ())
+        for rname, rval, rsig in zip(self._fare_restriction_list, r, rsigma):
+            raw[f"restrictions_{rname}"] = rval
+            raw[f"restrictions_{rname}_sigma"] = rsig
+        return raw
+
+    def set_choice_parameters(
+        self, choicemodel: str | ChoiceModel, values: dict[str, float]
+    ):
+        """Set the parameters for a choice model."""
+        if isinstance(choicemodel, str):
+            choicemodel = self.choice_models[choicemodel]
+        raw = choicemodel.get_parameters()
+        for k, v in values.items():
+            if k.startswith("restrictions_"):
+                if k.endswith("_sigma"):
+                    kr = k[13:-6]
+                else:
+                    kr = k[13:]
+                position = self._fare_restriction_mapping[kr] - 1
+                if k.endswith("_sigma"):
+                    raw["restriction_sigmas"][position] = v
+                else:
+                    raw["restrictions"][position] = v
+            else:
+                raw[k] = v
+        choicemodel.set_parameters(raw)

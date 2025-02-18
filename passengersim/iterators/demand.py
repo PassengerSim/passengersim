@@ -49,7 +49,15 @@ class DemandIterator:
                 continue
             return dmd
 
-    def __call__(self, *args, **kwargs):
-        if len(args):
-            raise TypeError("DemandIterator takes only keyword arguments")
-        return DemandIterator(self._sim, **kwargs)
+    def __call__(self, **kwargs):
+        kw = dict(
+            orig=self._orig,
+            dest=self._dest,
+            segment=self._segment,
+        )
+        kw.update(kwargs)
+        return DemandIterator(self._sim, **kw)
+
+    def select(self, **kwargs):
+        i = self(**kwargs)
+        return next(i)

@@ -150,6 +150,13 @@ class BaseSimulation(ABC):
 
         return DemandIterator(self._sim)
 
+    @property
+    def fares(self):
+        """Generator of all fares in the simulation."""
+        from .iterators.fare import FareIterator
+
+        return FareIterator(self._sim)
+
 
 class Simulation(BaseSimulation, CallbackMixin):
     def __init__(

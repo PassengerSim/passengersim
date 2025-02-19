@@ -40,6 +40,7 @@ from passengersim.core import (
     Market,
     PathClass,
     SimulationEngine,
+    UserAction,
 )
 from passengersim.summaries import SimulationTables
 from passengersim.summaries.generic import GenericSimulationTables
@@ -268,6 +269,7 @@ class Simulation(BaseSimulation, CallbackMixin):
         self._init_todd_curves(config)
         self._init_choice_models(config)
         self._init_frat5_curves(config)
+        self._init_blf_curves(config)
         self._init_load_factor_curves(config)
         self._init_carriers(config)
         self._init_booking_curves(config)
@@ -452,6 +454,16 @@ class Simulation(BaseSimulation, CallbackMixin):
             f5.max_cap = f5_data.max_cap
             self.sim.add_frat5(f5)
             self.frat5curves[f5_name] = f5
+
+    def _init_blf_curves(self, config):
+        """These are currently grabbed by the RmStep"""
+        pass
+#        logger.info("Initializing BLF curves")
+#        for blf_name, blf_data in config.blf_curves.items():
+#            ua = UserAction(blf_name)
+#            ua.add_curve(blf_name, blf_data.min_distance, blf_data.max_distance, blf_data.type, blf_data.curve)
+#            #self.sim.add_frat5(f5)
+#            #self.frat5curves[f5_name] = f5
 
     def _init_load_factor_curves(self, config):
         logger.info("Initializing load factor curves")

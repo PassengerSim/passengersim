@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import pathlib
 import warnings
 from collections.abc import Callable
@@ -19,11 +18,13 @@ from rich.progress import (
 
 from passengersim import __version__ as _passengersim_version
 from passengersim import contrast
+from passengersim.callbacks import CallbackMixin
 from passengersim.core import __version__ as _passengersim_core_version
 
 from . import MultiSimulation, Simulation
 from .config import Config
 from .summaries import SimulationTables
+from .types import PathLike
 
 if TYPE_CHECKING:
     UseExistingT = Literal[True, False, "ignore", "raise"]
@@ -36,7 +37,7 @@ class Experiment:
         tag: str | None = None,
         multiprocess: bool = True,
         *,
-        external: str | os.PathLike | None = None,
+        external: PathLike | None = None,
     ):
         """
         Parameters
@@ -70,7 +71,9 @@ class Experiment:
                 )
 
 
-class Experiments:
+class Experiments(CallbackMixin):
+    _report_filename = None
+
     def __init__(
         self,
         config: Config,
@@ -83,6 +86,7 @@ class Experiments:
         self.experiments: list[Experiment] = []
         self.base_config = config
         self.output_dir = output_dir if output_dir is None else pathlib.Path(output_dir)
+        self.extra_reporting = None
         if self.output_dir is not None and hide_from_git:
             if not self.output_dir.exists():
                 self.output_dir.mkdir(parents=True)
@@ -100,6 +104,8 @@ class Experiments:
             self.base_config.outputs.html.filename = pathlib.Path(html)
 
     def _rename_file(self, tag: str, filename: pathlib.Path):
+        if not isinstance(filename, str | pathlib.Path):
+            return filename
         if self.output_dir is None:
             return pathlib.Path(tag) / filename
         else:
@@ -111,7 +117,7 @@ class Experiments:
         tag: str | None = None,
         multiprocess: bool = True,
         *,
-        external: str | os.PathLike | None = None,
+        external: PathLike | None = None,
     ):
         if not isinstance(title, str):
             # called as a decorator, so the first argument is the function
@@ -229,6 +235,7 @@ class Experiments:
         check_content: bool = True,
         single_process: bool = False,
         retain_sims: bool = False,
+        write_report: PathLike | bool | None = True,
     ):
         """
         Run the experiments.
@@ -261,6 +268,11 @@ class Experiments:
         retain_sims : bool, default False
             If True, retain the simulation objects in the `sims` attribute after
             running each simulation. This is primarily useful for debugging.
+        write_report : path-like or bool, default True
+            If provided, write a report of the experiments to the given file.
+            This will be relative to the output directory if that is set, and the
+            filename given here is a relative path. If True, the report filename
+            will be "experiments-summary.html". If False, do not write a report.
 
         Returns
         -------
@@ -402,15 +414,17 @@ class Experiments:
                     # Initialize the simulation
                     if e.multi and not single_process:
                         sim = MultiSimulation(config)
-                        summary = sim.run(rich_progress=rich_progress)
                         if retain_sims:
                             self.sims[e.tag] = sim
+                        self.apply_callback_functions(sim)
+                        summary = sim.run(rich_progress=rich_progress)
                         del sim
                     else:
                         sim = Simulation(config)
-                        summary = sim.run()
                         if retain_sims:
                             self.sims[e.tag] = sim
+                        self.apply_callback_functions(sim)
+                        summary = sim.run(rich_progress=rich_progress)
                         del sim
 
                 results[e.tag] = summary
@@ -422,6 +436,35 @@ class Experiments:
                 visible=False,
             )
 
+        if write_report:
+            if isinstance(write_report, PathLike):
+                write_report = pathlib.Path(write_report)
+            else:
+                write_report = pathlib.Path("experiments-summary.html")
+            # if output directory is set, write the report there,
+            # unless the path is absolute (then write it to the given path)
+            if self.output_dir is not None and not write_report.is_absolute():
+                write_report = self.output_dir / write_report
+            self._report_filename = results.write_report(
+                write_report, base_config=self.base_config, extra=self.extra_reporting
+            )
+
         if tag is not None and len(selected_experiments) == 1:
             return results[selected_experiments[0].tag]
         return results
+
+    @property
+    def report_filename(self) -> pathlib.Path:
+        """Filename of the written report.
+
+        Unless disabled, a report is written to a file after running the experiments.
+        The report filename is stored here for reference.
+
+        Raises
+        ------
+        ValueError
+            If no report has been written.
+        """
+        if self._report_filename is None:
+            raise ValueError("no report has been written")
+        return self._report_filename

@@ -4,6 +4,7 @@ import pathlib
 from typing import TYPE_CHECKING
 
 from passengersim.contrast import Contrast
+from passengersim.types import PathLike
 from passengersim.utils.bootstrap import BootstrapHtml
 
 if TYPE_CHECKING:
@@ -12,7 +13,7 @@ if TYPE_CHECKING:
 
 def to_html(
     summaries: Contrast,
-    filename: str | None = None,
+    filename: PathLike | None = None,
     *,
     base_config: Config | None = None,
     make_dirs: bool = True,
@@ -26,6 +27,7 @@ def to_html(
     fare_class_mix: bool = True,
     bookings_by_timeframe: bool = True,
     bid_price_history: bool = True,
+    extra: tuple | None = None,
 ) -> pathlib.Path:
     """
     Write a summary to an HTML file.
@@ -90,5 +92,8 @@ def to_html(
             rpt.add_figure(
                 summaries.fig_bookings_by_timeframe(by_carrier=carrier, by_class=True)
             )
+
+    if extra is not None:
+        rpt.add_extra(summaries, *extra)
 
     return rpt.write(filename, make_dirs=make_dirs)

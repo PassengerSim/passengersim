@@ -7,6 +7,8 @@ from passengersim_core import (
     Event,
 )
 
+from .tracers.generic import GenericTracer
+
 if TYPE_CHECKING:
     from passengersim_core import SimulationEngine
 
@@ -15,7 +17,9 @@ class CallbackMixin:
     if TYPE_CHECKING:
         sim: SimulationEngine
 
-    def end_sample_callback(self, callback: Callable[[CallbackMixin], None]):
+    def end_sample_callback(
+        self, callback: Callable[[CallbackMixin], None] | GenericTracer
+    ):
         """Register a function to be triggered at the end of each sample.
 
         The callback function will be triggered before counters are reset or
@@ -29,10 +33,14 @@ class CallbackMixin:
         """
         if not hasattr(self, "end_sample_callbacks"):
             self.end_sample_callbacks = []
+        if isinstance(callback, GenericTracer):
+            callback = callback.fresh()
         self.end_sample_callbacks.append(callback)
         return callback
 
-    def begin_sample_callback(self, callback: Callable[[CallbackMixin], None]):
+    def begin_sample_callback(
+        self, callback: Callable[[CallbackMixin], None] | GenericTracer
+    ):
         """Register a function to be triggered at the beginning of each sample.
 
         The callback function will be triggered after initial setup including
@@ -46,10 +54,14 @@ class CallbackMixin:
         """
         if not hasattr(self, "begin_sample_callbacks"):
             self.begin_sample_callbacks = []
+        if isinstance(callback, GenericTracer):
+            callback = callback.fresh()
         self.begin_sample_callbacks.append(callback)
         return callback
 
-    def daily_callback(self, callback: Callable[[CallbackMixin, int], None]):
+    def daily_callback(
+        self, callback: Callable[[CallbackMixin, int], None] | GenericTracer
+    ):
         """Register a function to be triggered each day during a sample.
 
         The callback function will be triggered after all RM steps when the day
@@ -58,11 +70,13 @@ class CallbackMixin:
         Parameters
         ----------
         callback : Callable[[Simulation, int], None]
-            The callback function to register.  It should accept a two argument,
+            The callback function to register.  It should accept two arguments,
             which will be the Simulation object and the days_prior, and return None.
         """
         if not hasattr(self, "daily_callbacks"):
             self.daily_callbacks = []
+        if isinstance(callback, GenericTracer):
+            callback = callback.fresh()
         self.daily_callbacks.append(callback)
         return callback
 
@@ -73,6 +87,15 @@ class CallbackMixin:
             if hasattr(self, f"{k}_callbacks"):
                 cb[f"{k}_callbacks"] = getattr(self, f"{k}_callbacks", [])
         return cb
+
+    def apply_callback_functions(self, sim: CallbackMixin):
+        callbacks = self.callback_functions()
+        for cb in callbacks.get("begin_sample_callbacks", []):
+            sim.begin_sample_callback(cb)
+        for cb in callbacks.get("end_sample_callbacks", []):
+            sim.end_sample_callback(cb)
+        for cb in callbacks.get("daily_callbacks", []):
+            sim.daily_callback(cb)
 
     def add_callback_events(self):
         """Add callback events to the simulation event queue."""

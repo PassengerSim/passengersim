@@ -33,6 +33,7 @@ from . import (
     pathlegs,
     paths,
     segmentation_by_timeframe,
+    segmentation_detail,
 )
 from .generic import GenericSimulationTables
 

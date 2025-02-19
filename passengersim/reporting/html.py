@@ -22,6 +22,7 @@ def to_html(
     *,
     cfg: Config | None = None,
     make_dirs: bool = True,
+    extra: tuple | None = None,
 ) -> pathlib.Path:
     """
     Write a summary to an HTML file.
@@ -31,25 +32,37 @@ def to_html(
     summary : SimulationTables
     filename : Path-like, optional
         If not provided, the filename will be taken from the run config.  If
-        it is also not defined there, a ValueError will be raised.
+        it is also not defined there, a ValueError will be raised.  A timestamp
+        will be appended to the filename, so that each report is unique and
+        does not overwrite previous reports.
     cfg : Config, optional
         If not provided, the configuration will be taken from the summary
     make_dirs : bool, optional
         If True, create any necessary directories.
+    extra : tuple, optional
+        Additional data to include in the report.  Each item in the tuple should
+        either a section or subsection title, or a tuple of (title, func), or
+        just a function.  If a function is provided, it should take the summary
+        as its only argument and return a figure (altair.Chart or xmle.Elem) or
+        table (pandas.DataFrame).
 
     Returns
     -------
-
+    pathlib.Path
+        The path to the written file.  This includes any appended timestamp.
     """
     if cfg is None:
         cfg = summary.config
         if cfg is None:
-            raise ValueError("No configuration provided")
+            # no config provided, so use a default one
+            cfg = Config()
+            cfg.outputs.html.filename = None
+            cfg.outputs.html.configs = []
 
     if filename is None:
-        filename = pathlib.Path(cfg.outputs.html.filename)
-        if filename is None:
+        if cfg.outputs.html.filename is None:
             raise ValueError("No filename provided")
+        filename = pathlib.Path(cfg.outputs.html.filename)
 
     rpt = BootstrapHtml(title=cfg.outputs.html.title or cfg.scenario)
 
@@ -128,6 +141,9 @@ def to_html(
             dh = None
         if dh is not None and dh["displacement_mean"].max() > 0:
             rpt.add_figure(summary.fig_displacement_history())
+
+    if extra is not None:
+        rpt.add_extra(summary, *extra)
 
     if cfg.outputs.html.configs:
         rpt.new_section("Configuration")

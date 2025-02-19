@@ -3,9 +3,11 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, SerializeAsAny, model_validator
 
 from .named import Named
+
+TwoFloats = SerializeAsAny[tuple[float, float] | None]
 
 
 class CommonChoiceModel(Named, extra="forbid"):
@@ -84,13 +86,13 @@ class PodsChoiceModel(CommonChoiceModel, extra="forbid"):
     basefare_mult: float | None = None
     basefare_mult2: float | None = 1.0
     connect_disutility: float | None = None
-    path_quality: tuple[float, float] | None = None
-    airline_pref_pods: tuple[float, float] | None = None
-    airline_pref_hhi: tuple[float, float] | None = None
-    airline_pref_seat_share: tuple[float, float] | None = None
-    elapsed_time: tuple[float, float] | None = None
+    path_quality: TwoFloats = None
+    airline_pref_pods: TwoFloats = None
+    airline_pref_hhi: TwoFloats = None
+    airline_pref_seat_share: TwoFloats = None
+    elapsed_time: TwoFloats = None
     buffer_threshold: int | None = None
-    buffer_time: tuple[float, float] | None = None
+    buffer_time: TwoFloats = None
     tolerance: float | None = None
     non_stop_multiplier: float | None = None
     connection_multiplier: float | None = None
@@ -99,7 +101,7 @@ class PodsChoiceModel(CommonChoiceModel, extra="forbid"):
     todd_curve: str | None = None
     early_dep: dict | None = None
     late_arr: dict | None = None
-    replanning: tuple[float, float] | None = None
+    replanning: TwoFloats = None
 
     # Ancillaries
     anc1_relevance: float | None = None
@@ -156,4 +158,3 @@ Two types of choice models are available in PassengerSim.
 
 Use the `kind` key to select which kind of choice model you wish to parameterize.
 """
-

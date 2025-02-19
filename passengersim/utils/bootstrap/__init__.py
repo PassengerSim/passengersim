@@ -9,7 +9,7 @@ from xmle.uid import uid
 
 from passengersim.reporting.report import Elem
 from passengersim.utils.bootstrap.logo import passengersim_white_green_logo
-from passengersim.utils.colors import DarkPurple, LightGreen, LightPurple
+from passengersim.utils.colors import DarkGreen, DarkPurple, LightGreen, LightPurple
 from passengersim.utils.filenaming import filename_with_timestamp
 
 
@@ -69,13 +69,19 @@ class BootstrapHtml:
     .nav-link, .navbar-brand {{
         color: white;
     }}
+    .nav-link:hover {{
+        color: {LightGreen};
+    }}
     .nav-link-side {{
         color: black;
         border-radius: 3px;
     }}
+    .nav-link-side:hover {{
+        color: {DarkGreen};
+    }}
     .nav-link-side.active {{
         color: {DarkPurple};
-        background-color: {LightPurple};
+        background-color: #f8ebff;
     }}
     :target::before {{
       content: "";
@@ -263,11 +269,16 @@ class BootstrapHtml:
         self.current_section = section
         return section
 
+    add_section = new_section
+
     def set_section(self, title: str):
         if title not in self.sections:
             return self.new_section(title)
         self.current_section = self.sections[title]
         return self.current_section
+
+    def append(self, *args):
+        self.current_section.append(*args)
 
     def navbar(self):
         nav_top = Elem(
@@ -323,7 +334,7 @@ class BootstrapHtml:
             toc.elem(
                 "div",
                 text="Table of Contents",
-                attrib={"class": "fw-bold mt-3 ms-2"},
+                attrib={"class": "fw-bold mt-3 ms-1 ps-1"},
             )
             for i in self._rebuild_toc():
                 toc.append(i)
@@ -382,6 +393,48 @@ class BootstrapHtml:
             self.current_section.append(tbl)
         return tbl
 
+    def add_extra(self, obj, *args):
+        """Add extra content to the report.
+
+        Each extra content item can one of a number of things:
+        - A string starting with "# " will create a new section.
+        - A string starting with "## " will create a new subsection.
+        - A tuple or list of length 2, where the first element is a string
+          and the second element is a function that returns a figure or table.
+        - A function that returns a figure or table.
+
+        Each "function that returns a figure or table" should take a single
+        argument, which is the `obj` that is passed to this method.  To give
+        a function that takes other specific arguments, use functools.partial
+        to create a new function that takes only the `obj` argument.
+
+        Parameters
+        ----------
+        obj : object
+            The object to pass to the functions that generate figures and tables.
+        """
+        for item in args:
+            if isinstance(item, str) and item.startswith("# "):
+                self.new_section(item[2:])
+                continue
+            if isinstance(item, str) and item.startswith("## "):
+                self.new_section(item[3:], level=2)
+                continue
+            if (
+                isinstance(item, tuple | list)
+                and len(item) == 2
+                and isinstance(item[0], str)
+            ):
+                title, item = item
+                fig = item(obj)
+                if isinstance(fig, pd.DataFrame):
+                    self.add_table(title, fig)
+                else:
+                    self.add_figure(title, fig)
+            else:
+                fig = item(obj)
+                self.add_figure(fig)
+
     def _rebuild_toc(self):
         current_toc = Elem("div")
 
@@ -402,7 +455,7 @@ class BootstrapHtml:
             while anchor_lvl > len(xtoc_tree):
                 xtoc_tree.append(
                     xtoc_tree[-1].put(
-                        "nav", {"class": "nav nav-pills flex-column ms-2"}
+                        "nav", {"class": "nav nav-pills flex-column ms-1 ps-1"}
                     )
                 )
             while anchor_lvl < len(xtoc_tree):
@@ -411,7 +464,10 @@ class BootstrapHtml:
                 Elem(
                     "a",
                     text=anchor_text,
-                    attrib={"class": "nav-link-side ms-2", "href": f"#{anchor_ref}"},
+                    attrib={
+                        "class": "nav-link-side ms-1 ps-1",
+                        "href": f"#{anchor_ref}",
+                    },
                 )
             )
 

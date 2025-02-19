@@ -25,6 +25,7 @@ import pandas as pd
 import psutil  # noqa: F401
 from passengersim_core import Ancillary, DbWriter
 from passengersim_core.utils.airsim_utils import get_mileage
+from rich.progress import Progress
 from scipy.stats import gamma
 
 import passengersim.config.rm_systems
@@ -45,6 +46,7 @@ from passengersim.core import (
 from passengersim.summaries import SimulationTables
 from passengersim.summaries.generic import GenericSimulationTables
 from passengersim.summary import SummaryTables
+from passengersim.tracers.generic import GenericTracer
 from passengersim.utils.nested_dict import from_nested_dict  # noqa: F401
 from passengersim.utils.si import si_units  # noqa: F401
 
@@ -54,6 +56,7 @@ from .progressbar import DummyProgressBar, ProgressBar
 
 if TYPE_CHECKING:
     from passengersim.config.rm_systems import RmSystem as RmSystemConfig
+    from passengersim.core import ChoiceModel
 
 logger = logging.getLogger("passengersim")
 
@@ -140,6 +143,20 @@ class BaseSimulation(ABC):
         for path in self._sim.paths:
             if path.carrier_name == carrier:
                 yield from path.pathclasses
+
+    @property
+    def demands(self):
+        """Generator of all demands in the simulation."""
+        from .iterators.demand import DemandIterator
+
+        return DemandIterator(self._sim)
+
+    @property
+    def fares(self):
+        """Generator of all fares in the simulation."""
+        from .iterators.fare import FareIterator
+
+        return FareIterator(self._sim)
 
 
 class Simulation(BaseSimulation, CallbackMixin):
@@ -320,6 +337,7 @@ class Simulation(BaseSimulation, CallbackMixin):
                 "timeframe_demand_allocation",
                 "tot_z_factor",
                 "allow_unused_restrictions",
+                "additional_settings",
             ]:
                 pass
             else:
@@ -327,6 +345,10 @@ class Simulation(BaseSimulation, CallbackMixin):
         for pname, pvalue in config.simulation_controls.model_extra.items():
             print(f"extra simulation setting: {pname} = ", float(pvalue))
             self.sim.set_parm(pname, float(pvalue))
+        if config.simulation_controls.additional_settings:
+            self.sim.additional_settings(
+                **config.simulation_controls.additional_settings
+            )
 
         # There is a default array of DCPs, we'll override it with the data from the
         # input file (if available)
@@ -1186,8 +1208,17 @@ class Simulation(BaseSimulation, CallbackMixin):
                 progress = ProgressBar(total=n_samples_total)
             else:
                 progress = DummyProgressBar()
+        elif isinstance(rich_progress, Progress):
+            if self.sim.config.simulation_controls.show_progress_bar:
+                # if an external Progress object is provided, generate a
+                # ProgressBar object from it
+                progress = ProgressBar(
+                    total=n_samples_total, external_progress=rich_progress
+                )
+            else:
+                progress = DummyProgressBar()
         else:
-            progress = rich_progress
+            raise TypeError("rich_progress must be a Progress object")
         with progress:
             for trial in range(self.sim.num_trials):
                 self._run_single_trial(
@@ -1199,7 +1230,7 @@ class Simulation(BaseSimulation, CallbackMixin):
                 )
 
     def _run_sim_single_trial(
-        self, trial: int, *, rich_progress: ProgressBar | None = None
+        self, trial: int, *, rich_progress: Progress | None = None
     ):
         update_freq = self.update_frequency
         self.db_writer.update_db_write_flags()
@@ -1208,8 +1239,12 @@ class Simulation(BaseSimulation, CallbackMixin):
         self.sample_done_callback(n_samples_done, n_samples_total)
         if rich_progress is None:
             progress = DummyProgressBar()
+        elif isinstance(rich_progress, Progress):
+            progress = ProgressBar(
+                total=n_samples_total, external_progress=rich_progress
+            )
         else:
-            progress = rich_progress
+            raise TypeError("rich_progress must be a Progress object")
         with progress:
             self._run_single_trial(
                 trial,
@@ -2241,6 +2276,7 @@ class Simulation(BaseSimulation, CallbackMixin):
         summarizer: type[SimulationTablesT]
         | SimulationTablesT
         | None = SimulationTables,
+        rich_progress: Progress | None = None,
     ) -> SummaryTables | SimulationTablesT:
         """
         Run the simulation and compute reports.
@@ -2255,6 +2291,10 @@ class Simulation(BaseSimulation, CallbackMixin):
             Use this summarizer to compute the reports.  If None, the
             reports are computed in the SummaryTables object; this option
             is deprecated and will eventually be removed.
+        rich_progress : Progress, optional
+            A rich Progress object to use for displaying progress.  If not
+            provided, a new Progress object will be created unless the
+            simulation configuration specifies not to show progress.
 
         Returns
         -------
@@ -2271,9 +2311,9 @@ class Simulation(BaseSimulation, CallbackMixin):
         start_time = time.time()
         self.setup_scenario()
         if single_trial is not None:
-            self._run_sim_single_trial(single_trial)
+            self._run_sim_single_trial(single_trial, rich_progress=rich_progress)
         else:
-            self._run_sim()
+            self._run_sim(rich_progress=rich_progress)
         if self.choice_set_file is not None:
             self.choice_set_file.close()
         logger.info("Computing reports")
@@ -2297,11 +2337,34 @@ class Simulation(BaseSimulation, CallbackMixin):
                     "GenericSimulationTables"
                 )
 
+        # check all callbacks for tracers, and if any are found, write their
+        # finalized data to callback_data
+        for cb_group in [
+            "daily_callbacks",
+            "begin_sample_callbacks",
+            "end_sample_callbacks",
+        ]:
+            for cb in getattr(self, cb_group, []):
+                if isinstance(cb, GenericTracer):
+                    summary.callback_data[cb.name] = cb.finalize()
+
         # write output files if designated
         if isinstance(summary, GenericSimulationTables):
-            if self.config.outputs.html:
-                out_filename = summary.to_html(self.config.outputs.html.filename)
-                summary._metadata["outputs.html_filename"] = out_filename
+            if self.config.outputs.html and (
+                self.config.outputs.disk is True
+                or self.config.outputs.html.filename == self.config.outputs.disk
+            ):
+                # this will ensure the html and disk files have the same timestamp
+                filenames = summary.save(self.config.outputs.html.filename)
+                summary._metadata["outputs.html_filename"] = filenames[".html"]
+                summary._metadata["outputs.disk_filename"] = filenames[".pxsim"]
+            else:
+                if self.config.outputs.html:
+                    out_filename = summary.to_html(self.config.outputs.html.filename)
+                    summary._metadata["outputs.html_filename"] = out_filename
+                if isinstance(self.config.outputs.disk, str | pathlib.Path):
+                    out_filename = summary.to_file(self.config.outputs.disk)
+                    summary._metadata["outputs.disk_filename"] = out_filename
             if self.config.outputs.pickle:
                 pkl_filename = summary.to_pickle(self.config.outputs.pickle)
                 summary._metadata["outputs.pickle_filename"] = pkl_filename
@@ -2354,3 +2417,37 @@ class Simulation(BaseSimulation, CallbackMixin):
         dst : Path-like or sqlite3.Connection
         """
         return self.cnx.backup(dst)
+
+    def get_choice_parameters(self, choicemodel: str | ChoiceModel):
+        """Get the parameters for a choice model."""
+        if isinstance(choicemodel, str):
+            choicemodel = self.choice_models[choicemodel]
+        raw = choicemodel.get_parameters()
+        r = raw.pop("restrictions", ())
+        rsigma = raw.pop("restriction_sigmas", ())
+        for rname, rval, rsig in zip(self._fare_restriction_list, r, rsigma):
+            raw[f"restrictions_{rname}"] = rval
+            raw[f"restrictions_{rname}_sigma"] = rsig
+        return raw
+
+    def set_choice_parameters(
+        self, choicemodel: str | ChoiceModel, values: dict[str, float]
+    ):
+        """Set the parameters for a choice model."""
+        if isinstance(choicemodel, str):
+            choicemodel = self.choice_models[choicemodel]
+        raw = choicemodel.get_parameters()
+        for k, v in values.items():
+            if k.startswith("restrictions_"):
+                if k.endswith("_sigma"):
+                    kr = k[13:-6]
+                else:
+                    kr = k[13:]
+                position = self._fare_restriction_mapping[kr] - 1
+                if k.endswith("_sigma"):
+                    raw["restriction_sigmas"][position] = v
+                else:
+                    raw["restrictions"][position] = v
+            else:
+                raw[k] = v
+        choicemodel.set_parameters(raw)

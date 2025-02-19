@@ -2,7 +2,8 @@
 # DOC-NAME: 01-simulation-controls
 from __future__ import annotations
 
-from typing import Literal
+import warnings
+from typing import Any, Literal
 
 from pydantic import ValidationInfo, confloat, conint, field_validator
 
@@ -181,12 +182,25 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     If set to False, the automatic path generation algorithm is applied.
     """
 
-    use_3seg: bool | None = False
     generate_3seg: bool | None = False
     """
     Use the new A* search to build connections, it can create 3seg connects
-
     """
+
+    @property
+    def use_3seg(self) -> bool:
+        return self.generate_3seg
+
+    @use_3seg.setter
+    def use_3seg(self, value: bool):
+        # deprecated
+        if value:
+            warnings.warn(
+                "`use_3seg` is deprecated, use `generate_3seg` instead",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        self.generate_3seg = bool(value)
 
     write_raw_files: bool = False
 
@@ -271,6 +285,14 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     debug_fares: bool | None = False
     debug_offers: bool | None = False
     debug_orders: bool | None = False
+
+    additional_settings: dict[str, Any] = {}
+    """
+    Additional settings to pass to the simulation.
+
+    These settings are passed directly to the simulation object and can be used to
+    set various parameters that are not directly exposed in the configuration.
+    """
 
     @field_validator("controller_time_zone", mode="before")
     def _time_zone_convert_hours_to_seconds(cls, v):

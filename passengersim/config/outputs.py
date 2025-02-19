@@ -106,6 +106,15 @@ class OutputConfig(PrettyModel, extra="forbid", validate_assignment=True):
     pickle: pathlib.Path | None = None
     """Write a pickle of the SimulationTables output to this file after a run."""
 
+    disk: bool | pathlib.Path | None = True
+    """Write the SimulationTables output to this file after a run.
+
+    This will use pxsim format, an efficient binary file that allows "lazy" file
+    loading.  If set to `True`, the file will be named with the same name as
+    the HTML output file, except with the extension `.pxsim`, unless there is no
+    HTML output file, in which case no file will written.
+    """
+
     # TODO what reports require what database items?
     # e.g. demand_to_come requires we store all `demand` not just demand_final
 

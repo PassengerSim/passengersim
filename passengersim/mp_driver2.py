@@ -112,7 +112,7 @@ class MultiSimulation(BaseSimulation, CallbackMixin):
                 _subprocess_run_trial(
                     trial_id,
                     cfg_json,
-                    self.output_dir,
+                    output_dir=self.output_dir,
                     summarizer=summarizer,
                     callbacks=self.callback_functions(),
                 )
@@ -286,11 +286,28 @@ class MultiSimulation(BaseSimulation, CallbackMixin):
         ).isoformat()
 
         # write output files if designated
-        if self.config.outputs.html:
+        if self.config.outputs.html and (
+            self.config.outputs.disk is True
+            or self.config.outputs.html.filename == self.config.outputs.disk
+        ):
+            # this will ensure the html and disk files have the same timestamp
             try:
-                result.to_html(self.config.outputs.html.filename, make_dirs=True)
+                filenames = result.save(self.config.outputs.html.filename)
+                result._metadata["outputs.html_filename"] = filenames[".html"]
+                result._metadata["outputs.disk_filename"] = filenames[".pxsim"]
             except Exception as err:
-                warnings.warn(f"Error writing HTML file: {err}", stacklevel=2)
+                warnings.warn(f"Error writing HTML or disk file: {err}", stacklevel=2)
+        else:
+            if self.config.outputs.html:
+                try:
+                    result.to_html(self.config.outputs.html.filename, make_dirs=True)
+                except Exception as err:
+                    warnings.warn(f"Error writing HTML file: {err}", stacklevel=2)
+            if isinstance(self.config.outputs.disk, str | pathlib.Path):
+                try:
+                    result.to_file(self.config.outputs.disk, make_dirs=True)
+                except Exception as err:
+                    warnings.warn(f"Error writing HTML file: {err}", stacklevel=2)
         if self.config.outputs.pickle:
             try:
                 result.to_pickle(self.config.outputs.pickle, make_dirs="git")

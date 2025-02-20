@@ -41,7 +41,6 @@ from passengersim.core import (
     Market,
     PathClass,
     SimulationEngine,
-    UserAction,
 )
 from passengersim.summaries import SimulationTables
 from passengersim.summaries.generic import GenericSimulationTables
@@ -480,12 +479,6 @@ class Simulation(BaseSimulation, CallbackMixin):
     def _init_blf_curves(self, config):
         """These are currently grabbed by the RmStep"""
         pass
-#        logger.info("Initializing BLF curves")
-#        for blf_name, blf_data in config.blf_curves.items():
-#            ua = UserAction(blf_name)
-#            ua.add_curve(blf_name, blf_data.min_distance, blf_data.max_distance, blf_data.type, blf_data.curve)
-#            #self.sim.add_frat5(f5)
-#            #self.frat5curves[f5_name] = f5
 
     def _init_load_factor_curves(self, config):
         logger.info("Initializing load factor curves")
@@ -892,6 +885,9 @@ class Simulation(BaseSimulation, CallbackMixin):
         # to size the history buffers
         for carrier in self.sim.carriers:
             self.sim.initialize_pathclasses(carrier.get_history_def(), carrier.name)
+
+        # TODO: only initialize nonstop linkage when needed?
+        self.sim.initialize_nonstop_path_linkage()
 
         # Airlines using Q-forecasting need to have pathclasses set up for all paths
         # so Q-demand can be forecasted by pathclass even in the absence of bookings

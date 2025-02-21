@@ -3,6 +3,7 @@ theme:
   name: material
   custom_dir: docs/.overrides
   logo: assets/logo.svg
+  favicon: assets/favicon.ico
   features:
     - content.code.copy
     - content.code.annotate

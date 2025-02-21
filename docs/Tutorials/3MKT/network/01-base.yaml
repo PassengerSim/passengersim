@@ -44,6 +44,7 @@ simulation_controls:
   demand_multiplier: 1.0
   manual_paths: false
   timeframe_demand_allocation: pods
+  allow_unused_restrictions: true
 
 rm_systems:
   rm_no_detruncation:

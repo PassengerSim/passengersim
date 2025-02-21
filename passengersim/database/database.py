@@ -15,8 +15,8 @@ from pathlib import Path
 from typing import Any, Literal
 
 import pandas as pd
-
 from passengersim_core import DbWriter
+
 from passengersim.config import Config
 from passengersim.core import SimulationEngine
 
@@ -210,7 +210,9 @@ class Database:
             else:
                 return raw
 
-    def save_details(self: Database, db_writer: DbWriter, sim: SimulationEngine, dcp: int):
+    def save_details(
+        self: Database, db_writer: DbWriter, sim: SimulationEngine, dcp: int
+    ):
         """
         Save details, can be done at each RRD/DCP and at the end of the run
         """

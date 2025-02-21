@@ -163,6 +163,7 @@ class BootstrapHtml:
         else:
             self.content = self.main_row.elem("div")
         self.current_section = self.content
+        self.frontmatter = self.current_section.elem("div")
 
         self.sections = {}
         self.body.elem(
@@ -434,6 +435,10 @@ class BootstrapHtml:
             else:
                 fig = item(obj)
                 self.add_figure(fig)
+
+    def add_frontmatter(self, *content):
+        for c in content:
+            self.frontmatter.append(Elem.from_any(c))
 
     def _rebuild_toc(self):
         current_toc = Elem("div")

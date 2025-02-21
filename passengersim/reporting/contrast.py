@@ -28,6 +28,7 @@ def to_html(
     bookings_by_timeframe: bool = True,
     bid_price_history: bool = True,
     extra: tuple | None = None,
+    frontmatter: tuple | None = None,
 ) -> pathlib.Path:
     """
     Write a summary to an HTML file.
@@ -95,5 +96,10 @@ def to_html(
 
     if extra is not None:
         rpt.add_extra(summaries, *extra)
+
+    if frontmatter is not None:
+        if isinstance(frontmatter, str):
+            frontmatter = (frontmatter,)
+        rpt.add_frontmatter(*frontmatter)
 
     return rpt.write(filename, make_dirs=make_dirs)

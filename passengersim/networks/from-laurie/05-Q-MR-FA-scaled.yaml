@@ -1,0 +1,34 @@
+include:
+  - 03-Q-simple.yaml
+
+rm_systems:
+  rm_hybrid4:
+    availability_control: leg
+    processes:
+      DCP:
+        - step_type: forecast
+          name: hybrid_forecast
+          algorithm: additive_pickup
+          max_cap: 10.0
+          kind: hybrid
+        - step_type: fareadjustment
+          name: aggregate
+          algorithm: mr
+          kind: path
+          frat5: curve_C
+        - step_type: aggregation
+          name: aggregate
+        - step_type: emsr
+          name: optimization
+          algorithm: emsrb
+          kind: leg
+
+carriers:
+  - name: AL1
+    rm_system: rm_hybrid4
+    frat5: curve_C
+    fare_adjustment_scale: 0.5
+  - name: AL2
+    rm_system: rm_hybrid4
+    frat5: curve_C
+    fare_adjustment_scale: 0.5

@@ -1,0 +1,39 @@
+include:
+  - 03-Q-simple.yaml
+
+snapshot_filters:
+ - type: rm
+   title: RM Snapshot, EMSRb leg optimization
+   sample: [35]
+   dcp: [14]
+   flt_no: 111
+
+rm_systems:
+  rm_hybrid3:
+    availability_control: leg
+    processes:
+      DCP:
+        - step_type: forecast
+          name: hybrid_forecast
+          algorithm: additive_pickup
+          max_cap: 10.0
+          kind: hybrid
+        - step_type: fareadjustment
+          name: aggregate
+          algorithm: mr
+          kind: path
+          frat5: curve_C
+        - step_type: aggregation
+          name: aggregate
+        - step_type: emsr
+          name: optimization
+          algorithm: emsrb
+          kind: leg
+
+carriers:
+  - name: AL1
+    rm_system: rm_hybrid3
+    frat5: curve_C
+  - name: AL2
+    rm_system: rm_hybrid3
+    frat5: curve_C

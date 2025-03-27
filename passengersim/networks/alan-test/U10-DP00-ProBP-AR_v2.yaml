@@ -1,0 +1,246 @@
+scenario: U10-DP-00
+
+db:
+  write_items:
+    - leg_final
+    - leg_daily
+#    - leg
+    - fare_final
+    - demand_final
+    - bookings
+    - demand
+#    - bucket
+  fast: true
+  engine: sqlite
+  filename: "runs/{scenario}/{date_Ymd}-{time_HM}_v2.sqlite"
+  #filename: ":memory:"
+
+outputs:
+  reports:
+#    - bid_price_history
+    - bookings_by_timeframe
+    - displacement_history
+    - fare_class_mix
+    - load_factor_distribution
+    - load_factors
+    - total_demand
+    - demand_to_come
+#    - carrier_history
+
+#outputs:
+#  excel: "{scenario}.xlsx"
+
+simulation_controls:
+  num_trials: 1
+  num_samples: 200
+  random_seed: 42
+  sys_k_factor: 0.10
+  mkt_k_factor: 0.20
+  #pax_type_k_factor: 0.0  # now simple_k_factor
+  simple_k_factor: 0.2
+  tf_k_factor: 0.1
+  tf_z_factor: 1.0
+  prorate_revenue: 1
+  dwm_lite: 0
+  max_connect_time: 120
+  disable_ap: false
+  demand_multiplier: 1.0
+  manual_paths: 1
+  timeframe_demand_allocation: pods
+
+choice_models:
+  business:
+    kind: pods
+    emult: 1.6
+    basefare_mult: 2.5
+    path_quality:  [38.30,  0.10]
+    r1: 0.30
+    r2: 0.10
+    r3: 0.20
+    r4: 0.15
+
+  leisure:
+    kind: pods
+    emult: 1.5
+    basefare_mult: 1.0
+    path_quality:  [2.02, 0.12]
+    r1: 0.30
+    r2: 0.15
+    r3: 0.25
+    r4: 0.20
+
+rm_systems:
+  rm_udp:
+    availability_control: bp
+    processes:
+      DCP:
+      - step_type: untruncation
+        name: untruncation
+        algorithm: em
+        kind: path
+        initialization_method: pods
+        minimum_mu: 0.0
+      - step_type: forecast
+        name: path_forecast
+        algorithm: additive_pickup
+        kind: path
+      - step_type: udp
+        name: optimization
+        arrivals_per_time_slice: 1.0
+        min_time_slices_per_dcp: 1
+      - step_type: aggregation  # not needed for algorithm, but gives leg forecast data for output
+        name: aggregate
+      DAILY:
+      - step_type: udpupdate
+        name: optimization
+  rm_emsr:
+    availability_control: leg
+    processes:
+      DCP:
+      - step_type: untruncation
+        algorithm: em
+        initialization_method: pods
+        minimum_mu: 0.0
+      - step_type: forecast
+        algorithm: additive_pickup
+        alpha: 0.15
+      - step_type: emsr
+        algorithm: emsrb
+  rm_emsr_path:
+    availability_control: leg
+    processes:
+      DCP:
+      - step_type: untruncation
+        algorithm: em
+        kind: path
+        initialization_method: pods
+        minimum_mu: 0.0
+      - step_type: forecast
+        algorithm: additive_pickup
+        kind: path
+        alpha: 0.15
+      - step_type: aggregation
+        name: aggregate
+      - step_type: emsr
+        algorithm: emsrb
+  rm_pro_bp:
+    availability_control: bp
+    processes:
+      DCP:
+      - step_type: untruncation
+        name: untruncation
+        algorithm: em
+        initialization_method: pods
+        kind: path
+      - step_type: forecast
+        name: path_forecast
+        algorithm: additive_pickup
+        alpha: 0.15
+        kind: path
+      - step_type: probp
+        name: optimization
+      DAILY:
+      - step_type: forecastadjustment
+        name: adjust
+        algorithm: timeframe
+        kind: path
+      - step_type: probp
+        name: optimization
+
+carriers:
+  AL1:
+    rm_system: rm_emsr
+  AL2:
+    rm_system: rm_emsr
+  AL3:
+    rm_system: rm_emsr
+  AL4:
+    rm_system: rm_emsr
+
+classes:
+  - Y0
+  - Y1
+  - Y2
+  - Y3
+  - Y4
+  - Y5
+  - Y6
+  - Y7
+  - Y8
+  - Y9
+
+dcps: [63,56,49,42,35,31,28,24,21,17,14,10,7,5,3,1]
+
+booking_curves:
+  - name: "1"
+    curve:
+      63: 0.01
+      56: 0.02
+      49: 0.05
+      42: 0.13
+      35: 0.19
+      31: 0.23
+      28: 0.29
+      24: 0.35
+      21: 0.45
+      17: 0.54
+      14: 0.67
+      10: 0.79
+      7:  0.86
+      5:  0.91
+      3:  0.96
+      1:  1.0
+  - name: "2"
+    curve:
+      63: 0.13
+      56: 0.22
+      49: 0.37
+      42: 0.52
+      35: 0.64
+      31: 0.7
+      28: 0.75
+      24: 0.78
+      21: 0.83
+      17: 0.87
+      14: 0.91
+      10: 0.94
+      7:  0.96
+      5:  0.98
+      3:  0.99
+      1:  1.0
+  - name: "3"
+    curve:
+      63: 0.04
+      56: 0.06
+      49: 0.12
+      42: 0.26
+      35: 0.35
+      31: 0.41
+      28: 0.48
+      24: 0.54
+      21: 0.63
+      17: 0.7
+      14: 0.81
+      10: 0.88
+      7:  0.93
+      5:  0.96
+      3:  0.98
+      1:  1.0
+  - name: "4"
+    curve:
+      63: 0.21
+      56: 0.35
+      49: 0.53
+      42: 0.67
+      35: 0.76
+      31: 0.8
+      28: 0.83
+      24: 0.85
+      21: 0.88
+      17: 0.91
+      14: 0.94
+      10: 0.96
+      7:  0.97
+      5:  0.98
+      3:  0.99
+      1:  1.0

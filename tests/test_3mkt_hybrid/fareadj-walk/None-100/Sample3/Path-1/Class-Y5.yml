@@ -1,0 +1,17 @@
+forecast:
+  mean_in_timeframe: []
+  mean_to_departure: []
+  stdev_in_timeframe: []
+  stdev_to_departure: []
+q_forecast:
+  mean_in_timeframe: []
+  mean_to_departure: []
+  stdev_in_timeframe: []
+  stdev_to_departure: []
+sold: 38
+sold_priceable: 38
+y_forecast:
+  mean_in_timeframe: []
+  mean_to_departure: []
+  stdev_in_timeframe: []
+  stdev_to_departure: []

@@ -1,0 +1,173 @@
+site_name: PassengerSim
+theme:
+  name: material
+  custom_dir: docs/.overrides
+  logo: assets/logo.svg
+  favicon: assets/favicon.png
+  features:
+    - content.code.copy
+    - content.code.annotate
+    - navigation.tabs
+    - navigation.indexes
+    - navigation.prune
+
+extra_css:
+  - stylesheets/extra.css
+
+plugins:
+  - offline
+  - autorefs
+  - mkdocs-jupyter:
+      include: ["*.nbconvert.ipynb"]
+      execute: false
+      remove_tag_config:
+        remove_input_tags:
+          - hidden
+  - mkdocstrings:
+      handlers:
+        python:
+#          import:
+#            - https://docs.python-requests.org/en/master/objects.inv
+          options:
+            show_source: true
+            separate_signature: true
+            show_signature_annotations: true
+            signature_crossrefs: true
+            docstring_style: numpy
+            allow_inspection: false
+            docstring_section_style: list
+            show_if_no_docstring: true
+            load_external_modules: false
+            preload_modules:
+              - passengersim_core
+  - search
+  - exclude-search:
+      exclude:
+        - colab/*
+  - gen-files:
+      scripts:
+      - docs/.scripts/_generate_ref_pages.py
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - attr_list
+  - md_in_html
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.arithmatex:
+      generic: true
+  - admonition
+  - pymdownx.details
+  - footnotes
+
+repo_url: https://github.com/PassengerSim/passengersim
+repo_name: PassengerSim/passengersim
+
+extra_javascript:
+  - javascript/mathjax.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+nav:
+  # TODO: https://github.com/lukasgeiter/mkdocs-awesome-pages-plugin
+  - index.md
+  - User Guide:
+    - Installation: 'user-guide/installation.md'
+    - How it Works: user-guide/how-it-works.md
+    - RM Systems:
+      - user-guide/rm-systems/index.md
+      - user-guide/rm-systems/untruncation.md
+      - user-guide/rm-systems/forecast.md
+      - user-guide/rm-systems/fcfs.md
+      - user-guide/rm-systems/emsr.md
+      - user-guide/rm-systems/probp.md
+    - Writing Configs: user-guide/writing-configs.md
+    - Database:
+      - user-guide/database/index.md
+      - user-guide/database/carrier_summary.md
+      - user-guide/database/leg_summary.md
+      - user-guide/database/leg_defs.md
+      - user-guide/database/leg_detail.md
+      - user-guide/database/leg_bucket_detail.md
+      - user-guide/database/path_class_detail.md
+      - user-guide/database/demand_detail.md
+      - user-guide/database/fare_detail.md
+      - user-guide/database/bookings_by_timeframe.md
+      - user-guide/database/distance.md
+    - Outputs:
+      - user-guide/processing-outputs/basic-usage.nbconvert.ipynb
+      - user-guide/processing-outputs/callbacks.nbconvert.ipynb
+      - user-guide/viz/carriers.nbconvert.ipynb
+    - Experiments: user-guide/experiments.nbconvert.ipynb
+  - Tutorials:
+    - Tutorials/index.md
+    - Tutorials/3MKT/gallery/EE.nbconvert.ipynb
+    - Tutorials/3MKT/gallery/PE.nbconvert.ipynb
+    - Tutorials/3MKT/gallery/QC.nbconvert.ipynb
+    - Tutorials/3MKT/3mkt-01.nbconvert.ipynb
+    - Tutorials/3MKT/3mkt-02.nbconvert.ipynb
+    - Tutorials/3MKT/3mkt-03.nbconvert.ipynb
+    - Tutorials/3MKT/3mkt-04.nbconvert.ipynb
+    - Tutorials/3MKT/3mkt-05.nbconvert.ipynb
+    - Tutorials/3MKT/3mkt-06.nbconvert.ipynb
+    - Tutorials/3MKT/3mkt-07.nbconvert.ipynb
+    - Tutorials/3MKT/3mkt-08.nbconvert.ipynb
+    - Tutorials/3MKT/3mkt-09.nbconvert.ipynb
+    - Tutorials/3MKT/3mkt-10.nbconvert.ipynb
+    - Tutorials/3MKT/3mkt-11.nbconvert.ipynb
+    - Tutorials/3MKT/3mkt-50.nbconvert.ipynb
+  - API:
+    - API/index.md
+    - Simulation:
+      - API/simulation.md
+    - Config:
+      - API/config/00-configs.md
+      - API/config/01-simulation-controls.md
+      - API/config/carriers.md
+      - API/config/booking_curves.md
+      - API/config/choice_model.md
+      - API/config/database.md
+      - API/config/demands.md
+      - API/config/fares.md
+      - API/config/frat5_curves.md
+      - API/config/legs.md
+      - API/config/named.md
+      - API/config/outputs.md
+      - API/config/paths.md
+      - API/config/places.md
+      - API/config/pretty.md
+      - API/config/rm_steps.md
+      - API/config/rm_systems.md
+      - API/config/snapshot_filter.md
+    - Database:
+      - API/database/index.md
+      - API/database/tables.md
+      - API/database/common-queries.md
+    - API/summary.md
+    - API/contrast.md
+    - Core:
+      - API/Core/index.md
+      - API/Core/00-SimulationEngine.md
+      - API/Core/Carrier.md
+      - API/Core/BookingCurves.md
+      - API/Core/Bucket.md
+      - API/Core/ChoiceModel.md
+      - API/Core/Demand.md
+      - API/Core/Fare.md
+      - API/Core/Generator.md
+      - API/Core/Leg.md
+      - API/Core/Path.md
+      - API/Core/PathClass.md

@@ -1,0 +1,2 @@
+# keep csv files in this test directory
+!*.csv

@@ -1,0 +1,1392 @@
+#
+# 3 market example that I'm using to test new features
+#
+
+scenario: AW_test_temp
+
+simulation_controls:
+  num_trials: 2
+  num_samples: 200
+  burn_samples: 100
+  random_seed: 666
+  sys_k_factor: 0.1
+  mkt_k_factor: 0.15
+  pax_type_k_factor: 0.2
+  simple_k_factor: 0.2
+  tf_k_factor: 0.1
+  tf_z_factor: 2.0
+  prorate_revenue: true
+  max_connect_time: 120
+  #  disable_ap: False
+  demand_multiplier: 1.0
+  capacity_multiplier: 1.0
+  manual_paths: false
+  #  debug_orders: false
+  timeframe_demand_allocation: pods
+  #  capture_choice_set_file: choice-set-junk3.csv
+  #  capture_choice_set_obs: 10000
+  # Mountain Standard Time (for me)
+  controller_time_zone: 0  # -7
+  generate_3seg: False
+  debug_connections: False
+#  show_progress_bar: True
+
+db:
+  write_items:
+    - leg
+    - fare
+    - demand
+    - bookings
+    #    - bucket
+    - pathclass
+    - leg_final
+    - fare_final
+    - demand_final
+  fast: true
+  engine: sqlite
+  #  filename: "AW-3MKT.sqlite"
+  filename: ":memory:"
+
+outputs:
+  reports:
+    #    - leg_forecasts
+    - fare_class_mix
+    - load_factors
+    - bookings_by_timeframe
+    - total_demand
+    - demand_to_come
+    - carrier_history2
+
+frat5_curves:
+  - name: curve_A
+    curve:
+      63: 1.6
+      56: 1.6
+      49: 1.7
+      42: 1.75
+      35: 1.88
+      31: 2.0
+      28: 2.12
+      24: 2.24
+      21: 2.68
+      17: 3.08
+      14: 3.60
+      10: 3.72
+      7: 3.80
+      5: 3.88
+      3: 3.95
+      1: 4.0
+  - name: curve_B
+    curve:
+      63: 1.4
+      56: 1.4
+      49: 1.5
+      42: 1.5
+      35: 1.6
+      31: 1.7
+      28: 1.8
+      24: 1.9
+      21: 2.3
+      17: 2.7
+      14: 3.2
+      10: 3.3
+      7: 3.4
+      5: 3.4
+      3: 3.5
+      1: 3.5
+  - name: curve_C
+    curve:
+      63: 1.20
+      56: 1.20
+      49: 1.29
+      42: 1.29
+      35: 1.37
+      31: 1.46
+      28: 1.54
+      24: 1.63
+      21: 1.97
+      17: 2.31
+      14: 2.74
+      10: 2.83
+      7: 2.91
+      5: 2.91
+      3: 3.00
+      1: 3.00
+  - name: curve_D
+    curve:
+      63: 1.15
+      56: 1.15
+      49: 1.25
+      42: 1.25
+      35: 1.30
+      31: 1.37
+      28: 1.45
+      24: 1.55
+      21: 1.75
+      17: 1.95
+      14: 2.40
+      10: 2.43
+      7: 2.46
+      5: 2.47
+      3: 2.50
+      1: 2.50
+  - name: curve_E
+    curve:
+      63: 1.10
+      56: 1.10
+      49: 1.15
+      42: 1.20
+      35: 1.25
+      31: 1.31
+      28: 1.37
+      24: 1.44
+      21: 1.51
+      17: 1.59
+      14: 1.90
+      10: 1.93
+      7: 1.96
+      5: 1.97
+      3: 2.0
+      1: 2.0
+  - name: curve_F
+    curve:
+      63: 1.28
+      56: 1.29
+      49: 1.31
+      42: 1.32
+      35: 1.34
+      31: 1.36
+      28: 1.38
+      24: 1.41
+      21: 1.44
+      17: 1.47
+      14: 1.51
+      10: 1.56
+      7: 1.63
+      5: 1.7
+      3: 1.81
+      1: 1.96
+  - name: curve_G
+    curve:
+      63: 1.01
+      56: 1.04
+      49: 1.08
+      42: 1.11
+      35: 1.14
+      31: 1.17
+      28: 1.21
+      24: 1.24
+      21: 1.27
+      17: 1.3
+      14: 1.34
+      10: 1.37
+      7: 1.4
+      5: 1.43
+      3: 1.47
+      1: 1.5
+  - name: curve_G_temp
+    curve:
+      63: 1.01
+      56: 1.04
+      49: 1.08
+      42: 1.11
+      35: 1.14
+      31: 1.17
+      28: 1.21
+      24: 1.24
+      21: 1.27
+      17: 1.3
+      14: 1.34
+      10: 1.37
+      7: 1.4
+      5: 1.43
+      3: 1.47
+      1: 1.5
+  - name: curve_1_5
+    # Purely flat curve, used to test if we can use ML to find the curve
+    curve:
+      63: 1.5
+      56: 1.5
+      49: 1.5
+      42: 1.5
+      35: 1.5
+      31: 1.5
+      28: 1.5
+      24: 1.5
+      21: 1.5
+      17: 1.5
+      14: 1.5
+      10: 1.5
+      7: 1.5
+      5: 1.5
+      3: 1.5
+      1: 1.5
+
+load_factor_curves:
+  - name: lf_curve1
+    algorithm: lf_target
+    min_accordion: 1.2
+    max_accordion: 1.8
+    target_load_factor: 0.8
+    convergence_constant: 0.75
+    curve:
+      Y0: 1.0
+      Y1: 0.9
+      Y2: 0.8
+      Y3: 0.7
+      Y4: 0.6
+      Y5: 0.5
+
+rm_systems:
+  rm_fcfs:
+    availability_control: leg
+    processes: {}
+  rm_lf:
+    availability_control: leg
+    processes:
+      DAILY:
+        - step_type: lfthreshold
+          name: optimization
+          algorithm: lf_target
+          kind: leg
+      DCP:
+        - step_type: lfthreshold
+          name: optimization
+          algorithm: lf_target
+          kind: leg
+  rm_no_detruncation:
+    availability_control: leg
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: none
+          kind: leg
+        - step_type: forecast
+          name: forecast
+          algorithm: exp_smoothing
+          alpha: 0.15
+          kind: leg
+        - step_type: emsr
+          name: optimization
+          algorithm: emsrb
+          kind: leg
+
+  rm_leg:
+    availability_control: leg
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          initialization_method: pods
+          minimum_mu: 0.0
+          kind: leg
+        - step_type: forecast
+          name: forecast
+          algorithm: exp_smoothing
+          alpha: 0.15
+          kind: leg
+        - step_type: emsr
+          name: leg_optimization
+          algorithm: emsrb
+          kind: leg
+
+  rm_leg_cabin:
+    availability_control: cabin
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: leg
+        - step_type: forecast
+          name: forecast
+          algorithm: exp_smoothing
+          alpha: 0.15
+          kind: leg
+        - step_type: cabin
+          name: leg_optimization
+          algorithm: emsrb
+          kind: leg
+
+  rm_test1:
+    availability_control: leg
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          initialization_method: pods
+          kind: leg
+        - step_type: forecast
+          name: forecast
+          algorithm: additive_pickup
+          alpha: 0.15
+          kind: leg
+        #        - step_type: errors
+        #          bias: 0.05
+        #          k_factor: 0.2
+        - step_type: emsr
+          name: leg_optimization
+          algorithm: emsrb
+          kind: leg
+        - step_type: emsr
+          name: estimate_bp
+          algorithm: emsrc
+          kind: leg
+  #        - step_type: useradjustment
+  #          name: user_adjustment
+  #          algorithm: booked_lf
+
+  rm_test_elasticity:
+    availability_control: leg
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: leg
+        - step_type: forecast
+          name: forecast
+          algorithm: exp_smoothing
+          alpha: 0.15
+          kind: leg
+        - step_type: emsr
+          name: optimization
+          algorithm: emsrb
+          kind: leg
+      DEPARTURE:
+        - step_type: elasticity
+          name: elasticity
+          algorithm: loglog
+          kind: leg
+
+  rm_emsrg:
+    availability_control: leg
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: leg
+        - step_type: forecast
+          name: forecast
+          algorithm: exp_smoothing
+          alpha: 0.15
+          kind: leg
+        - step_type: emsr
+          name: optimization
+          algorithm: emsrg
+          kind: leg
+
+  rm_mfem:
+    availability_control: leg
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: mfem
+          kind: leg
+        - step_type: forecast
+          name: forecast
+          algorithm: exp_smoothing
+          alpha: 0.15
+          kind: leg
+        - step_type: emsr
+          name: optimization
+          algorithm: emsrb
+          kind: leg
+
+  rm_davn:
+    availability_control: vn
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: path
+        - step_type: forecast
+          name: path_forecast
+          algorithm: additive_pickup
+          alpha: 0.15
+          kind: path
+        - step_type: probp
+          name: displacement
+        - step_type: aggregation
+          name: aggregate
+        - step_type: emsr
+          name: optimization
+          algorithm: emsrb
+          kind: leg
+      DAILY:
+        - step_type: forecastadjustment
+          name: adjust
+          algorithm: timeframe
+          kind: path
+        - step_type: probp
+          name: displacement
+        - step_type: aggregation
+          name: aggregate
+        - step_type: emsr
+          name: optimization
+          algorithm: emsrb
+          kind: leg
+
+  rm_udp:
+    availability_control: bp
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: path
+          initialization_method: pods
+          minimum_mu: 0.0
+        - step_type: forecast
+          name: path_forecast
+          algorithm: additive_pickup
+          kind: path
+        - step_type: udp
+          name: optimization
+          arrivals_per_time_slice: 1.0
+          min_time_slices_per_dcp: 1
+        - step_type: aggregation  # not needed for algorithm, but gives leg forecast data for output
+          name: aggregate
+      DAILY:
+        - step_type: udpupdate
+          name: optimization
+
+  rm_pro_bp:
+    availability_control: bp
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          initialization_method: pods
+          kind: path
+        - step_type: forecast
+          name: path_forecast
+          algorithm: additive_pickup
+          alpha: 0.15
+          kind: path
+        - step_type: probp
+          name: optimization
+      DAILY:
+        - step_type: forecastadjustment
+          name: adjust
+          algorithm: timeframe
+          kind: path
+        - step_type: probp
+          name: optimization
+
+  rm_bid_price2:
+    availability_control: bp
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: path
+        - step_type: forecast
+          name: path_forecast
+          algorithm: additive_pickup
+          alpha: 0.15
+          kind: path
+        - step_type: probp
+          name: optimization
+      DAILY:
+        - step_type: forecastadjustment
+          name: adjust
+          algorithm: timeframe
+          kind: path
+        - step_type: probp
+          name: optimization
+
+  rm_sub_bp:
+    availability_control: bp
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: path
+        - step_type: forecast
+          name: path_forecast
+          algorithm: additive_pickup
+          alpha: 0.15
+          kind: path
+        - step_type: subbp
+          name: optimization
+      DAILY:
+        - step_type: forecastadjustment
+          name: adjust
+          algorithm: timeframe
+          kind: path
+        - step_type: subbp
+          name: optimization
+
+  rm_lp:
+    availability_control: bp
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: path
+        - step_type: forecast
+          name: path_forecast
+          algorithm: additive_pickup
+          alpha: 0.15
+          kind: path
+        - step_type: lp
+          name: optimization
+      DAILY:
+        - step_type: forecastadjustment
+          name: adjust
+          algorithm: timeframe
+          kind: path
+        - step_type: lp
+          name: optimization
+
+  rm_hybrid:
+    availability_control: leg
+    processes:
+      DCP:
+        - step_type: forecast
+          name: hybrid_forecast
+          algorithm: additive_pickup
+          alpha: 0.15
+          max_cap: 10.0
+          kind: hybrid
+        - step_type: aggregation
+          name: aggregate
+        - step_type: emsr
+          name: optimization
+          algorithm: emsrb
+          kind: leg
+  #      DEPARTURE:
+  #        - step_type: elasticity
+  #          name: elasticity
+  #          algorithm: loglog
+  #          kind: leg
+
+  rm_hybrid_mr:
+    availability_control: leg
+    processes:
+      DCP:
+        - step_type: forecast
+          name: hybrid_forecast
+          algorithm: additive_pickup
+          max_cap: 10.0
+          kind: hybrid
+        - step_type: fareadjustment
+          name: aggregate
+          algorithm: mr
+          kind: path
+          frat5: curve_C
+        - step_type: aggregation
+          name: aggregate
+        - step_type: emsr
+          name: optimization
+          algorithm: emsrb
+          kind: leg
+
+  rm_adaptive_hybrid:
+    availability_control: leg
+    processes:
+      DCP:
+        - step_type: forecast
+          name: hybrid_forecast
+          algorithm: exp_smoothing
+          alpha: 0.15
+          max_cap: 10.0
+          kind: hybrid
+        - step_type: aggregation
+          name: aggregate
+        - step_type: emsr
+          name: optimization
+          algorithm: emsrb
+          kind: leg
+      DEPARTURE:
+        - step_type: elasticity
+          name: elasticity
+          algorithm: loglog
+          kind: leg
+          min_r: 0.5
+          alpha: 0.03
+          smoothing_function: tanh
+
+  rm_fare_adj_leg:
+    availability_control: leg
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: path
+        - step_type: forecast
+          name: path_forecast
+          algorithm: additive_pickup
+          alpha: 0.15
+          kind: hybrid
+        - step_type: fareadjustment
+          name: aggregate
+          algorithm: mr
+          kind: path
+          frat5: curve_C
+        - step_type: aggregation
+          name: aggregate
+        - step_type: emsr
+          name: optimization
+          algorithm: emsrb
+          kind: leg
+
+  rm_fare_adj_bp:
+    availability_control: bp
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: path
+        - step_type: forecast
+          name: path_forecast
+          algorithm: exp_smoothing
+          alpha: 0.15
+          kind: path
+        - step_type: fareadjustment
+          name: adj
+          algorithm: mr
+          kind: path
+          frat5: curve_C
+        - step_type: probp
+          name: optimization
+      DAILY:
+        - step_type: forecastadjustment
+          name: adjust
+          algorithm: timeframe
+          kind: path
+        - step_type: fareadjustment
+          name: adj
+          algorithm: mr
+          kind: path
+          frat5: curve_C
+        - step_type: probp
+          name: optimization
+      DEPARTURE:
+        - step_type: elasticity
+          name: elasticity
+          algorithm: loglog
+          kind: leg
+
+  rm_subgradient:
+    availability_control: bp
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: path
+        - step_type: forecast
+          name: path_forecast
+          algorithm: exp_smoothing
+          alpha: 0.15
+          kind: path
+        - step_type: subgradient
+          name: optimization
+          kind: path
+          max_iter: 100
+          step_size: 0.3
+          max_viol: 1.0
+          min_lambda: 1.0
+          use_gamma: True
+      DAILY:
+        - step_type: forecastadjustment
+          name: adjust
+          algorithm: timeframe
+          kind: path
+        - step_type: subgradient
+          name: optimization
+          kind: path
+          max_iter: 100
+          step_size: 0.3
+          max_viol: 1.0
+          min_lambda: 1.0
+          use_gamma: True
+
+todd_curves:
+  - name: Tues_SameTZ_LE600
+    probabilities:
+      0: 0.001
+      1: 0.001
+      2: 0.001
+      3: 0.001
+      4: 0.001
+      5: 0.051
+      6: 0.073
+      7: 0.077
+      8: 0.071
+      9: 0.062
+      10: 0.057
+      11: 0.055
+      12: 0.054
+      13: 0.054
+      14: 0.056
+      15: 0.058
+      16: 0.060
+      17: 0.061
+      18: 0.059
+      19: 0.051
+      20: 0.041
+      21: 0.031
+      22: 0.023
+      23: 0.001
+
+  - name: business
+    min_distance: 0
+    max_distance: 25000
+    k_factor: 3.0
+    early_dep: [0, 0.1]
+    late_dep: [0, 0.1]
+    early_arr: [0, 0.1]
+    late_arr: [0, 0.1]
+    replanning: [0.0, 0.0]
+    probabilities: {0: 0.28, 1: 0.09, 2: 0.06, 3: 0.04, 4: 0.1, 5: 0.71,
+                    6: 2.70, 7: 4.76, 8: 6.01, 9: 6.54, 10: 6.29, 11: 5.88,
+                    12: 5.71, 13: 5.77, 14: 6.06, 15: 6.57, 16: 7.22, 17: 7.75,
+                    18: 7.94, 19: 7.36, 20: 5.73, 21: 3.67, 22: 1.94, 23: 0.82}
+
+  - name: leisure
+    min_distance: 0
+    max_distance: 25000
+    k_factor: 0.3
+    early_dep: [0, 0.05]
+    late_dep: [0, 0.05]
+    early_arr: [0, 0.05]
+    late_arr: [0, 0.05]
+    replanning: [0.0, 0.0]
+    #        probabilities: [0.28, 0.09, 0.06, 0.04, 0.1, 0.71, 2.7, 4.76, 6.01, 6.54, 6.29, 5.88,
+    #                        5.71, 5.77, 6.06, 6.57, 7.22, 7.75, 7.94, 7.36, 5.73, 3.67, 1.94, 0.82]
+    probabilities: {0: 0.0028, 1: 0.0009, 2: 0.0006, 3: 0.0004, 4: 0.001, 5: 0.0071,
+                    6: 0.0270, 7: 0.0476, 8: 0.0601, 9: 0.0654, 10: 0.0629, 11: 0.0588,
+                    12: 0.0571, 13: 0.0577, 14: 0.0606, 15: 0.0657, 16: 0.0722, 17: 0.0775,
+                    18: 0.0794, 19: 0.0736, 20: 0.0573, 21: 0.0367, 22: 0.0194, 23: 0.0082}
+
+choice_models:
+  business:
+    kind: pods
+    emult: 1.6
+    basefare_mult: 2.5
+    path_quality:  [38.30,  0.10]
+    #    airline_pref_pods:  [-12.29,  0.17]
+    r1: 2.0
+    r2: 0.35
+    r3: 0.50
+  #    anc1_relevance: 0.8
+  #    anc2_relevance: 0.5
+  #    anc3_relevance: 0.8
+  #    todd_curve: business
+
+  leisure:
+    kind: pods
+    emult: 1.5
+    basefare_mult: 1.0
+    path_quality:  [2.02, 0.12]
+    #    airline_pref_pods:  [-1.98, 0.11]
+    r1: 0.70
+    r2: 0.35
+    r3: 0.35
+#    anc1_relevance: 0.5
+#    anc2_relevance: 0.8
+#    anc3_relevance: 0.5
+#    hhi: [0.0, 0.0001]
+#    elapsed_time: [0, 0.7]
+#    buffer_threshold: 25
+#    buffer_time: [0, 0.1]
+#    todd_curve: leisure
+
+circuity_rules:
+  - name: hawaii
+    orig_state: HA
+    dest_state: HA
+    connect_airport: HNL
+    alpha: 0.0
+    beta: 1000.0
+  - name: default
+    alpha: 0.0002
+    beta: 2.0
+
+carriers:
+  - name: AL1
+    rm_system: rm_pro_bp
+    frat5: curve_G
+    #    fare_adjustment_scale: 0.3
+    #    load_factor_curve: lf_curve1
+    cp_algorithm: CBC
+    #    cp_quantize: 5
+    classes:
+      - (Y0, Y)
+      - (Y1, Y)
+      - (Y2, Y)
+      - (Y3, Y)
+      - (Y4, Y)
+      - (Y5, Y)
+  - name: AL2
+    rm_system: rm_pro_bp
+    frat5: curve_C
+    fare_adjustment_scale: 0.5
+    load_factor_curve: lf_curve1
+#    cp_algorithm: BP
+#    ancillaries:
+#      ANC1: 75.0
+#      ANC2: 40.0
+
+classes:
+  - Y0
+  - Y1
+  - Y2
+  - Y3
+  - Y4
+  - Y5
+dcps:
+  - 63
+  - 56
+  - 49
+  - 42
+  - 35
+  - 31
+  - 28
+  - 24
+  - 21
+  - 17
+  - 14
+  - 10
+  - 7
+  - 5
+  - 3
+  - 1
+
+booking_curves:
+  - name: c1
+    curve:
+      63: 0.06
+      56: 0.11
+      49: 0.15
+      42: 0.2
+      35: 0.23
+      31: 0.25
+      28: 0.28
+      24: 0.31
+      21: 0.35
+      17: 0.4
+      14: 0.5
+      10: 0.62
+      7: 0.7
+      5: 0.78
+      3: 0.95
+      1: 1.0
+  - name: c2
+    curve:
+      63: 0.17
+      56: 0.25
+      49: 0.34
+      42: 0.43
+      35: 0.49
+      31: 0.53
+      28: 0.61
+      24: 0.69
+      21: 0.75
+      17: 0.8
+      14: 0.85
+      10: 0.88
+      7: 0.9
+      5: 0.95
+      3: 0.98
+      1: 1.0
+
+places:
+  BOS:
+    label: Boston Logan International Airport
+    lat: 42.3656
+    lon: -71.0098
+    time_zone: America/New_York
+    mct: [20, 45, 45, 60]
+  ORD:
+    label: Chicago O'Hare International Airport
+    lat: 41.9802
+    lon: -87.9090
+    time_zone: America/Chicago
+  LAX:
+    label: Los Angeles International Airport
+    lat: 33.9438
+    lon: -118.4091
+    time_zone: America/Los_Angeles
+
+legs:
+  - carrier: AL1
+    fltno: 101
+    orig: BOS
+    dest: ORD
+    date: '2020-01-01'
+    dep_time: 08:00
+    arr_time: '10:00'
+    capacity: 100
+    #      "": 100
+    distance: 864.0
+  - carrier: AL1
+    fltno: 102
+    orig: BOS
+    dest: ORD
+    date: '2020-01-01'
+    dep_time: '14:00'
+    arr_time: '16:00'
+    capacity: 100
+    distance: 864.0
+
+  - carrier: AL2
+    fltno: 201
+    orig: BOS
+    dest: ORD
+    date: '2020-01-01'
+    dep_time: 08:00
+    arr_time: '10:00'
+    capacity: 100
+    distance: 864.0
+  - carrier: AL2
+    fltno: 202
+    orig: BOS
+    dest: ORD
+    date: '2020-01-01'
+    dep_time: '14:00'
+    arr_time: '16:00'
+    capacity: 100
+    distance: 864.0
+
+  - carrier: AL1
+    fltno: 111
+    orig: ORD
+    dest: LAX
+    date: '2020-01-01'
+    dep_time: '11:00'
+    arr_time: '13:00'
+    capacity: 120
+    distance: 1741.0
+  - carrier: AL1
+    fltno: 112
+    orig: ORD
+    dest: LAX
+    date: '2020-01-01'
+    dep_time: '17:00'
+    arr_time: '19:00'
+    capacity: 120
+    distance: 1741.0
+
+  - carrier: AL2
+    fltno: 211
+    orig: ORD
+    dest: LAX
+    date: '2020-01-01'
+    dep_time: '11:00'
+    arr_time: '13:00'
+    capacity: 120
+    distance: 1741.0
+  - carrier: AL2
+    fltno: 212
+    orig: ORD
+    dest: LAX
+    date: '2020-01-01'
+    dep_time: '17:00'
+    arr_time: '19:00'
+    capacity: 120
+    distance: 1741.0
+
+demands:
+  - orig: BOS
+    dest: ORD
+    segment: business
+    base_demand: 70.0
+    reference_fare: 250.0
+    choice_model: business
+    curve: c1
+    distance: 864.0
+  #    todd_curve: Tues_SameTZ_LE600
+  - orig: BOS
+    dest: ORD
+    segment: leisure
+    base_demand: 90.0
+    reference_fare: 100.0
+    choice_model: leisure
+    curve: c2
+    distance: 864.0
+    group_sizes: [0.4, 0.3, 0.2, 0.1]
+  - orig: ORD
+    dest: LAX
+    segment: business
+    base_demand: 120.0
+    reference_fare: 375.0
+    distance: 1745
+    choice_model: business
+    curve: c1
+  - orig: ORD
+    dest: LAX
+    segment: leisure
+    base_demand: 150.0
+    reference_fare: 150.0
+    distance: 1745
+    choice_model: leisure
+    curve: c2
+    group_sizes: [0.4, 0.3, 0.2, 0.1]
+  - orig: BOS
+    dest: LAX
+    segment: business
+    base_demand: 100.0
+    reference_fare: 500.0
+    #    distance: 2611
+    choice_model: business
+    curve: c1
+  - orig: BOS
+    dest: LAX
+    segment: leisure
+    base_demand: 140.0
+    reference_fare: 200.0
+    #    distance: 2611
+    choice_model: leisure
+    curve: c2
+    group_sizes: [0.4, 0.3, 0.2, 0.1]
+
+fares:
+  - carrier: AL1
+    orig: BOS
+    dest: ORD
+    booking_class: Y0
+    price: 400.0
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL1
+    orig: BOS
+    dest: ORD
+    booking_class: Y1
+    price: 300.0
+    advance_purchase: 0
+    restrictions:
+      - R2
+  - carrier: AL1
+    orig: BOS
+    dest: ORD
+    booking_class: Y2
+    price: 200.0
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: BOS
+    dest: ORD
+    booking_class: Y3
+    price: 150.0
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL1
+    orig: BOS
+    dest: ORD
+    booking_class: Y4
+    price: 125.0
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R3
+  - carrier: AL1
+    orig: BOS
+    dest: ORD
+    booking_class: Y5
+    price: 100.0
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL1
+    orig: ORD
+    dest: LAX
+    booking_class: Y0
+    price: 500.0
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL1
+    orig: ORD
+    dest: LAX
+    booking_class: Y1
+    price: 400.0
+    advance_purchase: 0
+    restrictions:
+      - R2
+  - carrier: AL1
+    orig: ORD
+    dest: LAX
+    booking_class: Y2
+    price: 300.0
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: ORD
+    dest: LAX
+    booking_class: Y3
+    price: 225.0
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL1
+    orig: ORD
+    dest: LAX
+    booking_class: Y4
+    price: 175.0
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R3
+  - carrier: AL1
+    orig: ORD
+    dest: LAX
+    booking_class: Y5
+    price: 150.0
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL1
+    orig: BOS
+    dest: LAX
+    booking_class: Y0
+    price: 750.0
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL1
+    orig: BOS
+    dest: LAX
+    booking_class: Y1
+    price: 625.0
+    advance_purchase: 0
+    restrictions:
+      - R2
+  - carrier: AL1
+    orig: BOS
+    dest: LAX
+    booking_class: Y2
+    price: 450.0
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: BOS
+    dest: LAX
+    booking_class: Y3
+    price: 325.0
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL1
+    orig: BOS
+    dest: LAX
+    booking_class: Y4
+    price: 250.0
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R3
+  - carrier: AL1
+    orig: BOS
+    dest: LAX
+    booking_class: Y5
+    price: 200.0
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL2
+    orig: BOS
+    dest: ORD
+    booking_class: Y0
+    price: 400.0
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL2
+    orig: BOS
+    dest: ORD
+    booking_class: Y1
+    price: 300.0
+    advance_purchase: 0
+    restrictions:
+      - R2
+  - carrier: AL2
+    orig: BOS
+    dest: ORD
+    booking_class: Y2
+    price: 200.0
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL2
+    orig: BOS
+    dest: ORD
+    booking_class: Y3
+    price: 150.0
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL2
+    orig: BOS
+    dest: ORD
+    booking_class: Y4
+    price: 125.0
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R3
+  - carrier: AL2
+    orig: BOS
+    dest: ORD
+    booking_class: Y5
+    price: 100.0
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL2
+    orig: ORD
+    dest: LAX
+    booking_class: Y0
+    price: 500.0
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL2
+    orig: ORD
+    dest: LAX
+    booking_class: Y1
+    price: 400.0
+    advance_purchase: 0
+    restrictions:
+      - R2
+  - carrier: AL2
+    orig: ORD
+    dest: LAX
+    booking_class: Y2
+    price: 300.0
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL2
+    orig: ORD
+    dest: LAX
+    booking_class: Y3
+    price: 225.0
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL2
+    orig: ORD
+    dest: LAX
+    booking_class: Y4
+    price: 175.0
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R3
+  - carrier: AL2
+    orig: ORD
+    dest: LAX
+    booking_class: Y5
+    price: 150.0
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL2
+    orig: BOS
+    dest: LAX
+    booking_class: Y0
+    price: 750.0
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL2
+    orig: BOS
+    dest: LAX
+    booking_class: Y1
+    price: 625.0
+    advance_purchase: 0
+    restrictions:
+      - R2
+  - carrier: AL2
+    orig: BOS
+    dest: LAX
+    booking_class: Y2
+    price: 450.0
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL2
+    orig: BOS
+    dest: LAX
+    booking_class: Y3
+    price: 325.0
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL2
+    orig: BOS
+    dest: LAX
+    booking_class: Y4
+    price: 250.0
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R3
+  - carrier: AL2
+    orig: BOS
+    dest: LAX
+    booking_class: Y5
+    price: 200.0
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+
+snapshot_filters:
+#  - type: path_untruncation
+#    title: Snapshot of path untruncation
+#    sample: 35
+#    dcp: 0
+#    flt_no: 202
+#  - type: forecast
+#    title: Snapshot of forecasting
+#    sample: 35
+#    dcp: [14]
+#    flt_no: 211
+#  - type: rm
+#    title: RM Snapshot, EMSRb leg optimization
+#    sample: [35]
+#    dcp: [14]
+#    flt_no: 111
+#  - type: rm
+#    title: RM Snapshot, EMSRb leg optimization
+#    sample: [35]
+#    dcp: [7]
+#    flt_no: 211
+#  - type: pro_bp
+#    title: ProBP Snapshot
+#    sample: [35]
+#    dcp: 35
+#    flt_no: 211

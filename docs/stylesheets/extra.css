@@ -1,0 +1,39 @@
+:root {
+  --md-primary-fg-color:        #6a3d9a;
+  --md-primary-fg-color--light: #6a3d9a;
+  --md-primary-fg-color--dark:  #6a3d9a;
+  --md-accent-fg-color: #cab2d6;
+}
+
+.md-typeset h1,
+.md-typeset h2 {
+  font-weight: 800;
+}
+
+div.has-actions details {
+  border-bottom-color: rgba(0,0,0,0);
+  border-top-color: rgba(0,0,0,0);
+  border-left-color: rgba(0,0,0,0);
+  border-right-color: rgba(0,0,0,0);
+    display: none;
+}
+
+@media screen and (min-width: 60em) {
+    .md-header__source {
+        max-width: 12.2rem;
+        width:12.2rem
+    }
+}
+
+.jupyter-wrapper .jp-OutputArea-output pre {
+    padding: 8px 15px;
+    font-size: var(--jp-code-font-size);
+}
+
+.md-header__topic:first-child {
+    display: none;
+}
+
+.md-header__button.md-logo img {
+    margin-top: -0.1rem;
+}

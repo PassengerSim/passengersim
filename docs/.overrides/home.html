@@ -1,0 +1,62 @@
+{#-
+  This file was automatically generated - do not edit
+-#}
+{% extends "main.html" %}
+{% block tabs %}
+  {{ super() }}
+  <style>.md-header{position:initial}.md-main__inner{margin:0}.md-content{display:none}@media screen and (min-width:60em){.md-sidebar--secondary{display:none}}@media screen and (min-width:76.25em){.md-sidebar--primary{display:none}}</style>
+  <style>
+  body {
+    background-image: url("assets/images/clouds-airplane-tint.jpg");
+    /*background-attachment: fixed;*/
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-color: black;
+  }
+  .parallax {
+    padding-left: 40px;
+  }
+  .parallax h1 {
+    color: white;
+    padding-bottom: 30px;
+  }
+  .md-button--white {
+      margin-bottom: 4px;
+  }
+  .md-button--white {
+      background-color: white;
+  }
+  .md-header {
+      background-color: rgba(0,0,0,0);
+  }
+  .md-tabs {
+      background-color: rgba(0,0,0,0);
+  }
+  .md-header__button.md-logo img{
+      display: none;
+  }
+  .big-logo {
+      padding-top: 50vh;
+      height: 40px;
+      margin-bottom: 20px;
+      padding-right: 10vw;
+  }
+  </style>
+  <div class="parallax">
+    <section class="mdx-container">
+      <div class="md-grid md-typeset">
+          <img src="assets/logo.svg" alt="logo" class="big-logo">
+          <h1>Passenger travel simulation for revenue management.</h1>
+          <a href="{{ page.next_page.url | url }}" title="{{ page.next_page.title | e }}" class="md-button md-button--primary">
+            Get Started
+          </a>
+          <a href="https://sites.gatech.edu/ce-atlatgt/" class="md-button md-button--white">
+            &#x2708; ATL@GT
+          </a>
+      </div>
+    </section>
+  </div>
+{% endblock %}
+{% block content %}{% endblock %}
+{% block footer %}{% endblock %}

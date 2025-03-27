@@ -1,0 +1,607 @@
+#
+# A very simple 3 market example
+#
+
+scenario: 3MKT
+
+db:
+  write_items:
+    - leg
+    - fare
+    - demand
+    - bookings
+    - bucket
+    - pathclass
+  fast: true
+  engine: sqlite
+  filename: ":memory:"
+
+outputs:
+  reports:
+    - leg_forecasts
+    - fare_class_mix
+    - load_factors
+    - bookings_by_timeframe
+    - total_demand
+    - demand_to_come
+    - carrier_history
+
+simulation_controls:
+  num_trials: 1
+  num_samples: 500
+  random_seed: 42
+  sys_k_factor: 0.1
+  mkt_k_factor: 0.15
+  pax_type_k_factor: 0.0  # now simple_k_factor
+  simple_k_factor: 0.2
+  tf_k_factor: 0.1
+  tf_z_factor: 1.0
+  tot_z_factor: 2.0
+  prorate_revenue: true
+  dwm_lite: false
+  max_connect_time: 120
+  disable_ap: true
+  demand_multiplier: 1.0
+  manual_paths: false
+  timeframe_demand_allocation: pods
+  allow_unused_restrictions: true
+
+rm_systems:
+  rm_no_detruncation:
+    availability_control: leg
+    processes:
+      DCP:
+      - step_type: untruncation
+        name: untruncation
+        algorithm: none
+        kind: leg
+      - step_type: forecast
+        name: forecast
+        algorithm: additive_pickup
+        alpha: 0.1
+        kind: leg
+      - step_type: emsr
+        name: optimization
+        algorithm: emsrb
+        kind: leg
+  rm_test1:
+    availability_control: leg
+    processes:
+      DCP:
+      - step_type: untruncation
+        name: untruncation
+        algorithm: em
+        kind: leg
+      - step_type: forecast
+        name: forecast
+        algorithm: additive_pickup
+        alpha: 0.15
+        kind: leg
+      - step_type: fcfs
+        name: optimization
+  rm_test2:
+    availability_control: bp
+    processes:
+      DCP:
+      - step_type: untruncation
+        name: untruncation
+        algorithm: em
+        kind: path
+      - step_type: forecast
+        name: path_forecast
+        algorithm: exp_smoothing
+        alpha: 0.15
+        kind: path
+      - step_type: probp
+        name: optimization
+      - step_type: aggregation
+        name: aggregate
+      - step_type: emsr
+        name: optimization
+        algorithm: emsrb
+        kind: leg
+
+choice_models:
+  business:
+    kind: pods
+    emult: 1.6
+    basefare_mult: 2.5
+  leisure:
+    kind: pods
+    emult: 1.6
+    basefare_mult: 1.0
+
+carriers:
+  - name: AL1
+    rm_system: rm_test1
+  - name: AL2
+    rm_system: rm_test1
+
+classes:
+  - Y0
+  - Y1
+  - Y2
+  - Y3
+  - Y4
+  - Y5
+dcps:
+  - 63
+  - 56
+  - 49
+  - 42
+  - 35
+  - 31
+  - 28
+  - 24
+  - 21
+  - 17
+  - 14
+  - 10
+  - 7
+  - 5
+  - 3
+  - 1
+booking_curves:
+  - name: c1  # business
+    curve:
+      63: 0.06
+      56: 0.11
+      49: 0.15
+      42: 0.2
+      35: 0.23
+      31: 0.25
+      28: 0.28
+      24: 0.31
+      21: 0.35
+      17: 0.4
+      14: 0.5
+      10: 0.62
+      7: 0.7
+      5: 0.78
+      3: 0.95
+      1: 1.0
+  - name: c2  # leisure
+    curve:
+      63: 0.17
+      56: 0.25
+      49: 0.34
+      42: 0.43
+      35: 0.49
+      31: 0.53
+      28: 0.61
+      24: 0.69
+      21: 0.75
+      17: 0.8
+      14: 0.85
+      10: 0.88
+      7: 0.9
+      5: 0.95
+      3: 0.98
+      1: 1.0
+
+places:
+  BOS:
+    label: Boston Logan International Airport
+    lat: 42.3656
+    lon: -71.0098
+    time_zone: America/New_York
+  ORD:
+    label: Chicago O'Hare International Airport
+    lat: 41.9802
+    lon: -87.9090
+    time_zone: America/Chicago
+  LAX:
+    label: Los Angeles International Airport
+    lat: 33.9438
+    lon: -118.4091
+    time_zone: America/Los_Angeles
+
+legs:
+  - carrier: AL1
+    fltno: 101
+    orig: BOS
+    dest: ORD
+    dep_time: 08:00
+    arr_time: '10:00'
+    capacity: 100
+  - carrier: AL1
+    fltno: 102
+    orig: BOS
+    dest: ORD
+    dep_time: '14:00'
+    arr_time: '16:00'
+    capacity: 100
+  - carrier: AL2
+    fltno: 201
+    orig: BOS
+    dest: ORD
+    dep_time: 08:00
+    arr_time: '10:00'
+    capacity: 100
+  - carrier: AL2
+    fltno: 202
+    orig: BOS
+    dest: ORD
+    dep_time: '14:00'
+    arr_time: '16:00'
+    capacity: 100
+  - carrier: AL1
+    fltno: 111
+    orig: ORD
+    dest: LAX
+    dep_time: '11:00'
+    arr_time: '13:00'
+    capacity: 120
+  - carrier: AL1
+    fltno: 112
+    orig: ORD
+    dest: LAX
+    dep_time: '17:00'
+    arr_time: '19:00'
+    capacity: 120
+  - carrier: AL2
+    fltno: 211
+    orig: ORD
+    dest: LAX
+    dep_time: '11:00'
+    arr_time: '13:00'
+    capacity: 120
+  - carrier: AL2
+    fltno: 212
+    orig: ORD
+    dest: LAX
+    dep_time: '17:00'
+    arr_time: '19:00'
+    capacity: 120
+
+demands:
+  - orig: BOS
+    dest: ORD
+    segment: business
+    base_demand: 70.0
+    reference_fare: 250.0
+    choice_model: business
+    curve: c1
+  - orig: BOS
+    dest: ORD
+    segment: leisure
+    base_demand: 90.0
+    reference_fare: 100.0
+    choice_model: leisure
+    curve: c2
+  - orig: ORD
+    dest: LAX
+    segment: business
+    base_demand: 120.0
+    reference_fare: 375.0
+    choice_model: business
+    curve: c1
+  - orig: ORD
+    dest: LAX
+    segment: leisure
+    base_demand: 150.0
+    reference_fare: 150.0
+    choice_model: leisure
+    curve: c2
+  - orig: BOS
+    dest: LAX
+    segment: business
+    base_demand: 100.0
+    reference_fare: 500.0
+    choice_model: business
+    curve: c1
+  - orig: BOS
+    dest: LAX
+    segment: leisure
+    base_demand: 140.0
+    reference_fare: 200.0
+    choice_model: leisure
+    curve: c2
+
+fares:
+  - carrier: AL1
+    orig: BOS
+    dest: ORD
+    booking_class: Y0
+    price: 400.0
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL1
+    orig: BOS
+    dest: ORD
+    booking_class: Y1
+    price: 300.0
+    advance_purchase: 0
+    restrictions:
+      - R2
+  - carrier: AL1
+    orig: BOS
+    dest: ORD
+    booking_class: Y2
+    price: 200.0
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: BOS
+    dest: ORD
+    booking_class: Y3
+    price: 150.0
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL1
+    orig: BOS
+    dest: ORD
+    booking_class: Y4
+    price: 125.0
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R3
+  - carrier: AL1
+    orig: BOS
+    dest: ORD
+    booking_class: Y5
+    price: 100.0
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL1
+    orig: ORD
+    dest: LAX
+    booking_class: Y0
+    price: 500.0
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL1
+    orig: ORD
+    dest: LAX
+    booking_class: Y1
+    price: 400.0
+    advance_purchase: 0
+    restrictions:
+      - R2
+  - carrier: AL1
+    orig: ORD
+    dest: LAX
+    booking_class: Y2
+    price: 300.0
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: ORD
+    dest: LAX
+    booking_class: Y3
+    price: 225.0
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL1
+    orig: ORD
+    dest: LAX
+    booking_class: Y4
+    price: 175.0
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R3
+  - carrier: AL1
+    orig: ORD
+    dest: LAX
+    booking_class: Y5
+    price: 150.0
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL1
+    orig: BOS
+    dest: LAX
+    booking_class: Y0
+    price: 750.0
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL1
+    orig: BOS
+    dest: LAX
+    booking_class: Y1
+    price: 625.0
+    advance_purchase: 0
+    restrictions:
+      - R2
+  - carrier: AL1
+    orig: BOS
+    dest: LAX
+    booking_class: Y2
+    price: 450.0
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: BOS
+    dest: LAX
+    booking_class: Y3
+    price: 325.0
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL1
+    orig: BOS
+    dest: LAX
+    booking_class: Y4
+    price: 250.0
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R3
+  - carrier: AL1
+    orig: BOS
+    dest: LAX
+    booking_class: Y5
+    price: 200.0
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL2
+    orig: BOS
+    dest: ORD
+    booking_class: Y0
+    price: 400.0
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL2
+    orig: BOS
+    dest: ORD
+    booking_class: Y1
+    price: 300.0
+    advance_purchase: 0
+    restrictions:
+      - R2
+  - carrier: AL2
+    orig: BOS
+    dest: ORD
+    booking_class: Y2
+    price: 200.0
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL2
+    orig: BOS
+    dest: ORD
+    booking_class: Y3
+    price: 150.0
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL2
+    orig: BOS
+    dest: ORD
+    booking_class: Y4
+    price: 125.0
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R3
+  - carrier: AL2
+    orig: BOS
+    dest: ORD
+    booking_class: Y5
+    price: 100.0
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL2
+    orig: ORD
+    dest: LAX
+    booking_class: Y0
+    price: 500.0
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL2
+    orig: ORD
+    dest: LAX
+    booking_class: Y1
+    price: 400.0
+    advance_purchase: 0
+    restrictions:
+      - R2
+  - carrier: AL2
+    orig: ORD
+    dest: LAX
+    booking_class: Y2
+    price: 300.0
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL2
+    orig: ORD
+    dest: LAX
+    booking_class: Y3
+    price: 225.0
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL2
+    orig: ORD
+    dest: LAX
+    booking_class: Y4
+    price: 175.0
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R3
+  - carrier: AL2
+    orig: ORD
+    dest: LAX
+    booking_class: Y5
+    price: 150.0
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3
+  - carrier: AL2
+    orig: BOS
+    dest: LAX
+    booking_class: Y0
+    price: 750.0
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL2
+    orig: BOS
+    dest: LAX
+    booking_class: Y1
+    price: 625.0
+    advance_purchase: 0
+    restrictions:
+      - R2
+  - carrier: AL2
+    orig: BOS
+    dest: LAX
+    booking_class: Y2
+    price: 450.0
+    advance_purchase: 3
+    restrictions:
+      - R1
+  - carrier: AL2
+    orig: BOS
+    dest: LAX
+    booking_class: Y3
+    price: 325.0
+    advance_purchase: 7
+    restrictions:
+      - R1
+      - R2
+  - carrier: AL2
+    orig: BOS
+    dest: LAX
+    booking_class: Y4
+    price: 250.0
+    advance_purchase: 14
+    restrictions:
+      - R1
+      - R3
+  - carrier: AL2
+    orig: BOS
+    dest: LAX
+    booking_class: Y5
+    price: 200.0
+    advance_purchase: 21
+    restrictions:
+      - R1
+      - R2
+      - R3

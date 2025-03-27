@@ -1,0 +1,77 @@
+scenario: 3MKT-UDP
+
+include:
+  - 01-base.yaml
+
+simulation_controls:
+  demand_multiplier: 1.0
+  disable_ap: false
+
+db:
+  write_items:
+    - leg_daily
+    - fare_final
+    - demand_final
+    - bookings
+    - bucket
+    - pathclass
+    - leg
+    - demand
+
+rm_systems:
+  rm_udp:
+    availability_control: bp
+    processes:
+      DCP:
+      - step_type: untruncation
+        name: untruncation
+        algorithm: em
+        kind: path
+        initialization_method: pods
+        minimum_mu: 0.01
+      - step_type: forecast
+        name: path_forecast
+        algorithm: additive_pickup
+        kind: path
+      - step_type: udp
+        name: optimization
+        arrivals_per_time_slice: 0.1
+      - step_type: aggregation  # not needed for algorithm, but gives leg forecast data for output
+        name: aggregate
+      DAILY:
+      - step_type: udpupdate
+        name: optimization
+
+carriers:
+  - name: AL1
+    rm_system: rm_udp
+    truncation_rule: 3
+  - name: AL2
+    rm_system: rm_udp
+    truncation_rule: 3
+
+outputs:
+  reports:
+    - fare_class_mix
+    - load_factors
+    - bookings_by_timeframe
+    - total_demand
+    - leg_forecasts
+    - path_forecasts
+    - [od_fare_class_mix, BOS, ORD]
+    - [od_fare_class_mix, BOS, LAX]
+    - [od_fare_class_mix, ORD, LAX]
+    - demand_to_come
+    - carrier_history
+    - bid_price_history
+    - displacement_history
+
+choice_models:
+  business:
+    r1: 1.0
+    r2: 0.35
+    r3: 0.50
+  leisure:
+    r1: 0.70
+    r2: 0.35
+    r3: 0.35

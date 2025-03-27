@@ -1,0 +1,67 @@
+include:
+  - 08-untrunc-em.yaml
+
+scenario: 3MKTproBP
+
+db:
+  write_items:
+    - leg_final
+    - fare_final
+    - demand_final
+    - bookings
+    - bucket
+    - pathclass
+    - leg
+    - demand
+
+simulation_controls:
+  num_trials: 10
+  show_progress_bar: false
+
+rm_systems:
+  rm_probp:
+    availability_control: bp
+    processes:
+      DCP:
+      - step_type: untruncation
+        name: untruncation
+        algorithm: em
+        kind: path
+      - step_type: forecast
+        name: path_forecast
+        algorithm: additive_pickup
+        kind: path
+      - step_type: probp
+        name: optimization
+      - step_type: aggregation  # not needed for algorithm, but gives leg forecast data for output
+        name: aggregate
+
+carriers:
+  - name: AL1
+    rm_system: rm_probp
+  - name: AL2
+    rm_system: rm_probp
+
+snapshot_filters:
+   - type: pro_bp
+     title: ProBP Snapshot
+     sample: [120, 290, 499]
+     dcp: [63, 56, 21]
+     flt_no: 111
+     airline: AL1
+     directory: snapshots/probp
+
+outputs:
+  reports:
+    - fare_class_mix
+    - load_factors
+    - bookings_by_timeframe
+    - total_demand
+    - leg_forecasts
+    - path_forecasts
+    - [od_fare_class_mix, BOS, ORD]
+    - [od_fare_class_mix, BOS, LAX]
+    - [od_fare_class_mix, ORD, LAX]
+    - demand_to_come
+    - carrier_history
+    - bid_price_history

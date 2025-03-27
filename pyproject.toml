@@ -1,0 +1,107 @@
+# pyproject.toml
+[build-system]
+requires = [
+    "setuptools",
+    "wheel",
+    "setuptools_scm[toml]>=7.0",
+]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+fallback_version = "0.1.0"
+write_to = "passengersim/_version.py"
+
+[tool.bumpversion]
+parse = "(?P<major>\\d+)\\.(?P<minor>\\d+)"
+serialize = ["{major}.{minor}"]
+search = "{current_version}"
+replace = "{new_version}"
+regex = false
+ignore_missing_version = false
+ignore_missing_files = false
+tag = true
+sign_tags = false
+tag_name = "v{new_version}"
+tag_message = "Bump version: {current_version} → {new_version}"
+allow_dirty = false
+commit = false
+message = "Bump version: {current_version} → {new_version}"
+commit_args = ""
+setup_hooks = []
+pre_commit_hooks = []
+post_commit_hooks = []
+
+[project]
+name = "passengersim"
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "License :: OSI Approved :: BSD License",
+  "Programming Language :: Python :: 3.12",
+]
+license = {file = "LICENSE"}
+dynamic = ["version"]
+requires-python = ">=3.12"
+dependencies = [
+    "addicty",
+    "joblib",
+    "numpy",
+    "ortools",
+    "pandas",
+    "pydantic>=2.7",
+    "pyyaml",
+    "scipy",
+    "typer",
+    "dill",
+    "lz4",
+]
+
+[project.optional-dependencies]
+test = [
+    "altair>=5.0",
+    "xmle",
+    "pytest-regressions ~=2.4",
+]
+reporting = [
+    "altair>=5.0",
+    "xmle",
+    "docutils",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]  # list of folders that contain the packages (["."] by default)
+include = ["passengersim*"]  # package names should match these glob patterns (["*"] by default)
+exclude = ["passengersim.tests*"]  # exclude packages matching these glob patterns (empty by default)
+namespaces = false  # to disable scanning PEP 420 namespaces (true by default)
+
+[tool.setuptools.package-data]
+passengersim = [
+    "networks/*.yaml",
+]
+
+[metadata]
+description = "User interface for PassengerSim"
+author = "PassengerSim LLC"
+
+[tool.ruff]
+fix = true
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+ignore = ["B905"]
+select = ["E", "F", "B", "UP", "TID", "I001"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["passengersim"]
+required-imports = ["from __future__ import annotations"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E402", "F401"]  # Ignore import violations in all `__init__.py` files
+"*.ipynb" = ["T20", "F401"]  # Ignore missing docstrings, allow extra imports in Jupyter Notebooks
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "--durations=0 --durations-min=1.0"

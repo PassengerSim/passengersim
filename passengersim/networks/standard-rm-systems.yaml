@@ -1,0 +1,392 @@
+rm_systems:
+
+  E:
+    description: >-
+      Leg-based additive pickup forecast, EM detruncation, EMSR-B optimization.
+    availability_control: leg
+    processes:
+      DCP:
+      - step_type: untruncation
+        name: untruncation
+        algorithm: em
+        kind: leg
+        initialization_method: default
+      - step_type: forecast
+        name: forecast
+        algorithm: additive_pickup
+        kind: leg
+      - step_type: emsr
+        name: optimization
+        algorithm: emsrb
+        kind: leg
+
+  P:
+    description: >-
+      Path-based additive pickup forecast, EM detruncation, ProBP optimization.
+    availability_control: bp
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: path
+        - step_type: forecast
+          name: path_forecast
+          algorithm: additive_pickup
+          kind: path
+        - step_type: probp
+          name: optimization
+      DAILY:
+        - step_type: forecastadjustment
+          algorithm: timeframe
+          kind: path
+        - step_type: probp
+          name: optimization
+
+  S:
+    description: >-
+      Path-based additive pickup forecast, EM detruncation, SubBP optimization.
+    availability_control: bp
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: path
+        - step_type: forecast
+          name: path_forecast
+          algorithm: additive_pickup
+          kind: path
+        - step_type: subbp
+          name: optimization
+      DAILY:
+        - step_type: forecastadjustment
+          algorithm: timeframe
+          kind: path
+        - step_type: subbp
+          name: optimization
+
+  U:
+    description: >-
+      Path-based additive pickup forecast, EM detruncation, UDP optimization.
+    availability_control: bp
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: path
+          initialization_method: pods
+          minimum_mu: 0.01
+        - step_type: forecast
+          name: path_forecast
+          algorithm: additive_pickup
+          kind: path
+        - step_type: udp
+          name: optimization
+          arrivals_per_time_slice: 0.1
+      DAILY:
+        - step_type: udpupdate
+          name: optimization
+
+  C:
+    description: >-
+      Path-based additive pickup conditional forecast,
+      EM detruncation of yieldable demand, ProBP optimization.
+    availability_control: bp
+    frat5: curve_C
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: path
+          which_data: yieldable
+        - step_type: forecast
+          name: path_forecast
+          algorithm: additive_pickup
+          kind: conditional
+          regression_weight: sellup
+          max_cap: 0
+        - step_type: probp
+          name: optimization
+      DAILY:
+        - step_type: forecastadjustment
+          algorithm: timeframe
+          kind: path
+        - step_type: probp
+          name: optimization
+
+  M:
+    description: >-
+      Path-based additive pickup conditional forecast,
+      EM detruncation of yieldable demand,
+      MR fare adjustment with 25% scaling,
+      ProBP optimization.
+    availability_control: bp
+    frat5: curve_C
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: path
+          which_data: yieldable
+        - step_type: forecast
+          name: path_forecast
+          algorithm: additive_pickup
+          kind: conditional
+          fare_adjustment: mr
+          fare_adjustment_scale: 0.25
+          weighted_by_ratio: true
+          max_cap: 10
+        - step_type: probp
+          name: optimization
+      DAILY:
+        - step_type: forecastadjustment
+          algorithm: timeframe
+          kind: path
+        - step_type: probp
+          name: optimization
+
+  V:
+    description: >-
+      Path-based additive pickup conditional forecast,
+      EM detruncation of yieldable demand,
+      MR fare adjustment with 25% scaling,
+      UDP optimization.
+    availability_control: bp
+    frat5: curve_C
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: path
+          which_data: yieldable
+        - step_type: forecast
+          name: path_forecast
+          algorithm: additive_pickup
+          kind: conditional
+          fare_adjustment: mr
+          fare_adjustment_scale: 0.25
+          weighted_by_ratio: true
+        - step_type: udp
+          name: optimization
+          arrivals_per_time_slice: 0.1
+      DAILY:
+        - step_type: udpupdate
+          name: optimization_update
+
+  K:
+    description: >-
+      Path-based additive pickup conditional forecast,
+      EM detruncation of yieldable demand,
+      KI fare adjustment with 25% scaling,
+      ProBP optimization.
+    availability_control: bp
+    frat5: curve_C
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: path
+          which_data: yieldable
+        - step_type: forecast
+          name: path_forecast
+          algorithm: additive_pickup
+          kind: conditional
+          fare_adjustment: ki
+          fare_adjustment_scale: 0.25
+          weighted_by_ratio: true
+          max_cap: 10
+        - step_type: probp
+          name: optimization
+      DAILY:
+        - step_type: forecastadjustment
+          algorithm: timeframe
+          kind: path
+        - step_type: probp
+          name: optimization
+
+  Q:
+    description: >-
+      Path-based additive pickup PODS-style Q-hybrid forecast
+      (with no fare restrictions this becomes Q-only),
+      EM detruncation of priceable and yieldable demand (separately),
+      ProBP optimization.
+    availability_control: bp
+    frat5: curve_C
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: q_untruncation
+          algorithm: em
+          kind: path
+          which_data: priceable
+        - step_type: untruncation
+          name: y_untruncation
+          algorithm: em
+          kind: path
+          which_data: yieldable
+        - step_type: forecast
+          name: path_forecast
+          algorithm: additive_pickup
+          kind: hybrid
+          # max_cap: 10 <- set this on the Frat5
+        - step_type: probp
+          name: optimization
+      DAILY:
+        - step_type: forecastadjustment
+          algorithm: timeframe
+          kind: path
+        - step_type: probp
+          name: optimization
+
+  F:
+    description: >-
+      Path-based additive pickup PODS-style Q-hybrid forecast
+      (with no fare restrictions this becomes Q-only),
+      EM detruncation of priceable and yieldable demand (separately),
+      MR fare adjustment with 25% scaling, ProBP optimization.
+    availability_control: bp
+    frat5: curve_C
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: q_untruncation
+          algorithm: em
+          kind: path
+          which_data: priceable
+        - step_type: untruncation
+          name: y_untruncation
+          algorithm: em
+          kind: path
+          which_data: yieldable
+        - step_type: forecast
+          name: path_forecast
+          algorithm: additive_pickup
+          kind: hybrid
+          # max_cap: 10 <- set this on the Frat5
+          fare_adjustment: mr
+          fare_adjustment_scale: 0.25
+          weighted_by_ratio: true
+        - step_type: probp
+          name: optimization
+      DAILY:
+        - step_type: forecastadjustment
+          algorithm: timeframe
+          kind: path
+        - step_type: probp
+          name: optimization
+
+  Z:
+    description: >-
+      Path-based additive pickup PODS-style Q-hybrid forecast
+      (with no fare restrictions this becomes Q-only),
+      EM detruncation of priceable and yieldable demand (separately),
+      MR fare adjustment with 25% scaling, SubBP optimization.
+    availability_control: bp
+    frat5: curve_C
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: q_untruncation
+          algorithm: em
+          kind: path
+          which_data: priceable
+        - step_type: untruncation
+          name: y_untruncation
+          algorithm: em
+          kind: path
+          which_data: yieldable
+        - step_type: forecast
+          name: path_forecast
+          algorithm: additive_pickup
+          kind: hybrid
+          # max_cap: 10 <- set this on the Frat5
+          fare_adjustment: mr
+          fare_adjustment_scale: 0.25
+          weighted_by_ratio: true
+        - step_type: subbp
+          name: optimization
+      DAILY:
+        - step_type: forecastadjustment
+          algorithm: timeframe
+          kind: path
+        - step_type: subbp
+          name: optimization
+
+  Q_PAX:
+    description: >-
+      Path-based additive pickup PassengerSim-style Q forecast,
+      Assume no fare restrictions and thus no yieldable demand,
+      ProBP optimization.
+    availability_control: bp
+    frat5: curve_C
+    processes:
+      DCP:
+        - step_type: forecast
+          name: path_forecast
+          algorithm: additive_pickup
+          kind: conditional
+          regression_weight: "sellup^2"
+          max_cap: 10
+        - step_type: probp
+          name: optimization
+      DAILY:
+        - step_type: forecastadjustment
+          algorithm: timeframe
+          kind: path
+        - step_type: probp
+          name: optimization
+
+  L:
+    description: >-
+      Leg-based additive pickup conditional forecast,
+      EM detruncation of yieldable demand, EMSR-B optimization.
+    availability_control: leg
+    frat5: curve_C
+    processes:
+      DCP:
+        - step_type: legvalue
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: leg
+          which_data: yieldable
+        - step_type: forecast
+          name: leg_forecast
+          algorithm: additive_pickup
+          kind: leg-conditional
+        - step_type: emsr
+          name: optimization
+          algorithm: emsrb
+          kind: leg
+
+  J:
+    description: >-
+      Leg-based additive pickup conditional forecast,
+      EM detruncation of yieldable demand, LegDP optimization.
+    availability_control: bp
+    frat5: curve_C
+    processes:
+      DCP:
+        - step_type: legvalue
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: leg
+          which_data: yieldable
+        - step_type: forecast
+          name: leg_forecast
+          algorithm: additive_pickup
+          kind: leg-conditional
+        - step_type: legdp
+          name: optimization
+          reoptimize: once
+          arrivals_per_time_slice: 0.1
+      DAILY:
+        - step_type: udpupdate
+          name: optimization

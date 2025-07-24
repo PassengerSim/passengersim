@@ -16,9 +16,9 @@ if TYPE_CHECKING:
 
 def extract_displacement_history(sim: Simulation) -> pd.DataFrame:
     """Extract the average displacement cost history for each carrier."""
-    df = from_nested_dict(
-        sim.displacement_traces, ["trial", "carrier", "days_prior", "measure"]
-    ).rename_axis(columns=None)
+    df = from_nested_dict(sim.displacement_traces, ["trial", "carrier", "days_prior", "measure"]).rename_axis(
+        columns=None
+    )
     df = df.fillna(0)
     return df
 
@@ -73,6 +73,7 @@ class SimTabDisplacementHistory(GenericSimulationTables):
         show_stdev: float | bool | None = None,
         *,
         raw_df=False,
+        also_df: bool = False,
         trial: int | None = None,
         title: str | None = "Displacement Cost History",
     ):
@@ -91,21 +92,15 @@ class SimTabDisplacementHistory(GenericSimulationTables):
         if show_stdev:
             if show_stdev is True:
                 show_stdev = 2
-            df["displacement_upper"] = (
-                df["displacement_mean"] + show_stdev * df["displacement_stdev"]
-            )
-            df["displacement_lower"] = (
-                df["displacement_mean"] - show_stdev * df["displacement_stdev"]
-            ).clip(0, None)
+            df["displacement_upper"] = df["displacement_mean"] + show_stdev * df["displacement_stdev"]
+            df["displacement_lower"] = (df["displacement_mean"] - show_stdev * df["displacement_stdev"]).clip(0, None)
         if raw_df:
             return df
 
         import altair as alt
 
         line_encoding = dict(
-            x=alt.X("days_prior:Q")
-            .scale(reverse=True)
-            .title("Days Prior to Departure"),
+            x=alt.X("days_prior:Q").scale(reverse=True).title("Days Prior to Departure"),
             y=alt.Y("displacement_mean", title="Displacement Cost"),
         )
         if color:
@@ -114,9 +109,7 @@ class SimTabDisplacementHistory(GenericSimulationTables):
         fig = chart.mark_line(interpolate="step-before").encode(**line_encoding)
         if show_stdev:
             area_encoding = dict(
-                x=alt.X("days_prior:Q")
-                .scale(reverse=True)
-                .title("Days Prior to Departure"),
+                x=alt.X("days_prior:Q").scale(reverse=True).title("Days Prior to Departure"),
                 y=alt.Y("displacement_lower:Q", title="Displacement Cost"),
                 y2=alt.Y2("displacement_upper:Q", title="Displacement Cost"),
             )
@@ -124,20 +117,14 @@ class SimTabDisplacementHistory(GenericSimulationTables):
                 opacity=0.1,
                 interpolate="step-before",
             ).encode(**area_encoding)
-            bound_line = chart.mark_line(
-                opacity=0.4, strokeDash=[5, 5], interpolate="step-before"
-            ).encode(
-                x=alt.X("days_prior:Q")
-                .scale(reverse=True)
-                .title("Days Prior to Departure")
+            bound_line = chart.mark_line(opacity=0.4, strokeDash=[5, 5], interpolate="step-before").encode(
+                x=alt.X("days_prior:Q").scale(reverse=True).title("Days Prior to Departure")
             )
-            top_line = bound_line.encode(
-                y=alt.Y("displacement_lower:Q", title="Displacement Cost")
-            )
-            bottom_line = bound_line.encode(
-                y=alt.Y("displacement_upper:Q", title="Displacement Cost")
-            )
+            top_line = bound_line.encode(y=alt.Y("displacement_lower:Q", title="Displacement Cost"))
+            bottom_line = bound_line.encode(y=alt.Y("displacement_upper:Q", title="Displacement Cost"))
             fig = fig + bound + top_line + bottom_line
         if title:
             fig = fig.properties(title=title).configure_title(fontSize=18)
+        if also_df:
+            return fig, df
         return fig

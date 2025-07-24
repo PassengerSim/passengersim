@@ -11,7 +11,7 @@ import sys
 import time
 import typing
 import warnings
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, ClassVar
 from urllib.request import urlopen
 
@@ -73,6 +73,20 @@ def web_opener(x):
     return urlopen(x.parts[0] + "//" + "/".join(x.parts[1:]))
 
 
+def _path_to_str(x):
+    """Convert paths in a nested structure to strings."""
+    if isinstance(x, dict):
+        return {k: _path_to_str(v) for k, v in x.items()}
+    if isinstance(x, list):
+        return list(_path_to_str(i) for i in x)
+    if isinstance(x, tuple):
+        return list(_path_to_str(i) for i in x)
+    if isinstance(x, pathlib.Path):
+        return str(x)
+    else:
+        return x
+
+
 class OptionalPath(pathlib.Path):
     """A pathlib.Path that, if missing, is ignored by the Yaml loader."""
 
@@ -106,9 +120,7 @@ class YamlConfig(PrettyModel):
             t = time.time()
             if isinstance(filename, str) and "\n" in filename:
                 # explicit YAML content cannot have include statements
-                content = addicty.Dict.load(
-                    filename, freeze=False, Loader=yaml.CSafeLoader
-                )
+                content = addicty.Dict.load(filename, freeze=False, Loader=yaml.CSafeLoader)
                 raw_config.update(content)
                 continue
             if not isinstance(filename, pathlib.Path):
@@ -122,15 +134,11 @@ class YamlConfig(PrettyModel):
                 if filename.parts[0] in {"https:", "http:", "s3:"}:
                     opener = web_opener
                     if filename.suffix == ".gz" or filename.suffix == ".lz4":
-                        raise NotImplementedError(
-                            "cannot load compressed files from web yet"
-                        )
+                        raise NotImplementedError("cannot load compressed files from web yet")
                 if isinstance(filename, OptionalPath) and not filename.exists():
                     continue
                 with opener(filename) as f:
-                    content = addicty.Dict.load(
-                        f, freeze=False, Loader=yaml.CSafeLoader
-                    )
+                    content = addicty.Dict.load(f, freeze=False, Loader=yaml.CSafeLoader)
                     if content is None:
                         warnings.warn(
                             f"Empty file {filename}",
@@ -186,9 +194,7 @@ class YamlConfig(PrettyModel):
         if cache_file:
             cache_is_outdated = check_modification_times(filenames, cache_file)
             if cache_is_outdated:
-                logger.info(
-                    f"cache file is {cache_is_outdated}, will reload YAML files"
-                )
+                logger.info(f"cache file is {cache_is_outdated}, will reload YAML files")
         if not cache_file or cache_is_outdated:
             raw_config = cls._load_unformatted_yaml(filenames)
             t = time.time()
@@ -296,19 +302,7 @@ class YamlConfig(PrettyModel):
             otherwise this method returns nothing.
         """
 
-        def path_to_str(x):
-            if isinstance(x, dict):
-                return {k: path_to_str(v) for k, v in x.items()}
-            if isinstance(x, list):
-                return list(path_to_str(i) for i in x)
-            if isinstance(x, tuple):
-                return list(path_to_str(i) for i in x)
-            if isinstance(x, pathlib.Path):
-                return str(x)
-            else:
-                return x
-
-        y = path_to_str(
+        y = _path_to_str(
             self.model_dump(
                 include=include,
                 exclude=exclude,
@@ -322,13 +316,88 @@ class YamlConfig(PrettyModel):
         if isinstance(stream, str):
             stream = pathlib.Path(stream)
         if isinstance(stream, pathlib.Path):
-            stream.write_bytes(b)
+            if stream.suffix == ".lz4":
+                with smart_open(stream, "wb") as f:
+                    f.write(b)
+            else:
+                stream.write_bytes(b)
         elif isinstance(stream, io.RawIOBase):
             stream.write(b)
         elif isinstance(stream, io.TextIOBase):
             stream.write(b.decode())
         else:
             return b
+
+    def to_yaml_parts(
+        self,
+        directory: pathlib.Path | str,
+        *,
+        include: IncEx = None,
+        exclude: IncEx = None,
+        exclude_unset: bool = False,
+        exclude_defaults: bool = False,
+        exclude_none: bool = False,
+        warnings: bool = True,
+        general_config: tuple[str] = ("simulation_controls", "tags"),
+    ) -> None:
+        """Write to a set of YAML files, one for each top level key.
+
+        Parameters
+        ----------
+        directory : pathlib.Path or str
+            The directory to write the YAML files to. If it does not exist,
+            it will be created.
+        include : list[int | str], optional
+            A list of fields to include in the output.
+        exclude : list[int | str], optional
+            A list of fields to exclude from the output.
+        exclude_unset : bool, default False
+            Whether to exclude fields that are unset or None from the output.
+        exclude_defaults : bool, default False
+            Whether to exclude fields that are set to their default value from
+            the output.
+        exclude_none : bool, default False
+            Whether to exclude fields that have a value of `None` from the output.
+        warnings : bool, default True
+            Whether to log warnings when invalid fields are encountered.
+        """
+        if isinstance(directory, str):
+            directory = pathlib.Path(directory)
+        if not directory.exists():
+            directory.mkdir(parents=True, exist_ok=True)
+        y = _path_to_str(
+            self.model_dump(
+                include=include,
+                exclude=exclude,
+                exclude_unset=exclude_unset,
+                exclude_defaults=exclude_defaults,
+                exclude_none=exclude_none,
+                warnings=warnings,
+            )
+        )
+        remainder = {}
+        for key, value in y.items():
+            if key == "raw_license_certificate":
+                # do not write the license certificate to a file
+                continue
+            if isinstance(value, dict | list) and key not in general_config:
+                filename = directory / f"{key}.yaml"
+                # when the value is empty, we don't write a file for it
+                if value:
+                    with open(filename, "w", encoding="utf8") as f:
+                        yaml.dump({key: value}, f, Dumper=yaml.CSafeDumper)
+                    # if the file just written is bigger than 1MB, compress it with lz4
+                    if filename.stat().st_size > 1024 * 1024:
+                        from passengersim.utils.compression import compress_file
+
+                        compress_file(filename, rm_original=True)
+            else:
+                remainder[key] = value
+        if remainder:
+            # write the general config to a separate file
+            filename = directory / "general.yaml"
+            with open(filename, "w", encoding="utf8") as f:
+                yaml.dump(remainder, f, Dumper=yaml.CSafeDumper)
 
 
 def find_differences(left, right):
@@ -401,9 +470,7 @@ class Config(YamlConfig, extra="forbid"):
 
     @field_serializer("db", mode="wrap")
     @classmethod
-    def _db_to_none(
-        cls, v: DatabaseConfig | None, nxt: SerializerFunctionWrapHandler
-    ) -> dict | None:
+    def _db_to_none(cls, v: DatabaseConfig | None, nxt: SerializerFunctionWrapHandler) -> dict | None:
         """Serialize the database to None if it is a null database."""
         if v is None:
             return None
@@ -568,9 +635,7 @@ class Config(YamlConfig, extra="forbid"):
         """AP restrictions on fare can only be invoked at the DCPs."""
         for f in m.fares:
             if f.advance_purchase != 0 and f.advance_purchase not in m.dcps:
-                raise ValueError(
-                    f"Advance purchase restriction not aligned with DCP for Fare {f}"
-                )
+                raise ValueError(f"Advance purchase restriction not aligned with DCP for Fare {f}")
         return m
 
     @field_validator("markets")
@@ -624,17 +689,10 @@ class Config(YamlConfig, extra="forbid"):
         """burn_samples must be strictly less than samples"""
         if m.simulation_controls.burn_samples >= m.simulation_controls.num_samples:
             raise ValueError(
-                "burn_samples must be strictly less than samples. "
-                "It will default to 100 if you haven't set a value"
+                "burn_samples must be strictly less than samples. It will default to 100 if you haven't set a value"
             )
-        if (
-            m.simulation_controls.burn_samples == 0
-            and m.simulation_controls.num_samples > 10
-        ):
-            raise ValueError(
-                "to ensure meaningful results, burn_samples may not "
-                "be zero when num_samples > 10."
-            )
+        if m.simulation_controls.burn_samples == 0 and m.simulation_controls.num_samples > 10:
+            raise ValueError("to ensure meaningful results, burn_samples may not be zero when num_samples > 10.")
         return m
 
     @model_validator(mode="after")
@@ -642,14 +700,9 @@ class Config(YamlConfig, extra="forbid"):
         """If manual_paths is true, there must be Path items
         if it's set to false, then there shouldn't be any path items"""
         if m.simulation_controls.manual_paths and len(m.paths) == 0:
-            raise ValueError(
-                "manual_paths is set to true, but no paths found in the input config"
-            )
+            raise ValueError("manual_paths is set to true, but no paths found in the input config")
         if not m.simulation_controls.manual_paths and len(m.paths) > 0:
-            raise ValueError(
-                "manual_paths is set to false, "
-                "but paths were specified in the input config"
-            )
+            raise ValueError("manual_paths is set to false, but paths were specified in the input config")
         return m
 
     def _load_std_rm_system(self, std_name: str):
@@ -664,9 +717,7 @@ class Config(YamlConfig, extra="forbid"):
 
         raw_rm_systems = standard_rm_systems_raw()
         if std_name in raw_rm_systems:
-            rm_sys = Config.model_validate(
-                {"rm_systems": {std_name: raw_rm_systems[std_name]}}
-            )
+            rm_sys = Config.model_validate({"rm_systems": {std_name: raw_rm_systems[std_name]}})
             self.rm_systems[std_name] = rm_sys.rm_systems[std_name]
         else:
             raise KeyError(f"Unknown standard RM system {std_name}")
@@ -679,10 +730,7 @@ class Config(YamlConfig, extra="forbid"):
                 try:
                     m._load_std_rm_system(carrier.rm_system)
                 except KeyError:
-                    raise ValueError(
-                        f"Carrier {carrier.name} has unknown "
-                        f"RM system {carrier.rm_system}"
-                    ) from None
+                    raise ValueError(f"Carrier {carrier.name} has unknown RM system {carrier.rm_system}") from None
         return m
 
     def _load_std_frat5(self, std_name: str):
@@ -715,10 +763,7 @@ class Config(YamlConfig, extra="forbid"):
                 try:
                     m._load_std_frat5(carrier.frat5)
                 except KeyError:
-                    raise ValueError(
-                        f"Carrier {carrier.name} has unknown "
-                        f"Frat5 curve {carrier.frat5}"
-                    ) from None
+                    raise ValueError(f"Carrier {carrier.name} has unknown Frat5 curve {carrier.frat5}") from None
         return m
 
     @model_validator(mode="after")
@@ -726,9 +771,7 @@ class Config(YamlConfig, extra="forbid"):
         """Check that all legs have a carrier that has been defined."""
         for leg in m.legs:
             if leg.carrier not in m.carriers:
-                raise ValueError(
-                    f"Carrier for leg {leg.carrier} {leg.fltno} is not defined"
-                )
+                raise ValueError(f"Carrier for leg {leg.carrier} {leg.fltno} is not defined")
         return m
 
     @model_validator(mode="after")
@@ -736,9 +779,7 @@ class Config(YamlConfig, extra="forbid"):
         """Check that any TODD curves referenced in Demand objects have been defined."""
         for name, cm in m.choice_models.items():
             if cm.todd_curve is not None and cm.todd_curve not in m.todd_curves:
-                raise ValueError(
-                    f"ChoiceModel {name} has unknown TOD Curve {cm.todd_curve}"
-                )
+                raise ValueError(f"ChoiceModel {name} has unknown TOD Curve {cm.todd_curve}")
         return m
 
     @model_validator(mode="after")
@@ -749,19 +790,14 @@ class Config(YamlConfig, extra="forbid"):
             a2 = 1 if cm.airline_pref_hhi is not None else 0
             a3 = 1 if cm.airline_pref_seat_share is not None else 0
             if a1 + a2 + a3 > 1:
-                raise ValueError(
-                    f"ChoiceModel '{cm.name}' has more than one "
-                    f"airline preference model specified"
-                )
+                raise ValueError(f"ChoiceModel '{cm.name}' has more than one airline preference model specified")
         return m
 
     @model_validator(mode="after")
     def _choice_model_curve_s_vs_replanning(cls, m: Config):
         """Check that only one way of inputting airline preference was specified."""
         for _name, cm in m.choice_models.items():
-            if cm.replanning is not None and (
-                cm.early_dep is not None or cm.late_arr is not None
-            ):
+            if cm.replanning is not None and (cm.early_dep is not None or cm.late_arr is not None):
                 raise ValueError(
                     f"ChoiceModel '{cm.name}' has replanning and early_dep / late_arr "
                     f"specified, pick one or the other but not both !!!"
@@ -789,10 +825,7 @@ class Config(YamlConfig, extra="forbid"):
         """Check that any TODD curves referenced in Demand objects have been defined."""
         for dmd in m.demands:
             if dmd.todd_curve is not None and dmd.todd_curve not in m.todd_curves:
-                raise ValueError(
-                    f"Demand {dmd.orig}-{dmd.dest}:{dmd.segment} has "
-                    f"unknown TOD Curve {dmd.todd_curve}"
-                )
+                raise ValueError(f"Demand {dmd.orig}-{dmd.dest}:{dmd.segment} has unknown TOD Curve {dmd.todd_curve}")
         return m
 
     @model_validator(mode="after")
@@ -802,12 +835,8 @@ class Config(YamlConfig, extra="forbid"):
         for curve in m.booking_curves.values():
             i = 0
             for dcp in sorted_dcps:
-                assert (
-                    dcp in curve.curve
-                ), f"booking curve {curve.name} is missing dcp {dcp}"
-                assert (
-                    curve.curve[dcp] >= i
-                ), f"booking curve {curve.name} moves backwards at dcp {dcp}"
+                assert dcp in curve.curve, f"booking curve {curve.name} is missing dcp {dcp}"
+                assert curve.curve[dcp] >= i, f"booking curve {curve.name} moves backwards at dcp {dcp}"
                 i = curve.curve[dcp]
         return m
 
@@ -822,56 +851,37 @@ class Config(YamlConfig, extra="forbid"):
                 )
         if "bid_price_history" in m.outputs.reports:
             if "leg" not in m.db.write_items:
-                raise ValueError(
-                    "the `bid_price_history` report requires recording "
-                    "`leg` details in the database"
-                )
+                raise ValueError("the `bid_price_history` report requires recording `leg` details in the database")
             if not m.db.store_leg_bid_prices:
-                raise ValueError(
-                    "the `bid_price_history` report requires recording "
-                    "`store_leg_bid_prices` to be True"
-                )
+                raise ValueError("the `bid_price_history` report requires recording `store_leg_bid_prices` to be True")
         if "demand_to_come" in m.outputs.reports:
             if "demand" not in m.db.write_items:
-                raise ValueError(
-                    "the `demand_to_come` report requires recording "
-                    "`demand` details in the database"
-                )
+                raise ValueError("the `demand_to_come` report requires recording `demand` details in the database")
         if "demand_to_come_summary" in m.outputs.reports:
             if "demand" not in m.db.write_items:
                 raise ValueError(
-                    "the `demand_to_come_summary` report requires recording "
-                    "`demand` details in the database"
+                    "the `demand_to_come_summary` report requires recording `demand` details in the database"
                 )
         if "path_forecasts" in m.outputs.reports:
             if "pathclass" not in m.db.write_items:
-                raise ValueError(
-                    "the `path_forecasts` report requires recording "
-                    "`pathclass` details in the database"
-                )
+                raise ValueError("the `path_forecasts` report requires recording `pathclass` details in the database")
         if "leg_forecasts" in m.outputs.reports:
             if "bucket" not in m.db.write_items:
-                raise ValueError(
-                    "the `leg_forecasts` report requires recording "
-                    "`bucket` details in the database"
-                )
+                raise ValueError("the `leg_forecasts` report requires recording `bucket` details in the database")
         if "bookings_by_timeframe" in m.outputs.reports:
             if not m.db.write_items & {"bookings", "fare"}:
                 raise ValueError(
-                    "the `bookings_by_timeframe` report requires recording "
-                    "`fare` or `bookings` details in the database"
+                    "the `bookings_by_timeframe` report requires recording `fare` or `bookings` details in the database"
                 )
         if "total_demand" in m.outputs.reports:
             if not m.db.write_items & {"demand", "demand_final"}:
                 raise ValueError(
-                    "the `total_demand` report requires recording "
-                    "at least `demand_final` details in the database"
+                    "the `total_demand` report requires recording at least `demand_final` details in the database"
                 )
         if "fare_class_mix" in m.outputs.reports:
             if not m.db.write_items & {"fare", "fare_final"}:
                 raise ValueError(
-                    "the `fare_class_mix` report requires recording "
-                    "at least `fare_final` details in the database"
+                    "the `fare_class_mix` report requires recording at least `fare_final` details in the database"
                 )
         if "load_factor_distribution" in m.outputs.reports:
             if not m.db.write_items & {"leg", "leg_final"}:
@@ -882,8 +892,7 @@ class Config(YamlConfig, extra="forbid"):
         if "edgar" in m.outputs.reports:
             if not m.db.write_items & {"edgar"}:
                 raise ValueError(
-                    "the 'edgar' forecast accuray report requires recording "
-                    "'edgar' details in the database"
+                    "the 'edgar' forecast accuray report requires recording 'edgar' details in the database"
                 )
         return m
 
@@ -898,13 +907,9 @@ class Config(YamlConfig, extra="forbid"):
                             req = step.require_availability_control
                         except AttributeError:
                             req = None
-                        if (
-                            req is not None
-                            and rm_system.availability_control not in req
-                        ):
+                        if req is not None and rm_system.availability_control not in req:
                             raise ValueError(
-                                f"RM System {rm_system.name} requires "
-                                f"availability control {req} for step {step.name}"
+                                f"RM System {rm_system.name} requires availability control {req} for step {step.name}"
                             )
         return m
 
@@ -956,7 +961,12 @@ class Config(YamlConfig, extra="forbid"):
         # `__tracebackhide__` tells pytest and some other tools to omit this
         # function from tracebacks
         __tracebackhide__ = True
-        return reloaded_class.__pydantic_validator__.validate_python(*args, **kwargs)
+        with warnings.catch_warnings(record=True) as wz:
+            warnings.simplefilter("always")  # Ensure all warnings are captured
+            result = reloaded_class.__pydantic_validator__.validate_python(*args, **kwargs)
+        for w in wz:
+            warnings.warn(w.message, category=w.category, stacklevel=2)
+        return result
 
     def model_revalidate(
         self,
@@ -999,9 +1009,7 @@ class Config(YamlConfig, extra="forbid"):
             other.model_dump(include=include, exclude=exclude),
         )
 
-    def add_output_prefix(
-        self, prefix: pathlib.Path, spool_format: str = "%Y%m%d-%H%M"
-    ):
+    def add_output_prefix(self, prefix: pathlib.Path, spool_format: str = "%Y%m%d-%H%M"):
         """
         Add a prefix directory to all simulation output files.
         """
@@ -1064,7 +1072,7 @@ class Config(YamlConfig, extra="forbid"):
                         # Alan's approach
                         # It was converted as a local time, so unpack it and
                         #   create a new datetime in the given TZ
-                        dt = datetime.fromtimestamp(t)  # , tz=timezone.utc)
+                        dt = datetime.fromtimestamp(t, tz=UTC)
                         dt2 = datetime(
                             dt.year,
                             dt.month,
@@ -1080,17 +1088,11 @@ class Config(YamlConfig, extra="forbid"):
                 return t, 0
 
             if not leg.time_adjusted:
-                # if leg.orig == "DFW" and leg.dest == "CLE":
-                #     pass
                 place_o = self.places.get(leg.orig, None)
-                leg.dep_time, leg.dep_time_offset = adjust_time_zone(
-                    leg.dep_time, place_o
-                )
+                leg.dep_time, leg.dep_time_offset = adjust_time_zone(leg.dep_time, place_o)
                 leg.orig_timezone = str(place_o.time_zone_info) if place_o else None
                 place_d = self.places.get(leg.dest, None)
-                leg.arr_time, leg.arr_time_offset = adjust_time_zone(
-                    leg.arr_time, place_d
-                )
+                leg.arr_time, leg.arr_time_offset = adjust_time_zone(leg.arr_time, place_d)
                 leg.dest_timezone = str(place_d.time_zone_info) if place_d else None
                 if place_o is None:
                     warnings.warn(f"No defined place for {leg.orig}", stacklevel=2)
@@ -1105,23 +1107,11 @@ class Config(YamlConfig, extra="forbid"):
         The core code will not crash if the places are missing, but the rules
         may not work as expected and that'll be a PITA to debug !!!"""
         for rule in cfg.circuity_rules:
-            if (
-                rule.carrier != ""
-                and rule.carrier is not None
-                and rule.carrier not in cfg.carriers
-            ):
+            if rule.carrier != "" and rule.carrier is not None and rule.carrier not in cfg.carriers:
+                raise ValueError(f"Circuity rule '{rule.name}' refers to a carrier that isn't specified in carriers")
+            if rule.orig_airport != "" and rule.orig_airport is not None and rule.orig_airport not in cfg.places:
                 raise ValueError(
-                    f"Circuity rule '{rule.name}' refers to a "
-                    f"carrier that isn't specified in carriers"
-                )
-            if (
-                rule.orig_airport != ""
-                and rule.orig_airport is not None
-                and rule.orig_airport not in cfg.places
-            ):
-                raise ValueError(
-                    f"Circuity rule '{rule.name}' refers to an "
-                    f"orig airport that isn't specified in places"
+                    f"Circuity rule '{rule.name}' refers to an orig airport that isn't specified in places"
                 )
             if (
                 rule.connect_airport != ""
@@ -1129,18 +1119,10 @@ class Config(YamlConfig, extra="forbid"):
                 and rule.connect_airport not in cfg.places
             ):
                 raise ValueError(
-                    f"Circuity rule '{rule.name}' refers to a "
-                    f"connecting airport that isn't specified in places"
+                    f"Circuity rule '{rule.name}' refers to a connecting airport that isn't specified in places"
                 )
-            if (
-                rule.dest_airport != ""
-                and rule.dest_airport is not None
-                and rule.dest_airport not in cfg.places
-            ):
-                raise ValueError(
-                    f"Circuity rule '{rule.name}' refers to a "
-                    f"dest airport that isn't specified in places"
-                )
+            if rule.dest_airport != "" and rule.dest_airport is not None and rule.dest_airport not in cfg.places:
+                raise ValueError(f"Circuity rule '{rule.name}' refers to a dest airport that isn't specified in places")
 
             # Now we check state codes
         return cfg

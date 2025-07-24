@@ -30,9 +30,7 @@ for path in sorted(sw_path.joinpath("passengersim/config").rglob("*.py")):
             if line.startswith("# DOC-NAME:"):
                 doc_name = line[11:].strip()
                 doc_path = (
-                    path.parent.joinpath(doc_name)
-                    .relative_to(sw_path.joinpath("passengersim"))
-                    .with_suffix(".md")
+                    path.parent.joinpath(doc_name).relative_to(sw_path.joinpath("passengersim")).with_suffix(".md")
                 )
                 full_doc_path = Path("API", doc_path)
             match = re.match(r"class (.*)\(.*", line)

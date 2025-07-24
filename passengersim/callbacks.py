@@ -17,9 +17,7 @@ class CallbackMixin:
     if TYPE_CHECKING:
         sim: SimulationEngine
 
-    def end_sample_callback(
-        self, callback: Callable[[CallbackMixin], None] | GenericTracer
-    ):
+    def end_sample_callback(self, callback: Callable[[CallbackMixin], None] | GenericTracer):
         """Register a function to be triggered at the end of each sample.
 
         The callback function will be triggered before counters are reset or
@@ -38,9 +36,7 @@ class CallbackMixin:
         self.end_sample_callbacks.append(callback)
         return callback
 
-    def begin_sample_callback(
-        self, callback: Callable[[CallbackMixin], None] | GenericTracer
-    ):
+    def begin_sample_callback(self, callback: Callable[[CallbackMixin], None] | GenericTracer):
         """Register a function to be triggered at the beginning of each sample.
 
         The callback function will be triggered after initial setup including
@@ -59,9 +55,7 @@ class CallbackMixin:
         self.begin_sample_callbacks.append(callback)
         return callback
 
-    def daily_callback(
-        self, callback: Callable[[CallbackMixin, int], None] | GenericTracer
-    ):
+    def daily_callback(self, callback: Callable[[CallbackMixin, int], None] | GenericTracer):
         """Register a function to be triggered each day during a sample.
 
         The callback function will be triggered after all RM steps when the day
@@ -131,8 +125,13 @@ class CallbackMixin:
 
         for callback in getattr(self, "daily_callbacks", []):
             day = self.dcp_list[0]
+            # The priority is a number of seconds before or after the overnight
+            # trigger time.  If priority is negative, the daily callback will be
+            # run before any RM system daily or same-time DCP events. If priority
+            # is positive it will be run after other RM events.
+            priority = getattr(callback, "priority", 0)
             while day >= 0:
-                event_time = int(self.sim.base_time - day * 86400 + 3600 * dcp_hour)
+                event_time = int(self.sim.base_time - day * 86400 + 3600 * dcp_hour + priority)
                 rm_event = Event(("callback_daily", callback, day), event_time)
                 self.sim.add_event(rm_event)
                 day -= 1
@@ -161,9 +160,7 @@ class CallbackData(MutableMapping):
     def __init__(self):
         self._data = {}
 
-    def get_data(
-        self, label: str, trial: int, sample: int, days_prior: int | None = None
-    ):
+    def get_data(self, label: str, trial: int, sample: int, days_prior: int | None = None):
         key_match = {"trial": trial, "sample": sample}
         if days_prior is not None:
             key_match["days_prior"] = days_prior
@@ -217,13 +214,9 @@ class CallbackData(MutableMapping):
     def __repr__(self):
         if self._data:
             keys = ", ".join(self._data.keys())
-            return (
-                f"<{self.__class__.__module__}.{self.__class__.__name__} from {keys}>"
-            )
+            return f"<{self.__class__.__module__}.{self.__class__.__name__} from {keys}>"
         else:
-            return (
-                f"<{self.__class__.__module__}.{self.__class__.__name__} with no data>"
-            )
+            return f"<{self.__class__.__module__}.{self.__class__.__name__} with no data>"
 
     def __bool__(self):
         return bool(self._data)

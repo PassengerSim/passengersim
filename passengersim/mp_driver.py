@@ -1,5 +1,4 @@
 import json
-import os
 import pathlib
 
 import joblib
@@ -10,6 +9,7 @@ from .driver import BaseSimulation, Simulation
 from .summaries import GenericSimulationTables, SimulationTables
 from .summary import SummaryTables
 from .utils.caffeine import keep_awake
+from .utils.tempdir import MaybeTemporaryDirectory
 
 
 def _subprocess_run_trial(
@@ -20,21 +20,10 @@ def _subprocess_run_trial(
     summarizer=SimulationTables,
 ):
     cfg = Config.model_validate(json.loads(cfg_json))
-    if (
-        cfg.db is not None
-        and cfg.db.filename is not None
-        and str(cfg.db.filename) != ":memory:"
-    ):
-        cfg.db.filename = cfg.db.filename.with_suffix(
-            f".trial{trial_id:02}" + cfg.db.filename.suffix
-        )
-    if output_dir is None:
-        import tempfile
-
-        _tempdir = tempfile.TemporaryDirectory()
-        output_dir = os.path.join(_tempdir.name, f"passengersim-trial-{trial_id:02}")
-
-    sim = Simulation(cfg, output_dir)
+    if cfg.db is not None and cfg.db.filename is not None and str(cfg.db.filename) != ":memory:":
+        cfg.db.filename = cfg.db.filename.with_suffix(f".trial{trial_id:02}" + cfg.db.filename.suffix)
+    output_dir = MaybeTemporaryDirectory(output_dir)
+    sim = Simulation(cfg, output_dir.joinpath(f"passengersim-trial-{trial_id:02}"))
     summary = sim.run(single_trial=trial_id, summarizer=summarizer)
     # Passing a database connection between processes is not allowed,
     # so we need to delete it before returning the summary. But first
@@ -67,9 +56,7 @@ class MultiSimulation(BaseSimulation):
                 raw_license_certificate = None
             self.config.raw_license_certificate = raw_license_certificate
         with keep_awake():
-            with joblib.Parallel(
-                n_jobs=self.config.simulation_controls.num_trials
-            ) as parallel:
+            with joblib.Parallel(n_jobs=self.config.simulation_controls.num_trials) as parallel:
                 cfg_json = self.config.model_dump_json()
                 results = parallel(
                     joblib.delayed(_subprocess_run_trial)(
@@ -89,11 +76,7 @@ class MultiSimulation(BaseSimulation):
         cfg_json = self.config.model_dump_json()
         for trial_id in range(self.config.simulation_controls.num_trials):
             print("starting trial", trial_id)
-            results.append(
-                _subprocess_run_trial(
-                    trial_id, cfg_json, self.output_dir, summarizer=summarizer
-                )
-            )
+            results.append(_subprocess_run_trial(trial_id, cfg_json, self.output_dir, summarizer=summarizer))
             print("finished trial", trial_id)
         return SummaryTables.aggregate(results)
 

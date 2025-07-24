@@ -115,9 +115,7 @@ def _base_dashboard_figures(
 ):
     if include is not None:
         summaries = {k: v for k, v in summaries.items() if k in include}
-    figures = {
-        k: fig_path_forecast_dashboard(v, path_id=path_id) for k, v in summaries.items()
-    }
+    figures = {k: fig_path_forecast_dashboard(v, path_id=path_id) for k, v in summaries.items()}
     return figures
 
 
@@ -166,9 +164,7 @@ def fig_path_forecast_dashboard(
         return fd.dashboard()
 
     fig = ForecastData.from_dataframe(
-        summary.callback_data.selected_path_forecasts.query(
-            f"path_id=={int(path_id)}"
-        ).droplevel("path_id")
+        summary.callback_data.selected_path_forecasts.query(f"path_id=={int(path_id)}").droplevel("path_id")
     ).dashboard()
 
     return fig

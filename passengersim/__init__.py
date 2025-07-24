@@ -5,6 +5,7 @@ try:
 except ImportError:
     raise
 
+from . import transforms
 from ._version import __version__, __version_tuple__
 from .cli.info import info  # noqa: F401
 from .config import Config, OptionalPath
@@ -26,6 +27,7 @@ __all__ = [
     "import_from_path",
     "__version__",
     "__version_tuple__",
+    "transforms",
 ]
 
 
@@ -37,11 +39,7 @@ def demo_network(name: str):
     # note: on macOS by default the file system is not case sensitive, but
     # on Linux it is. All the network files are lowercase, so we can get around
     # this by forcing the name to lowercase.
-    return (
-        importlib.resources.files(__package__)
-        .joinpath("networks")
-        .joinpath(name.lower())
-    )
+    return importlib.resources.files(__package__).joinpath("networks").joinpath(name.lower())
 
 
 def versions(verbose=False):
@@ -50,10 +48,7 @@ def versions(verbose=False):
     import passengersim_core
 
     if verbose:
-        print(
-            f"passengersim.core {passengersim_core.__version__} "
-            f"(expires {passengersim_core.build_expiration()})"
-        )
+        print(f"passengersim.core {passengersim_core.__version__} " f"(expires {passengersim_core.build_expiration()})")
     else:
         print(f"passengersim.core {passengersim_core.__version__}")
 
@@ -68,6 +63,7 @@ def _has_file_extensions(path: str, ext: list[str]) -> bool:
     path = str(path)
     lowercase_path = path.lower()
     return any(lowercase_path.endswith(e) for e in ext)
+
 
 def from_file(path: str):
     """Load a PassengerSim file.

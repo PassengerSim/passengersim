@@ -1,9 +1,10 @@
 import pathlib
 import re
+from typing import Literal
 
 import pandas as pd
 import xmle
-from altair import LayerChart
+from altair import LayerChart, MaxRowsError
 from altair.utils.schemapi import UndefinedType
 from xmle.uid import uid
 
@@ -126,9 +127,7 @@ class BootstrapHtml:
         self.top = Elem("html", lang="en")
         self.head = self.top.elem("head")
         self.head.elem("meta", charset="utf-8")
-        self.head.elem(
-            "meta", name="viewport", content="width=device-width, initial-scale=1"
-        )
+        self.head.elem("meta", name="viewport", content="width=device-width, initial-scale=1")
         if title is None:
             title = "PassengerSim Report"
         self.title = self.head.elem("title", text=str(title))
@@ -154,10 +153,7 @@ class BootstrapHtml:
         if self._toc_place == "sidebar":
             self.sidebar = self.main_row.elem(
                 "div",
-                {
-                    "class": "col-lg-3 scrolly-sidebar sticky-top "
-                    "sticky-top-offset d-none d-lg-inline-flex"
-                },
+                {"class": "col-lg-3 scrolly-sidebar sticky-top sticky-top-offset d-none d-lg-inline-flex"},
             )
             self.content = self.main_row.elem("div", {"class": "col-12 col-lg-9"})
         else:
@@ -224,9 +220,7 @@ class BootstrapHtml:
         for i in self.top.findall(".//span[@xmle_caption]"):
             caption_classes.add(i.attrib["xmle_caption"])
         for caption_class in caption_classes:
-            for n, i in enumerate(
-                self.top.findall(f".//span[@xmle_caption='{caption_class}']")
-            ):
+            for n, i in enumerate(self.top.findall(f".//span[@xmle_caption='{caption_class}']")):
                 i.text = re.sub(
                     rf"{caption_class}(\s?[0-9]*):",
                     f"{caption_class} {n + 1}:",
@@ -235,15 +229,11 @@ class BootstrapHtml:
                     flags=0,
                 )
 
-    def write(
-        self, filename: str, *, make_dirs: bool = True, timestamp=None
-    ) -> pathlib.Path:
+    def write(self, filename: str, *, make_dirs: bool = True, timestamp=None) -> pathlib.Path:
         self._add_javascript()
         self.renumber_numbered_items()
         self.navbar()
-        filename = filename_with_timestamp(
-            filename, suffix=".html", make_dirs=make_dirs, timestamp=timestamp
-        )
+        filename = filename_with_timestamp(filename, suffix=".html", make_dirs=make_dirs, timestamp=timestamp)
         with open(filename, "w") as f:
             f.write("<!doctype html>\n")
             f.write(self.top.tostring())
@@ -255,16 +245,12 @@ class BootstrapHtml:
         if level == 1:
             section = self.content.elem("div")
             ident = title.lower().replace(" ", "-")
-            section.elem("h1", text=title, id=ident).anchor(
-                ident, reftxt=title, cls={}, toclevel=str(level)
-            )
+            section.elem("h1", text=title, id=ident).anchor(ident, reftxt=title, cls={}, toclevel=str(level))
             self.sections[title] = section
         elif level == 2:
             section = self.current_section.elem("div")
             ident = title.lower().replace(" ", "-")
-            section.elem("h2", text=title, id=ident).anchor(
-                ident, reftxt=title, cls={}, toclevel=str(level)
-            )
+            section.elem("h2", text=title, id=ident).anchor(ident, reftxt=title, cls={}, toclevel=str(level))
         else:
             raise ValueError(f"Invalid level {level}")
         self.current_section = section
@@ -290,13 +276,9 @@ class BootstrapHtml:
             },
         )
         nav = nav_top
-        nav_brand = nav.elem(
-            "a", {"class": "navbar-brand", "href": "https://www.passengersim.com"}
-        )
+        nav_brand = nav.elem("a", {"class": "navbar-brand", "href": "https://www.passengersim.com"})
         nav_brand.append(
-            passengersim_white_green_logo(
-                {"width": "180px", "height": "25px", "style": "margin-top: -7px;"}
-            )
+            passengersim_white_green_logo({"width": "180px", "height": "25px", "style": "margin-top: -7px;"})
         )
         if self._toc_place == "top":
             nav.elem(
@@ -318,9 +300,7 @@ class BootstrapHtml:
             ul = div.elem("ul", {"class": "navbar-nav mr-auto"})
             for section in self.sections:
                 ident = section.lower().replace(" ", "-")
-                ul.elem("li", {"class": "nav-item"}).elem(
-                    "a", {"class": "nav-link", "href": f"#{ident}"}, text=section
-                )
+                ul.elem("li", {"class": "nav-item"}).elem("a", {"class": "nav-link", "href": f"#{ident}"}, text=section)
         else:
             ul = nav.elem("ul", {"class": "navbar-nav mr-auto"})
             ul.elem("li", {"class": "nav-item"}).elem(
@@ -341,14 +321,41 @@ class BootstrapHtml:
                 toc.append(i)
             self.sidebar.append(toc)
 
-    def add_figure(self, title, fig=None):
+    def add_figure(
+        self,
+        fig,
+        *,
+        title: str | None = None,
+        backup_data: pd.DataFrame | None = None,
+        on_max_rows_error: Literal["ignore", "raise"] = "ignore",
+    ):
+        """
+        Add a figure to the report.
+
+        Parameters
+        ----------
+        fig : object or tuple[object, pd.DataFrame]
+            The figure to add, or a tuple of a figure and a DataFrame containing
+            the underlying data.  Do not provide both a figure with backup data and also
+            an explicit `backup_data` argument.
+        title : str, optional
+            The title of the figure.  If not provided, the title will be taken from
+            the figure itself.  If the figure has no title, a ValueError will be raised.
+        backup_data : pd.DataFrame, optional
+            A DataFrame containing the underlying data for the figure.  The backup
+            data will be included as a collapsible table below the figure.
+        """
         stolen_title = False
-        if fig is None:
-            fig = title
+        if isinstance(fig, tuple) and len(fig) == 2 and isinstance(fig[1], pd.DataFrame):
+            if backup_data is not None:
+                raise ValueError("Cannot provide both a figure with backup data and also explicit backup data")
+            backup_data = fig[1]
+            fig = fig[0]
+        if title is None:
             try:
                 title = fig.title
             except AttributeError as err:
-                raise ValueError("figure has no title attribute") from err
+                raise ValueError("figure has no title attribute and no title is provided") from err
             if isinstance(title, UndefinedType):
                 if isinstance(fig, LayerChart):
                     title = fig.layer[0].title
@@ -358,14 +365,40 @@ class BootstrapHtml:
                 raise ValueError("figure has no title defined")
             fig.title = ""
             stolen_title = True
+        if isinstance(fig, str) and not isinstance(title, str):
+            raise TypeError("a figure cannot be just a string if the title is not a string")
         self.current_section.append(self._numbered_figure(title))
-        self.current_section.append(Elem.from_any(fig))
+        try:
+            self.current_section.append(Elem.from_any(fig))
+        except MaxRowsError as mrerr:
+            if on_max_rows_error == "raise":
+                raise
+            else:
+                self.current_section.append(Elem.from_any(f"Could not render figure, {mrerr}"))
+        except Exception as err:
+            self.current_section.append(Elem.from_any(f"Could not render figure due to {type(err)}, {err}"))
+        if backup_data is not None:
+            self.add_table(
+                None,
+                backup_data,
+                collapsible=True,
+                collapse_tag="View Underlying Data",
+                collapse_tag_class="fst-italic text-muted",
+            )
         if stolen_title:
             fig.title = title
         return fig
 
-    def add_table(self, title, tbl, collapsible: bool | None = None):
-        self.current_section.append(self._numbered_table(title))
+    def add_table(
+        self,
+        title,
+        tbl,
+        collapsible: bool | None = None,
+        collapse_tag: str = "View Table",
+        collapse_tag_class: str = "",
+    ):
+        if title:
+            self.current_section.append(self._numbered_table(title))
         unique_id = uid()
         if collapsible is None:
             collapsible = isinstance(tbl, pd.DataFrame) and len(tbl) > 9
@@ -373,7 +406,7 @@ class BootstrapHtml:
             tbl_eye = Elem(
                 "button",
                 {
-                    "class": "btn btn-default btn-xs",
+                    "class": f"btn btn-default btn-xs {collapse_tag_class}",
                     "type": "button",
                     "data-bs-toggle": "collapse",
                     "data-bs-target": f"#{unique_id}",
@@ -383,8 +416,8 @@ class BootstrapHtml:
             )
             tbl_eye.elem(
                 "i",
-                {"class": "bi bi-eye mr-2", "aria-hidden": "true"},
-                tail="View Table",
+                {"class": "bi bi-eye me-1", "aria-hidden": "true"},
+                tail=collapse_tag,
             )
             tbl_collapser = Elem("div", {"class": "collapse", "id": unique_id})
             tbl_collapser.append(tbl)
@@ -421,17 +454,13 @@ class BootstrapHtml:
             if isinstance(item, str) and item.startswith("## "):
                 self.new_section(item[3:], level=2)
                 continue
-            if (
-                isinstance(item, tuple | list)
-                and len(item) == 2
-                and isinstance(item[0], str)
-            ):
+            if isinstance(item, tuple | list) and len(item) == 2 and isinstance(item[0], str):
                 title, item = item
                 fig = item(obj)
                 if isinstance(fig, pd.DataFrame):
-                    self.add_table(title, fig)
+                    self.add_table(title=title, tbl=fig)
                 else:
-                    self.add_figure(title, fig)
+                    self.add_figure(title=title, fig=fig)
             else:
                 fig = item(obj)
                 self.add_figure(fig)
@@ -443,9 +472,7 @@ class BootstrapHtml:
     def _rebuild_toc(self):
         current_toc = Elem("div")
 
-        xtoc_tree = [
-            current_toc.put("nav", {"class": "nav nav-pills flex-column pb-3"})
-        ]
+        xtoc_tree = [current_toc.put("nav", {"class": "nav nav-pills flex-column pb-3"})]
 
         min_anchor_lvl = 5
         for anchor in self.content.findall(".//a[@toclevel]"):
@@ -458,11 +485,7 @@ class BootstrapHtml:
             anchor_text = anchor.get("reftxt")
             anchor_lvl = int(anchor.get("toclevel")) - min_anchor_lvl + 1
             while anchor_lvl > len(xtoc_tree):
-                xtoc_tree.append(
-                    xtoc_tree[-1].put(
-                        "nav", {"class": "nav nav-pills flex-column ms-1 ps-1"}
-                    )
-                )
+                xtoc_tree.append(xtoc_tree[-1].put("nav", {"class": "nav nav-pills flex-column ms-1 ps-1"}))
             while anchor_lvl < len(xtoc_tree):
                 xtoc_tree = xtoc_tree[:-1]
             xtoc_tree[-1].append(

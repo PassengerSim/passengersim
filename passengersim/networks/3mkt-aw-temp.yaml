@@ -585,7 +585,6 @@ rm_systems:
           name: aggregate
           algorithm: mr
           kind: path
-          frat5: curve_C
         - step_type: aggregation
           name: aggregate
         - step_type: emsr
@@ -635,7 +634,6 @@ rm_systems:
           name: aggregate
           algorithm: mr
           kind: path
-          frat5: curve_C
         - step_type: aggregation
           name: aggregate
         - step_type: emsr
@@ -660,7 +658,6 @@ rm_systems:
           name: adj
           algorithm: mr
           kind: path
-          frat5: curve_C
         - step_type: probp
           name: optimization
       DAILY:
@@ -672,7 +669,6 @@ rm_systems:
           name: adj
           algorithm: mr
           kind: path
-          frat5: curve_C
         - step_type: probp
           name: optimization
       DEPARTURE:

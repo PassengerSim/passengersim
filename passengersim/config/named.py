@@ -18,20 +18,11 @@ class Dict(addicty.Dict):
         return dict.__repr__(self)
 
     @classmethod
-    def __get_pydantic_core_schema__(
-        cls: Any, source_type: Any, handler: GetCoreSchemaHandler
-    ) -> CoreSchema:
-        if (
-            isinstance(source_type, types.GenericAlias)
-            and source_type.__origin__ is Dict
-        ):
-            return core_schema.no_info_after_validator_function(
-                cls, handler(dict[source_type.__args__])
-            )
+    def __get_pydantic_core_schema__(cls: Any, source_type: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
+        if isinstance(source_type, types.GenericAlias) and source_type.__origin__ is Dict:
+            return core_schema.no_info_after_validator_function(cls, handler(dict[source_type.__args__]))
         else:
-            return core_schema.no_info_after_validator_function(
-                cls, handler(source_type)
-            )
+            return core_schema.no_info_after_validator_function(cls, handler(source_type))
 
 
 class DictAttr(dict):
@@ -46,20 +37,11 @@ class DictAttr(dict):
         self[item.lower()] = value
 
     @classmethod
-    def __get_pydantic_core_schema__(
-        cls: Any, source_type: Any, handler: GetCoreSchemaHandler
-    ) -> CoreSchema:
-        if (
-            isinstance(source_type, types.GenericAlias)
-            and source_type.__origin__ is DictAttr
-        ):
-            return core_schema.no_info_after_validator_function(
-                cls, handler(dict[source_type.__args__])
-            )
+    def __get_pydantic_core_schema__(cls: Any, source_type: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
+        if isinstance(source_type, types.GenericAlias) and source_type.__origin__ is DictAttr:
+            return core_schema.no_info_after_validator_function(cls, handler(dict[source_type.__args__]))
         else:
-            return core_schema.no_info_after_validator_function(
-                cls, handler(source_type)
-            )
+            return core_schema.no_info_after_validator_function(cls, handler(source_type))
 
 
 class Named(PrettyModel):
@@ -103,9 +85,7 @@ def enforce_name(x: dict[str, T] | list[T]) -> dict[str, T]:
                 raise ValueError(f"explict name {v['name']!r} does not match key {k!r}")
         except TypeError:
             if v.name != k:
-                raise ValueError(
-                    f"explict name {v.name!r} does not match key {k!r}"
-                ) from None
+                raise ValueError(f"explict name {v.name!r} does not match key {k!r}") from None
     return x
 
 
@@ -114,20 +94,11 @@ DictOfNamed = Annotated[DictAttr[str, T], BeforeValidator(enforce_name)]
 
 class ListOfNamed(list):
     @classmethod
-    def __get_pydantic_core_schema__(
-        cls: Any, source_type: Any, handler: GetCoreSchemaHandler
-    ) -> CoreSchema:
-        if (
-            isinstance(source_type, types.GenericAlias)
-            and source_type.__origin__ is ListOfNamed
-        ):
-            return core_schema.no_info_after_validator_function(
-                cls, handler(list[source_type.__args__])
-            )
+    def __get_pydantic_core_schema__(cls: Any, source_type: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
+        if isinstance(source_type, types.GenericAlias) and source_type.__origin__ is ListOfNamed:
+            return core_schema.no_info_after_validator_function(cls, handler(list[source_type.__args__]))
         else:
-            return core_schema.no_info_after_validator_function(
-                cls, handler(source_type)
-            )
+            return core_schema.no_info_after_validator_function(cls, handler(source_type))
 
     def __getattr__(self, item):
         for step in self:

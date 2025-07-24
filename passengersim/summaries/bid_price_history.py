@@ -11,14 +11,14 @@ from .generic import GenericSimulationTables, SimulationTableItem
 from .tools import aggregate_by_concat_dataframe
 
 if TYPE_CHECKING:
+    import altair as alt
+
     from passengersim import Simulation
 
 
 def extract_bid_price_history(sim: Simulation) -> pd.DataFrame:
     """Compute the average bid price history for each carrier."""
-    df = from_nested_dict(
-        sim.bid_price_traces, ["trial", "carrier", "days_prior", "measure"]
-    ).rename_axis(columns=None)
+    df = from_nested_dict(sim.bid_price_traces, ["trial", "carrier", "days_prior", "measure"]).rename_axis(columns=None)
     df = df.fillna(0)
     return df
 
@@ -99,7 +99,8 @@ class SimTabBidPriceHistory(GenericSimulationTables):
         raw_df=False,
         trial: int | None = None,
         title: str | None = "Bid Price History",
-    ):
+        also_df: bool = False,
+    ) -> alt.Chart | pd.DataFrame | tuple[alt.Chart, pd.DataFrame]:
         if cap is None:
             bp_mean = "bid_price_mean"
         elif cap == "some":
@@ -124,18 +125,14 @@ class SimTabBidPriceHistory(GenericSimulationTables):
             if show_stdev is True:
                 show_stdev = 2
             df["bid_price_upper"] = df[bp_mean] + show_stdev * df["bid_price_stdev"]
-            df["bid_price_lower"] = (
-                df[bp_mean] - show_stdev * df["bid_price_stdev"]
-            ).clip(0, None)
+            df["bid_price_lower"] = (df[bp_mean] - show_stdev * df["bid_price_stdev"]).clip(0, None)
         if raw_df:
             return df
 
         import altair as alt
 
         line_encoding = dict(
-            x=alt.X("days_prior:Q")
-            .scale(reverse=True)
-            .title("Days Prior to Departure"),
+            x=alt.X("days_prior:Q").scale(reverse=True).title("Days Prior to Departure"),
             y=alt.Y(bp_mean, title="Bid Price"),
         )
         if color:
@@ -144,9 +141,7 @@ class SimTabBidPriceHistory(GenericSimulationTables):
         fig = chart.mark_line(interpolate="step-before").encode(**line_encoding)
         if show_stdev:
             area_encoding = dict(
-                x=alt.X("days_prior:Q")
-                .scale(reverse=True)
-                .title("Days Prior to Departure"),
+                x=alt.X("days_prior:Q").scale(reverse=True).title("Days Prior to Departure"),
                 y=alt.Y("bid_price_lower:Q", title="Bid Price"),
                 y2=alt.Y2("bid_price_upper:Q", title="Bid Price"),
             )
@@ -154,20 +149,14 @@ class SimTabBidPriceHistory(GenericSimulationTables):
                 opacity=0.1,
                 interpolate="step-before",
             ).encode(**area_encoding)
-            bound_line = chart.mark_line(
-                opacity=0.4, strokeDash=[5, 5], interpolate="step-before"
-            ).encode(
-                x=alt.X("days_prior:Q")
-                .scale(reverse=True)
-                .title("Days Prior to Departure")
+            bound_line = chart.mark_line(opacity=0.4, strokeDash=[5, 5], interpolate="step-before").encode(
+                x=alt.X("days_prior:Q").scale(reverse=True).title("Days Prior to Departure")
             )
-            top_line = bound_line.encode(
-                y=alt.Y("bid_price_lower:Q", title="Bid Price")
-            )
-            bottom_line = bound_line.encode(
-                y=alt.Y("bid_price_upper:Q", title="Bid Price")
-            )
+            top_line = bound_line.encode(y=alt.Y("bid_price_lower:Q", title="Bid Price"))
+            bottom_line = bound_line.encode(y=alt.Y("bid_price_upper:Q", title="Bid Price"))
             fig = fig + bound + top_line + bottom_line
         if title:
             fig = fig.properties(title=title)
+        if also_df:
+            return fig, df
         return fig

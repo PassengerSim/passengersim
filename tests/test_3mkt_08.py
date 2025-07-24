@@ -140,9 +140,7 @@ def test_3mkt_08_demand_to_come(summary, dataframe_regression):
 @pytest.mark.parametrize("leg_id", [101, 111])
 @pytest.mark.parametrize("days_prior", [63, 7, 1])
 @pytest.mark.parametrize("booking_class", ["Y0", "Y4", "Y5"])
-def test_3mkt_08_forecast_traces(
-    summary, leg_id, days_prior, booking_class, dataframe_regression
-):
+def test_3mkt_08_forecast_traces(summary, leg_id, days_prior, booking_class, dataframe_regression):
     assert isinstance(summary, SummaryTables)
     df = leg_forecast_trace(
         summary.cnx,
@@ -160,9 +158,7 @@ def test_3mkt_08_forecast_traces(
 @pytest.mark.parametrize("leg_id", [101, 111])
 @pytest.mark.parametrize("days_prior", [63, 7, 0])
 @pytest.mark.parametrize("booking_class", ["Y0", "Y4", "Y5"])
-def test_3mkt_08_sales_traces(
-    summary, leg_id, days_prior, booking_class, dataframe_regression
-):
+def test_3mkt_08_sales_traces(summary, leg_id, days_prior, booking_class, dataframe_regression):
     assert isinstance(summary, SummaryTables)
     df = leg_sales_trace(
         summary.cnx,
@@ -190,18 +186,14 @@ def test_3mkt_08_sales_traces(
         (True, "Y5"),
     ],
 )
-def test_3mkt_08_fig_bookings_by_timeframe(
-    summary, dataframe_regression, by_carrier, by_class
-):
+def test_3mkt_08_fig_bookings_by_timeframe(summary, dataframe_regression, by_carrier, by_class):
     assert isinstance(summary, SummaryTables)
     assert isinstance(
         summary.fig_bookings_by_timeframe(by_carrier=by_carrier, by_class=by_class),
         altair.TopLevelMixin,
     )
     dataframe_regression.check(
-        summary.fig_bookings_by_timeframe(
-            by_carrier=by_carrier, by_class=by_class, raw_df=True
-        ).reset_index(drop=True),
+        summary.fig_bookings_by_timeframe(by_carrier=by_carrier, by_class=by_class, raw_df=True).reset_index(drop=True),
         default_tolerance=DEFAULT_TOLERANCE,
     )
 
@@ -282,9 +274,7 @@ def test_3mkt_08_fig_od_fare_class_mix(summary, dataframe_regression):
     assert isinstance(summary, SummaryTables)
     fig = summary.fig_od_fare_class_mix(orig="BOS", dest="ORD")
     assert isinstance(fig, altair.TopLevelMixin)
-    df = summary.fig_od_fare_class_mix(orig="BOS", dest="ORD", raw_df=True).reset_index(
-        drop=True
-    )
+    df = summary.fig_od_fare_class_mix(orig="BOS", dest="ORD", raw_df=True).reset_index(drop=True)
     dataframe_regression.check(
         df,
         basename="fig_od_fare_class_mix",
@@ -293,9 +283,7 @@ def test_3mkt_08_fig_od_fare_class_mix(summary, dataframe_regression):
 
 
 @pytest.mark.parametrize("of", ["mu", "sigma"])
-def test_3mkt_08_fig_leg_forecasts(
-    summary, dataframe_regression, of: Literal["mu", "sigma"]
-):
+def test_3mkt_08_fig_leg_forecasts(summary, dataframe_regression, of: Literal["mu", "sigma"]):
     assert isinstance(summary, SummaryTables)
     fig = summary.fig_leg_forecasts(of=of)
     assert isinstance(fig, altair.TopLevelMixin)

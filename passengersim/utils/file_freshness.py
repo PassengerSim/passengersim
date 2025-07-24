@@ -1,9 +1,7 @@
 import pathlib
 
 
-def check_modification_times(
-    filenames: list[pathlib.Path] | pathlib.Path, cache_file: pathlib.Path
-) -> str | None:
+def check_modification_times(filenames: list[pathlib.Path] | pathlib.Path, cache_file: pathlib.Path) -> str | None:
     """
     Check the modification times of a list of files against a cache file.
 

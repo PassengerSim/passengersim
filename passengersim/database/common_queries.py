@@ -10,9 +10,7 @@ from .database import Database
 logger = logging.getLogger("passengersim.database")
 
 
-def fare_class_mix(
-    cnx: Database, scenario: str, burn_samples: int = 100
-) -> pd.DataFrame:
+def fare_class_mix(cnx: Database, scenario: str, burn_samples: int = 100) -> pd.DataFrame:
     """
     Fare class mix by carrier.
 
@@ -68,14 +66,10 @@ def fare_class_mix(
     GROUP BY carrier, booking_class
     ORDER BY carrier, booking_class;
     """
-    return cnx.dataframe(qry, (scenario, burn_samples)).set_index(
-        ["carrier", "booking_class"]
-    )
+    return cnx.dataframe(qry, (scenario, burn_samples)).set_index(["carrier", "booking_class"])
 
 
-def od_fare_class_mix(
-    cnx: Database, orig: str, dest: str, scenario: str, burn_samples: int = 100
-) -> pd.DataFrame:
+def od_fare_class_mix(cnx: Database, orig: str, dest: str, scenario: str, burn_samples: int = 100) -> pd.DataFrame:
     """
     Fare class mix by carrier for a particular origin-destination market.
 
@@ -130,9 +124,7 @@ def od_fare_class_mix(
     GROUP BY carrier, booking_class
     ORDER BY carrier, booking_class;
     """
-    return cnx.dataframe(qry, (scenario, burn_samples, orig, dest)).set_index(
-        ["carrier", "booking_class"]
-    )
+    return cnx.dataframe(qry, (scenario, burn_samples, orig, dest)).set_index(["carrier", "booking_class"])
 
 
 def load_factors(cnx: Database, scenario: str, burn_samples: int = 100) -> pd.DataFrame:
@@ -181,8 +173,7 @@ def load_factor_distribution(
             f"AS '{cutoffs[i]} - {cutoffs[i+1]}'"
         )
     vars.append(
-        f"count(CASE WHEN lf>= {cutoffs[-2]} AND lf <= {cutoffs[-1]} THEN 1 END) "
-        f"AS '{cutoffs[-2]} - {cutoffs[-1]}'"
+        f"count(CASE WHEN lf>= {cutoffs[-2]} AND lf <= {cutoffs[-1]} THEN 1 END) " f"AS '{cutoffs[-2]} - {cutoffs[-1]}'"
     )
     vars = ",\n        ".join(vars)
     qry = f"""
@@ -327,14 +318,10 @@ def bookings_by_timeframe(
     ORDER BY
         carrier, booking_class, days_prior, trial;
     """
-    return cnx.dataframe(qry_bookings, (scenario,)).set_index(
-        ["trial", "carrier", "booking_class", "days_prior"]
-    )
+    return cnx.dataframe(qry_bookings, (scenario,)).set_index(["trial", "carrier", "booking_class", "days_prior"])
 
 
-def leg_forecasts(
-    cnx: Database, *, scenario: str = None, burn_samples: int = 100
-) -> pd.DataFrame:
+def leg_forecasts(cnx: Database, *, scenario: str = None, burn_samples: int = 100) -> pd.DataFrame:
     """
     Average forecasts of demand by leg, bucket, and days to departure.
 
@@ -386,9 +373,7 @@ def leg_forecasts(
         params = (burn_samples,)
     else:
         params = (burn_samples, scenario)
-    return cnx.dataframe(qry, params).set_index(
-        ["carrier", "leg_id", "bucket_number", "booking_class", "days_prior"]
-    )
+    return cnx.dataframe(qry, params).set_index(["carrier", "leg_id", "bucket_number", "booking_class", "days_prior"])
 
 
 def _leg_bucket_trace(
@@ -538,8 +523,7 @@ def leg_forecast_trace(
             was closed in the data used to make a forecast.
     """
     return _leg_bucket_trace(
-        "forecast_mean, forecast_stdev, "
-        "forecast_closed_in_tf, forecast_closed_in_future",
+        "forecast_mean, forecast_stdev, " "forecast_closed_in_tf, forecast_closed_in_future",
         cnx,
         scenario=scenario,
         burn_samples=burn_samples,
@@ -601,9 +585,7 @@ def leg_sales_trace(
     )
 
 
-def path_forecasts(
-    cnx: Database, *, scenario: str = None, burn_samples: int = 100
-) -> pd.DataFrame:
+def path_forecasts(cnx: Database, *, scenario: str = None, burn_samples: int = 100) -> pd.DataFrame:
     """
     Average forecasts of demand by path, class, and days to departure.
 
@@ -654,14 +636,10 @@ def path_forecasts(
         params = (burn_samples,)
     else:
         params = (burn_samples, scenario)
-    return cnx.dataframe(qry, params).set_index(
-        ["path_id", "booking_class", "days_prior"]
-    )
+    return cnx.dataframe(qry, params).set_index(["path_id", "booking_class", "days_prior"])
 
 
-def demand_to_come(
-    cnx: Database, *, scenario: str = None, burn_samples: int = 100
-) -> pd.DataFrame:
+def demand_to_come(cnx: Database, *, scenario: str = None, burn_samples: int = 100) -> pd.DataFrame:
     """
     Demand by market and timeframe across each sample.
 
@@ -703,18 +681,14 @@ def demand_to_come(
         params = (burn_samples, scenario)
     dmd = cnx.dataframe(qry, params, dtype={"future_demand": np.int32})
     dhs = (
-        dmd.set_index(
-            ["iteration", "trial", "sample", "segment", "orig", "dest", "days_prior"]
-        )["future_demand"]
+        dmd.set_index(["iteration", "trial", "sample", "segment", "orig", "dest", "days_prior"])["future_demand"]
         .unstack("days_prior")
         .sort_values(by="days_prior", axis=1, ascending=False)
     )
     return dhs
 
 
-def demand_to_come_summary(
-    cnx: Database, scenario: str, burn_samples: int = 100
-) -> pd.DataFrame:
+def demand_to_come_summary(cnx: Database, scenario: str, burn_samples: int = 100) -> pd.DataFrame:
     """
     Demand by market and timeframe across each sample.
 
@@ -777,9 +751,7 @@ def demand_to_come_summary(
     return dhs
 
 
-def carrier_history(
-    cnx: Database, *, scenario: str = None, burn_samples: int = 100
-) -> pd.DataFrame:
+def carrier_history(cnx: Database, *, scenario: str = None, burn_samples: int = 100) -> pd.DataFrame:
     """
     Sample-level details of carrier-level measures.
 
@@ -846,9 +818,7 @@ def carrier_history(
     """
     if scenario is None:
         qry1 = qry1.replace("AND scenario == @scenario", "")
-    bd1 = cnx.dataframe(qry1, qry_params).set_index(
-        ["iteration", "trial", "sample", "carrier"]
-    )
+    bd1 = cnx.dataframe(qry1, qry_params).set_index(["iteration", "trial", "sample", "carrier"])
     qry2 = """
     SELECT
         iteration, trial, sample, carrier,
@@ -862,9 +832,7 @@ def carrier_history(
     """
     if scenario is None:
         qry2 = qry2.replace("AND scenario == @scenario", "")
-    bd2 = cnx.dataframe(qry2, qry_params).set_index(
-        ["iteration", "trial", "sample", "carrier"]
-    )
+    bd2 = cnx.dataframe(qry2, qry_params).set_index(["iteration", "trial", "sample", "carrier"])
     return pd.concat([bd1, bd2], axis=1).unstack("carrier")
 
 
@@ -938,9 +906,7 @@ def bid_price_history(
     try:
         cnx._commit_raw()
     except sqlite3.OperationalError:
-        preqry = preqry.replace(
-            "CREATE TABLE IF NOT EXISTS", "CREATE TEMP TABLE IF NOT EXISTS"
-        )
+        preqry = preqry.replace("CREATE TABLE IF NOT EXISTS", "CREATE TEMP TABLE IF NOT EXISTS")
         cnx.execute(preqry, (burn_samples,))
     qry = """
     SELECT
@@ -978,9 +944,7 @@ def bid_price_history(
     try:
         cnx._commit_raw()
     except sqlite3.OperationalError:
-        preqry2 = preqry2.replace(
-            "CREATE TABLE IF NOT EXISTS", "CREATE TEMP TABLE IF NOT EXISTS"
-        )
+        preqry2 = preqry2.replace("CREATE TABLE IF NOT EXISTS", "CREATE TEMP TABLE IF NOT EXISTS")
         cnx.execute(preqry2, (burn_samples,))
     qry2 = """
     SELECT
@@ -1057,9 +1021,7 @@ def displacement_history(
     try:
         cnx._commit_raw()
     except sqlite3.OperationalError:
-        preqry = preqry.replace(
-            "CREATE TABLE IF NOT EXISTS", "CREATE TEMP TABLE IF NOT EXISTS"
-        )
+        preqry = preqry.replace("CREATE TABLE IF NOT EXISTS", "CREATE TEMP TABLE IF NOT EXISTS")
         cnx.execute(preqry, (burn_samples,))
     qry = """
     SELECT carrier, days_prior, displacement_mean, displacement_stdev
@@ -1074,9 +1036,30 @@ def displacement_history(
     return df
 
 
-def local_and_flow_yields(
-    cnx: Database, *, scenario: str = None, burn_samples: int = 100
+def leg_detail(
+        cnx: Database,
+        scenario: str,
+        burn_samples: int = 100,
 ) -> pd.DataFrame:
+    """
+    Dump leg_detail into a dataframe
+    """
+
+    qry = """
+    SELECT l.trial, l.sample, l.leg_id, d.carrier, d.flt_no, d.orig, d.dest,
+           l.days_prior, l.sold, l.revenue, l.local_sold, l.local_revenue, l.bid_price 
+    FROM leg_detail l
+    JOIN leg_defs d USING (leg_id)
+    """
+    df = cnx.dataframe(
+        qry,
+#        (scenario,),
+    )
+#    print(f"Dataframe has {len(df)} rows, scenario = {scenario}")
+#    df = df.set_index(["trial", "sample", "flt_no", "orig", "dest", "days_prior"])
+    return df
+
+def local_and_flow_yields(cnx: Database, *, scenario: str = None, burn_samples: int = 100) -> pd.DataFrame:
     """
     Compute yields for local (nonstop) and flow (connecting) passengers.
 
@@ -1160,9 +1143,7 @@ def local_and_flow_yields(
     return df
 
 
-def leg_local_and_flow_by_class(
-    cnx: Database, scenario: str, burn_samples: int = 100
-) -> pd.DataFrame:
+def leg_local_and_flow_by_class(cnx: Database, scenario: str, burn_samples: int = 100) -> pd.DataFrame:
     logger.info("creating pthcls temp table")
     cnx.execute(
         """
@@ -1232,9 +1213,7 @@ def leg_local_and_flow_by_class(
     return df
 
 
-def edgar(
-    cnx: Database, *, scenario: str = None, burn_samples: int = 100
-) -> pd.DataFrame:
+def edgar(cnx: Database, *, scenario: str = None, burn_samples: int = 100) -> pd.DataFrame:
     """
     Forecast accuracy information.
 

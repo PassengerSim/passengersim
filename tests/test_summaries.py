@@ -86,6 +86,40 @@ def test_table_basic(summary: SimulationTables):
     assert summary.pathclasses.gt_revenue.sum() == approx(carrier_total_revenue)
     assert summary.legbuckets.gt_revenue.sum() == approx(carrier_total_revenue)
 
+    # check that total sold aligns over all tables
+    carrier_total_sold = summary.carriers.avg_sold.sum() * summary.n_total_samples
+    legs_sold = summary.legs.gt_sold.sum()
+    assert legs_sold > carrier_total_sold
+    # legs sold should be > carrier sold due to connecting itineraries
+    assert summary.paths.gt_sold.sum() == approx(carrier_total_sold)
+    assert summary.pathclasses.gt_sold.sum() == approx(carrier_total_sold)
+    assert summary.legbuckets.gt_sold.sum() == approx(legs_sold)
+    assert summary.demands.gt_sold.sum() == approx(carrier_total_sold)
+
+    # check sold and nogo is consistent over demands and segmentation
+    dmd_sold = summary.demands.gt_sold.sum()
+    n_trials = summary.segmentation_by_timeframe.index.get_level_values("trial").nunique()
+    segm_sold = (
+        summary.segmentation_by_timeframe.stack("segment", future_stack=True)[["bookings"]]
+        .query("carrier != 'NONE'")
+        .sum()
+        * summary.n_total_samples
+        / n_trials
+    )
+    assert dmd_sold == approx(segm_sold)
+
+    assert "gt_eliminated_no_offers" in summary.demands.columns
+
+    dmd_nogo = summary.demands.eval("gt_eliminated_no_offers + gt_eliminated_chose_nothing + gt_eliminated_wtp").sum()
+    segm_nogo = (
+        summary.segmentation_by_timeframe.stack("segment", future_stack=True)[["bookings"]]
+        .query("carrier == 'NONE'")
+        .sum()
+        * summary.n_total_samples
+        / n_trials
+    )
+    assert dmd_nogo == pytest.approx(segm_nogo)
+
 
 TABLES = [
     "demands",
@@ -134,9 +168,7 @@ def test_table_presence_two_process(summary2, dataframe_regression, table_name: 
 
 
 @pytest.mark.parametrize("table_name", TABLES)
-def test_table_presence_multi_process(
-    summary_mp, dataframe_regression, table_name: str
-):
+def test_table_presence_multi_process(summary_mp, dataframe_regression, table_name: str):
     assert isinstance(summary_mp, SimulationTables)
     df = getattr(summary_mp, table_name)
     if df.columns.nlevels > 1:

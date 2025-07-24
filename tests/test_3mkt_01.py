@@ -39,12 +39,8 @@ def test_3mkt_01_time_zones():
     assert leg.dest == "ORD"
     assert leg.orig_timezone == "America/New_York"
     assert leg.dest_timezone == "America/Chicago"
-    assert leg.dep_localtime == datetime.datetime(
-        2020, 3, 1, 8, 0, tzinfo=zoneinfo.ZoneInfo(key="America/New_York")
-    )
-    assert leg.arr_localtime == datetime.datetime(
-        2020, 3, 1, 10, 0, tzinfo=zoneinfo.ZoneInfo(key="America/Chicago")
-    )
+    assert leg.dep_localtime == datetime.datetime(2020, 3, 1, 8, 0, tzinfo=zoneinfo.ZoneInfo(key="America/New_York"))
+    assert leg.arr_localtime == datetime.datetime(2020, 3, 1, 10, 0, tzinfo=zoneinfo.ZoneInfo(key="America/Chicago"))
     assert leg.dep_time == 1583067600
     assert leg.arr_time == 1583078400
     assert leg.distance == approx(863.753282)
@@ -190,18 +186,14 @@ def test_3mkt_01_demand_to_come(summary, dataframe_regression):
         (True, "Y5"),
     ],
 )
-def test_3mkt_01_fig_bookings_by_timeframe(
-    summary, dataframe_regression, by_carrier, by_class
-):
+def test_3mkt_01_fig_bookings_by_timeframe(summary, dataframe_regression, by_carrier, by_class):
     assert isinstance(summary, SummaryTables)
     assert isinstance(
         summary.fig_bookings_by_timeframe(by_carrier=by_carrier, by_class=by_class),
         altair.TopLevelMixin,
     )
     dataframe_regression.check(
-        summary.fig_bookings_by_timeframe(
-            by_carrier=by_carrier, by_class=by_class, raw_df=True
-        ).reset_index(drop=True),
+        summary.fig_bookings_by_timeframe(by_carrier=by_carrier, by_class=by_class, raw_df=True).reset_index(drop=True),
         default_tolerance=DEFAULT_TOLERANCE,
     )
 
@@ -276,9 +268,7 @@ def test_3mkt_01_fig_od_fare_class_mix(summary, dataframe_regression):
     assert isinstance(summary, SummaryTables)
     fig = summary.fig_od_fare_class_mix(orig="BOS", dest="ORD")
     assert isinstance(fig, altair.TopLevelMixin)
-    df = summary.fig_od_fare_class_mix(orig="BOS", dest="ORD", raw_df=True).reset_index(
-        drop=True
-    )
+    df = summary.fig_od_fare_class_mix(orig="BOS", dest="ORD", raw_df=True).reset_index(drop=True)
     dataframe_regression.check(
         df,
         basename="fig_od_fare_class_mix",
@@ -291,21 +281,15 @@ def test_3mkt_01_fig_leg_forecasts(summary, dataframe_regression):
     fig = summary.fig_leg_forecasts()
     assert isinstance(fig, altair.TopLevelMixin)
     df = summary.fig_leg_forecasts(raw_df=True).reset_index(drop=True)
-    dataframe_regression.check(
-        df, basename="fig_leg_forecasts", default_tolerance=DEFAULT_TOLERANCE
-    )
+    dataframe_regression.check(df, basename="fig_leg_forecasts", default_tolerance=DEFAULT_TOLERANCE)
 
 
 @pytest.mark.parametrize("by_carrier", [False, True, "AL1"])
 @pytest.mark.parametrize("source", ["leg_avg", "raw", "db"])
 @pytest.mark.filterwarnings("error")
-def test_3mkt_01_fig_load_factor_grouped(
-    summary, dataframe_regression, by_carrier, source: Literal["raw", "db"]
-):
+def test_3mkt_01_fig_load_factor_grouped(summary, dataframe_regression, by_carrier, source: Literal["raw", "db"]):
     assert isinstance(summary, SummaryTables)
     fig = summary.fig_load_factor_distribution(by_carrier=by_carrier, source=source)
     assert isinstance(fig, altair.TopLevelMixin)
-    df = summary.fig_load_factor_distribution(
-        by_carrier=by_carrier, raw_df=True, source=source
-    ).reset_index(drop=True)
+    df = summary.fig_load_factor_distribution(by_carrier=by_carrier, raw_df=True, source=source).reset_index(drop=True)
     dataframe_regression.check(df, default_tolerance=DEFAULT_TOLERANCE)

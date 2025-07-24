@@ -44,9 +44,11 @@ class SimTabSegByTimeframe(GenericSimulationTables):
     def fig_segmentation_by_timeframe(
         self,
         metric: Literal["bookings", "revenue"],
+        *,
         by_carrier: bool | str = True,
         by_class: bool | str = False,
         raw_df: bool = False,
+        also_df: bool = False,
         exclude_nogo: bool = True,
     ):
         if self.segmentation_by_timeframe is None:
@@ -68,13 +70,7 @@ class SimTabSegByTimeframe(GenericSimulationTables):
                 g += ["booking_class"]
             df = df.groupby(g, observed=False)[[metric]].sum().reset_index()
         if by_carrier and not by_class:
-            df = (
-                df.groupby(["carrier", "days_prior", "segment"], observed=False)[
-                    [metric]
-                ]
-                .sum()
-                .reset_index()
-            )
+            df = df.groupby(["carrier", "days_prior", "segment"], observed=False)[[metric]].sum().reset_index()
         if isinstance(by_carrier, str):
             df = df[df["carrier"] == by_carrier]
             df = df.drop(columns=["carrier"])
@@ -114,18 +110,10 @@ class SimTabSegByTimeframe(GenericSimulationTables):
             .mark_bar()
             .encode(
                 color=alt.Color(color).title(color_title),
-                x=alt.X("days_prior:O")
-                .scale(reverse=True)
-                .title("Days Prior to Departure"),
+                x=alt.X("days_prior:O").scale(reverse=True).title("Days Prior to Departure"),
                 y=alt.Y(metric),
-                tooltip=(
-                    [alt.Tooltip("carrier").title("Carrier")] if by_carrier else []
-                )
-                + (
-                    [alt.Tooltip("booking_class").title("Booking Class")]
-                    if by_class
-                    else []
-                )
+                tooltip=([alt.Tooltip("carrier").title("Carrier")] if by_carrier else [])
+                + ([alt.Tooltip("booking_class").title("Booking Class")] if by_class else [])
                 + [
                     alt.Tooltip("segment", title="Passenger Type"),
                     alt.Tooltip("days_prior", title="Days Prior"),
@@ -144,6 +132,9 @@ class SimTabSegByTimeframe(GenericSimulationTables):
             )
         else:
             chart = chart.properties(title=title)
+
+        if also_df:
+            return chart, df
         return chart
 
     def fig_bookings_by_timeframe(self, *args, **kwargs):

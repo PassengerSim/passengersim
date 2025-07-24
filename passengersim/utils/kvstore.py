@@ -11,9 +11,7 @@ except ImportError:
 class KVStore(MutableMapping):
     def __init__(self, db_path=":memory:"):
         if lz4 is None:
-            raise ImportError(
-                "lz4 is not installed, but required for this file storage format."
-            )
+            raise ImportError("lz4 is not installed, but required for this file storage format.")
         self.conn = sqlite3.connect(db_path)
         self._create_table()
 

@@ -124,6 +124,8 @@ class Place(BaseModel, extra="forbid", validate_assignment=True):
 
     @property
     def time_zone_info(self):
+        if self.time_zone is None:
+            return None  # No time zone set
         return ZoneInfo(self.time_zone)
 
 
@@ -135,9 +137,7 @@ def great_circle(place1: Place, place2: Place):
     lat2 = math.radians(place2.lat)
     lon_diff = lon2 - lon1
     lat_diff = lat2 - lat1
-    a = math.sin((lat_diff) / 2.0) ** 2.0 + (
-        math.cos(lat1) * math.cos(lat2) * (math.sin((lon_diff) / 2.0) ** 2.0)
-    )
+    a = math.sin((lat_diff) / 2.0) ** 2.0 + (math.cos(lat1) * math.cos(lat2) * (math.sin((lon_diff) / 2.0) ** 2.0))
     angle2 = 2.0 * math.asin(min(1.0, math.sqrt(a)))
     # Convert back to degrees.
     angle2 = math.degrees(angle2)

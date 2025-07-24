@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ValidationInfo, field_serializer, field_validator
@@ -47,8 +47,12 @@ class Leg(BaseModel, extra="forbid"):
     dest_timezone: str | None = None
     """Timezone name for the destination location for this leg."""
 
-    date: datetime = datetime.fromisoformat("2020-03-01")
-    """Departure date for this leg."""
+    #    date: datetime = datetime.fromisoformat("2020-03-01")
+    date: datetime = datetime(2020, 3, 1, tzinfo=UTC)
+    """Departure date for this leg.
+       The initial load is local, so we have a psuedo-timestamp here, we're avoiding local timezones
+       In the overall model validation, we'll unpack it to HH:MM and use the timezone
+       to get the true UTC value"""
 
     arr_day: int = 0
     """If the arrival time is on a different day, this is offset in days.
@@ -71,7 +75,7 @@ class Leg(BaseModel, extra="forbid"):
     @property
     def dep_localtime(self) -> datetime:
         """Departure time for this leg in local time at the origin."""
-        t = datetime.fromtimestamp(self.dep_time, tz=timezone.utc)
+        t = datetime.fromtimestamp(self.dep_time, tz=UTC)
         if self.orig_timezone is not None:
             z = ZoneInfo(self.orig_timezone)
             t = t.astimezone(z)
@@ -90,7 +94,7 @@ class Leg(BaseModel, extra="forbid"):
     @property
     def arr_localtime(self) -> datetime:
         """Arrival time for this leg in local time at the destination."""
-        t = datetime.fromtimestamp(self.arr_time, tz=timezone.utc)
+        t = datetime.fromtimestamp(self.arr_time, tz=UTC)
         if self.dest_timezone is not None:
             z = ZoneInfo(self.dest_timezone)
             t = t.astimezone(z)
@@ -106,13 +110,13 @@ class Leg(BaseModel, extra="forbid"):
             v = datetime.fromisoformat(v)
         if v.tzinfo is None:
             # when no timezone is specified, assume UTC (not naive)
-            v = v.replace(tzinfo=timezone.utc)
+            v = v.replace(tzinfo=UTC)
         return v
 
     @field_serializer("date", when_used="always")
     def serialize_date(self, date: datetime) -> str:
         if date.tzinfo is None:
-            date = date.replace(tzinfo=timezone.utc)
+            date = date.replace(tzinfo=UTC)
         return date.isoformat()
 
     @field_validator("dep_time", "arr_time", mode="before")

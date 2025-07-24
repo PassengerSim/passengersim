@@ -10,10 +10,7 @@ class IFrame:
     Generic class to embed an iframe in an IPython notebook
     """
 
-    framestyle = (
-        "border: 1px solid #aaaaaa; border-radius: 3px; "
-        "padding:3px; width: {width}px; overflow-x: hidden;"
-    )
+    framestyle = "border: 1px solid #aaaaaa; border-radius: 3px; " "padding:3px; width: {width}px; overflow-x: hidden;"
     iframe = """
         <div style="{framestyle}">
         <iframe

@@ -74,7 +74,7 @@ class SimTabForecasts(GenericSimulationTables):
         *,
         by_class: bool | str = True,
         of: Literal["mu", "sigma", "closed", "adj_price"] = "mu",
-        raw_df=False,
+        raw_df: bool = False,
     ):
         if isinstance(of, list):
             if raw_df:
@@ -107,14 +107,9 @@ class SimTabForecasts(GenericSimulationTables):
                 if by_path_id:
                     path_def = self.paths.loc[by_path_id]
                     title += f" ({path_def['orig']}~{path_def['dest']})"
-                    for leg_id in self.path_legs.query(
-                        f"path_id == {by_path_id}"
-                    ).leg_id:
+                    for leg_id in self.path_legs.query(f"path_id == {by_path_id}").leg_id:
                         leg_def = self.legs.loc[leg_id]
-                        title += (
-                            f", {leg_def['carrier']} {leg_def['flt_no']} "
-                            f"({leg_def['orig']}-{leg_def['dest']})"
-                        )
+                        title += f", {leg_def['carrier']} {leg_def['flt_no']} " f"({leg_def['orig']}-{leg_def['dest']})"
             except Exception:
                 raise
             return fig.properties(title=title)
@@ -162,8 +157,7 @@ class SimTabForecasts(GenericSimulationTables):
         by_leg_id: bool | int = True,
         *,
         by_class: bool | str = True,
-        of: Literal["mu", "sigma", "closed"]
-        | list[Literal["mu", "sigma", "closed"]] = "mu",
+        of: Literal["mu", "sigma", "closed"] | list[Literal["mu", "sigma", "closed"]] = "mu",
         raw_df=False,
     ):
         if isinstance(of, list):

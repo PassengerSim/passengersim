@@ -3,6 +3,8 @@ from __future__ import annotations
 import pathlib
 from typing import TYPE_CHECKING
 
+from altair import MaxRowsError
+
 from passengersim.contrast import Contrast
 from passengersim.types import PathLike
 from passengersim.utils.bootstrap import BootstrapHtml
@@ -56,32 +58,32 @@ def to_html(
     rpt.new_section("Results")
 
     if carrier_revenues:
-        rpt.add_figure(summaries.fig_carrier_revenues())
+        rpt.add_figure(summaries.fig_carrier_revenues(also_df=True))
 
     if carrier_total_bookings:
-        rpt.add_figure(summaries.fig_carrier_total_bookings())
+        rpt.add_figure(summaries.fig_carrier_total_bookings(also_df=True))
 
     if carrier_load_factors:
-        rpt.add_figure(summaries.fig_carrier_load_factors())
+        rpt.add_figure(summaries.fig_carrier_load_factors(also_df=True))
 
     if carrier_yields:
-        rpt.add_figure(summaries.fig_carrier_yields())
+        rpt.add_figure(summaries.fig_carrier_yields(also_df=True))
 
     if carrier_rasm:
-        rpt.add_figure(summaries.fig_carrier_rasm())
+        rpt.add_figure(summaries.fig_carrier_rasm(also_df=True))
 
     if carrier_local_share:
-        rpt.add_figure(summaries.fig_carrier_local_share(load_measure="bookings"))
-        rpt.add_figure(summaries.fig_carrier_local_share(load_measure="leg_pax"))
+        rpt.add_figure(summaries.fig_carrier_local_share(load_measure="bookings", also_df=True))
+        rpt.add_figure(summaries.fig_carrier_local_share(load_measure="leg_pax", also_df=True))
 
     if fare_class_mix:
-        rpt.add_figure(summaries.fig_fare_class_mix())
+        rpt.add_figure(summaries.fig_fare_class_mix(also_df=True))
 
     if bid_price_history:
-        rpt.add_figure(summaries.fig_bid_price_history())
+        rpt.add_figure(summaries.fig_bid_price_history(also_df=True))
 
     if bookings_by_timeframe:
-        rpt.add_figure(summaries.fig_bookings_by_timeframe())
+        rpt.add_figure(summaries.fig_bookings_by_timeframe(also_df=True))
         if isinstance(bookings_by_timeframe, list | tuple):
             carriers = bookings_by_timeframe
         elif base_config is not None:
@@ -89,10 +91,25 @@ def to_html(
         else:
             carriers = []
         for carrier in carriers:
-            rpt.add_figure(summaries.fig_bookings_by_timeframe(by_carrier=carrier))
-            rpt.add_figure(
-                summaries.fig_bookings_by_timeframe(by_carrier=carrier, by_class=True)
-            )
+            rpt.add_figure(summaries.fig_bookings_by_timeframe(by_carrier=carrier, also_df=True))
+            try:
+                rpt.add_figure(
+                    summaries.fig_bookings_by_timeframe(by_carrier=carrier, by_class=True, also_df=True),
+                    on_max_rows_error="raise",
+                )
+            except MaxRowsError:
+                # This can happen if the data if very detailed or if there are many
+                # experiments being prepared.  In this case, we will just skip the figure.
+                # Try creating a separate figure for each passenger segment
+                all_segments = set()
+                for _k, v in summaries.items():
+                    all_segments |= set(v.segmentation_by_timeframe.columns.levels[1])
+                for seg in all_segments:
+                    rpt.add_figure(
+                        summaries.fig_bookings_by_timeframe(
+                            by_carrier=carrier, by_class=True, by_segment=seg, also_df=True
+                        ),
+                    )
 
     if extra is not None:
         rpt.add_extra(summaries, *extra)

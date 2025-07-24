@@ -2,11 +2,11 @@ import os.path
 from typing import Any
 
 
-def compress_file(input_file: str, chunk_size: int = 65536):
+def compress_file(input_file: str | os.PathLike[str], chunk_size: int = 65536, rm_original: bool = False):
     """Compresses a file using LZ4."""
     import lz4.frame
 
-    output_file = str(input_file) + ".lz4"
+    output_file = os.fspath(input_file) + ".lz4"
     with open(input_file, "rb") as infile, open(output_file, "wb") as outfile:
         compressor = lz4.frame.LZ4FrameCompressor()
         outfile.write(compressor.begin())
@@ -19,13 +19,15 @@ def compress_file(input_file: str, chunk_size: int = 65536):
             outfile.write(compressed_chunk)
 
         outfile.write(compressor.flush())
+    if rm_original:
+        os.remove(input_file)
 
 
-def decompress_file(input_file: str | os.PathLike, chunk_size: int = 65536):
+def decompress_file(input_file: str | os.PathLike[str], chunk_size: int = 65536):
     """Decompresses a file using LZ4."""
     import lz4.frame
 
-    input_file = str(input_file)
+    input_file = os.fspath(input_file)
     if not input_file.endswith(".lz4"):
         raise ValueError("Input file must have a .lz4 extension")
 
@@ -44,7 +46,7 @@ def decompress_file(input_file: str | os.PathLike, chunk_size: int = 65536):
 
 def smart_open(filename: str | os.PathLike, mode: str = "r"):
     """Opens a file with a compression filter based on the extension."""
-    filename = str(filename)
+    filename = os.fspath(filename)
     if filename.endswith(".lz4"):
         import lz4.frame
 

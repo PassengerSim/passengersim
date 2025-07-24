@@ -69,60 +69,52 @@ def to_html(
     rpt.new_section("Results")
 
     if cfg.outputs.html.carrier_revenues:
-        rpt.add_figure(summary.fig_carrier_revenues())
+        rpt.add_figure(summary.fig_carrier_revenues(also_df=True))
 
     if cfg.outputs.html.carrier_total_bookings:
-        rpt.add_figure(summary.fig_carrier_total_bookings())
+        rpt.add_figure(summary.fig_carrier_total_bookings(also_df=True))
 
     if cfg.outputs.html.carrier_load_factors:
-        rpt.add_figure(summary.fig_carrier_load_factors())
+        rpt.add_figure(summary.fig_carrier_load_factors(also_df=True))
 
     if cfg.outputs.html.carrier_yields:
-        rpt.add_figure(summary.fig_carrier_yields())
+        rpt.add_figure(summary.fig_carrier_yields(also_df=True))
 
     if cfg.outputs.html.carrier_rasm:
-        rpt.add_figure(summary.fig_carrier_rasm())
+        rpt.add_figure(summary.fig_carrier_rasm(also_df=True))
 
     if cfg.outputs.html.carrier_table:
         rpt.add_table("Carrier Data", summary.carriers.T)
 
     if cfg.outputs.html.fare_class_mix:
-        rpt.add_figure(summary.fig_fare_class_mix())
+        rpt.add_figure(summary.fig_fare_class_mix(also_df=True))
 
     if cfg.outputs.html.bookings_by_timeframe:
-        rpt.add_figure(summary.fig_bookings_by_timeframe())
+        rpt.add_figure(summary.fig_bookings_by_timeframe(also_df=True))
         if cfg.outputs.html.bookings_by_timeframe is True:
             carriers = list(cfg.carriers.keys())
         else:
             carriers = cfg.outputs.html.bookings_by_timeframe
         for c in carriers:
-            rpt.add_figure(
-                summary.fig_segmentation_by_timeframe("bookings", by_carrier=c)
-            )
-            rpt.add_figure(
-                summary.fig_segmentation_by_timeframe(
-                    "bookings", by_carrier=c, by_class=True
-                )
-            )
+            rpt.add_figure(summary.fig_segmentation_by_timeframe("bookings", by_carrier=c, also_df=True))
+            rpt.add_figure(summary.fig_segmentation_by_timeframe("bookings", by_carrier=c, by_class=True, also_df=True))
 
     if cfg.outputs.html.segmentation_by_timeframe_table:
         rpt.add_table(
             "Segmentation by Timeframe Data",
-            Elem.from_string(
-                summary.segmentation_by_timeframe.to_html(max_rows=10_000)
-            ),
+            Elem.from_string(summary.segmentation_by_timeframe.to_html(max_rows=10_000)),
             collapsible=True,
         )
 
     if cfg.outputs.html.carrier_revenue_distribution:
-        rpt.add_figure(summary.fig_carrier_revenue_distribution())
+        rpt.add_figure(summary.fig_carrier_revenue_distribution(also_df=True))
 
     if cfg.outputs.html.leg_load_factor_distribution:
-        rpt.add_figure(summary.fig_leg_load_factor_distribution())
+        rpt.add_figure(summary.fig_leg_load_factor_distribution(also_df=True))
 
     if cfg.outputs.html.carrier_local_share:
-        rpt.add_figure(summary.fig_carrier_local_share())
-        rpt.add_figure(summary.fig_carrier_local_share("leg_pax"))
+        rpt.add_figure(summary.fig_carrier_local_share(also_df=True))
+        rpt.add_figure(summary.fig_carrier_local_share("leg_pax", also_df=True))
 
     # bid price history is suppressed unless there is some bid price data
     if cfg.outputs.html.bid_price_history:
@@ -131,7 +123,7 @@ def to_html(
         except AttributeError:
             bph = None
         if bph is not None and bph["bid_price_mean"].max() > 0:
-            rpt.add_figure(summary.fig_bid_price_history())
+            rpt.add_figure(summary.fig_bid_price_history(also_df=True))
 
     # displacement history is suppressed unless there is some displacement data
     if cfg.outputs.html.displacement_history:
@@ -140,7 +132,7 @@ def to_html(
         except AttributeError:
             dh = None
         if dh is not None and dh["displacement_mean"].max() > 0:
-            rpt.add_figure(summary.fig_displacement_history())
+            rpt.add_figure(summary.fig_displacement_history(also_df=True))
 
     if extra is not None:
         rpt.add_extra(summary, *extra)
@@ -162,12 +154,7 @@ def to_html(
 
     if cfg.outputs.html.metadata:
         rpt.new_section("Metadata")
-        metadata_df = (
-            pd.Series(summary._metadata, name="value")
-            .rename_axis(index="key")
-            .to_frame()
-            .reset_index()
-        )
+        metadata_df = pd.Series(summary._metadata, name="value").rename_axis(index="key").to_frame().reset_index()
         rpt.current_section.append(metadata_df)
 
     if cfg.outputs.html.other:

@@ -87,9 +87,7 @@ class CalibrationScore:
         # targets for fare class mix, by carrier and booking class
         if isinstance(target_fare_class_mix, dict):
             self.target_fare_class_mix = (
-                pd.DataFrame(target_fare_class_mix)
-                .rename_axis(columns="carrier", index="booking_class")
-                .unstack()
+                pd.DataFrame(target_fare_class_mix).rename_axis(columns="carrier", index="booking_class").unstack()
             )
         else:
             self.target_fare_class_mix = target_fare_class_mix
@@ -110,21 +108,15 @@ class CalibrationScore:
         ]
 
         # ensure targets are normalized
-        self.target_fare_class_mix = self.target_fare_class_mix.groupby(
-            "carrier"
-        ).transform(lambda x: (x / x.sum()))
-        self.target_load_factor_distribution = (
-            self.target_load_factor_distribution.groupby("carrier").transform(
-                lambda x: (x / x.sum())
-            )
+        self.target_fare_class_mix = self.target_fare_class_mix.groupby("carrier").transform(lambda x: (x / x.sum()))
+        self.target_load_factor_distribution = self.target_load_factor_distribution.groupby("carrier").transform(
+            lambda x: (x / x.sum())
         )
 
         # Weights for fare class mix, by carrier
         if isinstance(weight_fare_class_mix, dict):
             self.wgt_fare_class_mix = (
-                pd.DataFrame.from_dict(
-                    weight_fare_class_mix, orient="index", columns=["wgt"]
-                )
+                pd.DataFrame.from_dict(weight_fare_class_mix, orient="index", columns=["wgt"])
                 .rename_axis(index="carrier")
                 .iloc[:, 0]
             )
@@ -134,23 +126,15 @@ class CalibrationScore:
         # Weights for load factor distribution, by carrier
         if isinstance(weight_load_factor_distribution, dict):
             self.wgt_load_factor_distribution = (
-                pd.DataFrame.from_dict(
-                    weight_load_factor_distribution, orient="index", columns=["wgt"]
-                )
+                pd.DataFrame.from_dict(weight_load_factor_distribution, orient="index", columns=["wgt"])
                 .rename_axis(index="carrier")
                 .iloc[:, 0]
             )
         else:
             self.wgt_load_factor_distribution = weight_load_factor_distribution
 
-    def _analyze_fare_class_mix(
-        self, run_summary: SummaryTables
-    ) -> tuple[pd.Series, pd.Series, pd.Series]:
-        run_shares = (
-            run_summary.raw_fare_class_mix["sold"]
-            .groupby("carrier")
-            .transform(lambda x: (x / x.sum()))
-        )
+    def _analyze_fare_class_mix(self, run_summary: SummaryTables) -> tuple[pd.Series, pd.Series, pd.Series]:
+        run_shares = run_summary.raw_fare_class_mix["sold"].groupby("carrier").transform(lambda x: (x / x.sum()))
         tgt_shares = self.target_fare_class_mix
         diffs = run_shares - tgt_shares
         return run_shares, tgt_shares, diffs
@@ -170,15 +154,11 @@ class CalibrationScore:
             axis=1,
         )
 
-    def _analyze_load_factor_distribution(
-        self, run_summary: SummaryTables
-    ) -> tuple[pd.Series, pd.Series, pd.Series]:
+    def _analyze_load_factor_distribution(self, run_summary: SummaryTables) -> tuple[pd.Series, pd.Series, pd.Series]:
         bins = sorted(
             set(
                 int(k.split("-")[0])
-                for k in self.target_load_factor_distribution.index.get_level_values(
-                    "load_factor_range"
-                )
+                for k in self.target_load_factor_distribution.index.get_level_values("load_factor_range")
             )
         )
         run_lfs = (
@@ -193,15 +173,11 @@ class CalibrationScore:
         diffs = run_lfs - tgt_lfs
         return run_lfs, tgt_lfs, diffs
 
-    def compute_load_factor_distribution_score(
-        self, run_summary: SummaryTables
-    ) -> float:
+    def compute_load_factor_distribution_score(self, run_summary: SummaryTables) -> float:
         run_lfs, tgt_lfs, diffs = self._analyze_load_factor_distribution(run_summary)
         return ((diffs * self.wgt_load_factor_distribution) ** 2).sum()
 
-    def analyze_load_factor_distribution(
-        self, run_summary: SummaryTables
-    ) -> pd.DataFrame:
+    def analyze_load_factor_distribution(self, run_summary: SummaryTables) -> pd.DataFrame:
         run_lfs, tgt_lfs, diffs = self._analyze_load_factor_distribution(run_summary)
         return pd.concat(
             [

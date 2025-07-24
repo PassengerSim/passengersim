@@ -75,9 +75,7 @@ class OlympicForecastStep(RmStep):
         # sum historic demand over all remaining time periods
         history = history.sum(1)
         # compute average pickup excluding min and max
-        avg_pickup = (history.sum() - history.max() - history.min()) / (
-            history.size - 2
-        )
+        avg_pickup = (history.sum() - history.max() - history.min()) / (history.size - 2)
         # ensure non-negative value
         fcst = max(avg_pickup, 0.0)
         bkt.fcst_mean = fcst

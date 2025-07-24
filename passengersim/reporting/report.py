@@ -1,5 +1,6 @@
 import pathlib
 
+import pandas as pd
 import xmle
 import yaml
 from altair import LayerChart
@@ -191,7 +192,8 @@ class Elem(xmle.Elem):
     def append(self, arg):
         if isinstance(arg, LayerChart):
             arg = Elem.from_altair(arg)
-        return super().append(arg)
+        with pd.option_context("display.max_rows", 10_000, "display.max_columns", 1_000):
+            return super().append(arg)
 
     def __lshift__(self, other):
         if isinstance(other, LayerChart):

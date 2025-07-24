@@ -21,9 +21,7 @@ def config() -> Config:
 
 
 @pytest.fixture(scope="module", params=[None, "em"])
-def summary(
-    config: Config, request: pytest.FixtureRequest
-) -> (str | None, SimulationTables):
+def summary(config: Config, request: pytest.FixtureRequest) -> (str | None, SimulationTables):
     detruncation = request.param
     if detruncation:
         pytest.skip("hybrid with detruncation testing is suspended")
@@ -35,9 +33,7 @@ def summary(
 
 
 @pytest.fixture(scope="module", params=[None, "em"])
-def summary_mp(
-    config: Config, request: pytest.FixtureRequest
-) -> (str | None, SimulationTables):
+def summary_mp(config: Config, request: pytest.FixtureRequest) -> (str | None, SimulationTables):
     detruncation = request.param
     if detruncation:
         pytest.skip("hybrid with detruncation testing is suspended")
@@ -59,18 +55,14 @@ def summary_mp(
         ("mr", "em", 0.5),
     ],
 )
-def summary_fare_adjustment(
-    config: Config, request: pytest.FixtureRequest
-) -> (str, SimulationTables):
+def summary_fare_adjustment(config: Config, request: pytest.FixtureRequest) -> (str, SimulationTables):
     fare_adj = request.param[0]
     detruncation = request.param[1]
     if detruncation:
         pytest.skip("Fare adjustment with detruncation testing is suspended")
     fare_adj_scale = request.param[2]
     config.rm_systems.rm_hybrid.processes.dcp.forecast.fare_adjustment = fare_adj
-    config.rm_systems.rm_hybrid.processes.dcp.forecast.fare_adjustment_scale = (
-        fare_adj_scale
-    )
+    config.rm_systems.rm_hybrid.processes.dcp.forecast.fare_adjustment_scale = fare_adj_scale
     # config.rm_systems.rm_hybrid.processes.dcp.forecast.detruncation_algorithm = (
     #     detruncation
     # )
@@ -99,9 +91,7 @@ TABLE_NOT_SENSITIVE_TO_RM = [
 
 
 @pytest.mark.parametrize("table_name", TABLES)
-def test_3mkt_hybrid_table_single_process(
-    summary, dataframe_regression, table_name: str
-):
+def test_3mkt_hybrid_table_single_process(summary, dataframe_regression, table_name: str):
     detruncation, summary = summary
     assert isinstance(summary, SimulationTables)
     df = getattr(summary, table_name)
@@ -109,15 +99,11 @@ def test_3mkt_hybrid_table_single_process(
         basename = table_name
     else:
         basename = f"{detruncation}-{table_name}"
-    dataframe_regression.check(
-        df, basename=basename, default_tolerance=DEFAULT_TOLERANCE
-    )
+    dataframe_regression.check(df, basename=basename, default_tolerance=DEFAULT_TOLERANCE)
 
 
 @pytest.mark.parametrize("table_name", TABLES)
-def test_3mkt_hybrid_table_multi_process(
-    summary_mp, dataframe_regression, table_name: str
-):
+def test_3mkt_hybrid_table_multi_process(summary_mp, dataframe_regression, table_name: str):
     detruncation, summary_mp = summary_mp
     assert isinstance(summary_mp, SimulationTables)
     df = getattr(summary_mp, table_name)
@@ -125,15 +111,11 @@ def test_3mkt_hybrid_table_multi_process(
         basename = table_name
     else:
         basename = f"{detruncation}-{table_name}"
-    dataframe_regression.check(
-        df, basename=basename, default_tolerance=DEFAULT_TOLERANCE
-    )
+    dataframe_regression.check(df, basename=basename, default_tolerance=DEFAULT_TOLERANCE)
 
 
 @pytest.mark.parametrize("table_name", TABLES)
-def test_3mkt_hybrid_fareadj_table_single_process(
-    summary_fare_adjustment, dataframe_regression, table_name: str
-):
+def test_3mkt_hybrid_fareadj_table_single_process(summary_fare_adjustment, dataframe_regression, table_name: str):
     fare_adj, detruncation, fare_adj_scale, run_summary = summary_fare_adjustment
     assert isinstance(run_summary, SimulationTables)
     df = getattr(run_summary, table_name)
@@ -141,9 +123,7 @@ def test_3mkt_hybrid_fareadj_table_single_process(
         basename = table_name
     else:
         basename = f"{fare_adj}-{fare_adj_scale}-{detruncation}-{table_name}"
-    dataframe_regression.check(
-        df, basename=basename, default_tolerance=DEFAULT_TOLERANCE
-    )
+    dataframe_regression.check(df, basename=basename, default_tolerance=DEFAULT_TOLERANCE)
 
 
 @pytest.mark.parametrize(
@@ -246,17 +226,14 @@ def test_fare_adj_walk(data_regression, fareadj, adjscale):
                 for pth in self.sim.paths:
                     for pc in pth.pathclasses:
                         try:
-                            state[f"Path-{pth.path_id}"][
-                                f"Class-{pc.booking_class}"
-                            ].pop("adj_fares")
+                            state[f"Path-{pth.path_id}"][f"Class-{pc.booking_class}"].pop("adj_fares")
                         except KeyError:
                             pass
             for k, v in state.items():
                 for kk, vv in v.items():
                     data_regression.check(
                         vv,
-                        basename=f"fareadj-walk/{fareadj}-{int(adjscale*100):03d}/"
-                        f"Sample{s}/{k}/{kk}",
+                        basename=f"fareadj-walk/{fareadj}-{int(adjscale*100):03d}/" f"Sample{s}/{k}/{kk}",
                         round_digits=6,
                     )
 

@@ -14,9 +14,7 @@ def target_demand_by_timeframe(cfg: Config):
             b = dmd.base_demand
             curve = cfg.booking_curves[dmd.curve].curve
             frac = curve.get(dcp1, 0) - curve.get(dcp0, 0)
-            target_demand[dmd.segment][dcp1] += (
-                frac * b * cfg.simulation_controls.demand_multiplier
-            )
+            target_demand[dmd.segment][dcp1] += frac * b * cfg.simulation_controls.demand_multiplier
     return {i: dict(j) for (i, j) in target_demand.items()}
 
 

@@ -100,9 +100,7 @@ class MultiWelford:
     def sample_variance(self) -> dict[str, np.typing.ArrayLike]:
         if self._n < 2:
             return {k: np.nan for k in self._mean.keys()}
-        return self._aux | {
-            k: (self._mean2[k] / (self._n - 1)) for k in self._mean.keys()
-        }
+        return self._aux | {k: (self._mean2[k] / (self._n - 1)) for k in self._mean.keys()}
 
     @property
     def sample_std_dev(self) -> dict[str, np.typing.ArrayLike]:

@@ -25,9 +25,11 @@ simulation_controls:
   debug_offers: false
   timeframe_demand_allocation: pods
   capture_choice_set_file: choice-set-junk3.csv
-  capture_choice_set_obs: 10000
+  capture_choice_set_obs: 5000
+  capture_choice_set_mkts:
+    - ["BOS", "LAX"]
   # Mountain Standard Time (for me)
-  controller_time_zone: 0  # -7
+  # controller_time_zone: 0  # -7
   generate_3seg: True
   debug_connections: False
   debug_choice: False
@@ -245,9 +247,14 @@ load_factor_curves:
 
 rm_systems:
   rm_fcfs:
+    description: >-
+      First Come First Served - No RM controls.
     availability_control: leg
     processes: {}
+
   rm_lf:
+    description: >-
+      Load factor threshold.  Included for historical purposes.
     availability_control: leg
     processes:
       DAILY:
@@ -260,10 +267,15 @@ rm_systems:
           name: optimization
           algorithm: lf_target
           kind: leg
+
   rm_no_detruncation:
+    description: >-
+      Leg controls, without demand untruncation.
     availability_control: leg
     processes:
       DCP:
+          # Note that we need an untruncation step with algorithm "none"
+          # This sets demand = actual sales
         - step_type: untruncation
           name: untruncation
           algorithm: none
@@ -633,7 +645,6 @@ rm_systems:
           name: aggregate
           algorithm: mr
           kind: path
-          frat5: curve_C
         - step_type: aggregation
           name: aggregate
         - step_type: emsr
@@ -683,7 +694,6 @@ rm_systems:
           name: aggregate
           algorithm: mr
           kind: path
-          frat5: curve_C
         - step_type: aggregation
           name: aggregate
         - step_type: emsr
@@ -708,7 +718,6 @@ rm_systems:
           name: adj
           algorithm: mr
           kind: path
-          frat5: curve_C
         - step_type: probp
           name: optimization
       DAILY:
@@ -720,7 +729,6 @@ rm_systems:
           name: adj
           algorithm: mr
           kind: path
-          frat5: curve_C
         - step_type: probp
           name: optimization
       DEPARTURE:
@@ -764,8 +772,92 @@ rm_systems:
           min_lambda: 100.0
           use_gamma: False
 
+  CLF_EMSRb:
+    description: >-
+      EM detruncation of yieldable demand, Leg-based additive pickup conditional
+      forecast, booked load factor adjustment to forecast, LegDP optimization.
+    availability_control: leg
+    frat5: curve_G
+    processes:
+      DCP:
+        - step_type: legvalue
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: leg
+          which_data: yieldable
+        - step_type: forecast
+          name: leg_forecast
+          algorithm: additive_pickup
+          kind: leg-conditional
+        - step_type: emsr
+          name: leg_optimization
+          algorithm: emsrb
+          kind: leg
+
+  CLF_UA_EMSRb:
+    description: >-
+      EM detruncation of yieldable demand, Leg-based additive pickup conditional
+      forecast, booked load factor adjustment to forecast, LegDP optimization.
+    availability_control: leg
+    frat5: curve_G
+    processes:
+      DCP:
+        - step_type: legvalue
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: leg
+          which_data: yieldable
+        - step_type: forecast
+          name: leg_forecast
+          algorithm: additive_pickup
+          kind: leg-conditional
+        - step_type: useradjustment
+          name: user_adjustment
+          algorithm: booked_lf2
+        - step_type: emsr
+          name: leg_optimization
+          algorithm: emsrb
+          kind: leg
+
+  CPF_UA_DP:  # United
+    description: >-
+      EM detruncation of yieldable demand,
+      Path-based additive pickup conditional forecast,
+      MR fare adjustment with 25% scaling,
+      Booked load factor adjustment to non-stop path forecasts,
+      UDP optimization.
+    availability_control: bp
+    frat5: curve_G
+    processes:
+      DCP:
+        - step_type: untruncation
+          name: untruncation
+          algorithm: em
+          kind: path
+          which_data: yieldable
+        - step_type: forecast
+          name: path_forecast
+          algorithm: additive_pickup
+          kind: conditional
+          fare_adjustment: mr
+          fare_adjustment_scale: 0.25
+          max_cap: 10
+          weighted_by_ratio: true
+        - step_type: useradjustment
+          name: user_adjustment
+          algorithm: none
+        - step_type: udp
+          name: optimization
+          arrivals_per_time_slice: 0.1
+      DAILY:
+        - step_type: udpupdate
+          name: optimization_update
+
 todd_curves:
   - name: Tues_SameTZ_LE600
+    k_factor: 0.3
     probabilities:
       0: 0.001
       1: 0.001
@@ -881,6 +973,7 @@ carriers:
   - name: AL2
     rm_system: rm_leg
     truncation_rule: 1
+    frat5: curve_G
 #    frat5: curve_C
 #    fare_adjustment_scale: 0.5
 #    load_factor_curve: lf_curve1
@@ -952,12 +1045,15 @@ booking_curves:
       3: 0.98
       1: 1.0
 
+# The places data is used to compute distances for legs and demands, if not specified in those items
+# Timezones are used to compute durations
 places:
   BOS:
     label: Boston Logan International Airport
     lat: 42.3656
     lon: -71.0098
     time_zone: America/New_York
+    # MCT is minutes for DD / DI / ID / II
     mct: [20, 45, 45, 60]
   ORD:
     label: Chicago O'Hare International Airport
@@ -986,7 +1082,6 @@ legs:
     dep_time: 08:00
     arr_time: '10:00'
     capacity: 100
-#      "": 100
     distance: 864.0
   - carrier: AL1
     fltno: 102
@@ -1445,7 +1540,7 @@ snapshot_filters:
 #    flt_no: 211
 
 
-# Tolerance values for Decision Window Model
+# Tolerance values, in hours, for the Decision Window Model
 dwm_tolerance:
   - {"min_dist": 0, "max_dist": 500, "business": 3.093, "leisure": 4.3}
   - {"min_dist": 501, "max_dist": 1000, "business": 3.318, "leisure": 4.617}

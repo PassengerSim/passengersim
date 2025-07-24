@@ -3,9 +3,7 @@ import pandas as pd
 from passengersim.config import Config
 
 
-def leg_load_factors(
-    leg_carried: pd.DataFrame, config: Config, passenger_count: str = "carried_all"
-):
+def leg_load_factors(leg_carried: pd.DataFrame, config: Config, passenger_count: str = "carried_all"):
     caps = {}
     carriers = {}
     for leg in config.legs:
@@ -29,16 +27,12 @@ def fig_leg_load_factors(
     if x.legs is not None:
         df_x = x.legs.set_index(["flt_no", "carrier"])[["lf"]]
     else:
-        df_x = leg_load_factors(x.leg_carried, config, passenger_count="carried_all")[
-            ["lf"]
-        ]
+        df_x = leg_load_factors(x.leg_carried, config, passenger_count="carried_all")[["lf"]]
 
     if y.legs is not None:
         df_y = y.legs.set_index(["flt_no", "carrier"])[["lf"]]
     else:
-        df_y = leg_load_factors(y.leg_carried, config, passenger_count="carried_all")[
-            ["lf"]
-        ]
+        df_y = leg_load_factors(y.leg_carried, config, passenger_count="carried_all")[["lf"]]
 
     z = df_x.join(df_y, lsuffix="_x", rsuffix="_y").reset_index()
 
@@ -79,9 +73,7 @@ def fig_leg_load_factors(
     legend = (
         alt.Chart(zz)
         .mark_point(clip=True)
-        .encode(
-            alt.Y(f"{carrier}:N", title="Carrier").axis(orient="right"), color=color
-        )
+        .encode(alt.Y(f"{carrier}:N", title="Carrier").axis(orient="right"), color=color)
         .add_params(selection)
     )
 

@@ -83,11 +83,21 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     """
     Passenger-type randomness factor.
 
-    This factor controls the level of correlation in demand levels across passenger
-    types.
+    Deprecated: use `simple_k_factor` instead.
+
+    This factor add uncorrelated variance to every demand, unless there are
+    multiple demands in the same market and with the same passenger segment.
 
     See [k-factors][demand-generation-k-factors]
     for more details.
+    """
+
+    segment_k_factor: confloat(ge=0, le=5.0) = 0.0
+    """
+    Passenger segment randomness factor.
+
+    This factor controls the level of correlation in demand levels across
+    passenger segments.
     """
 
     simple_k_factor: confloat(ge=0, le=5.0) = 0.40
@@ -99,6 +109,9 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     See [k-factors][demand-generation-k-factors]
     for more details.
     """
+
+    simple_cv100: confloat(ge=0, le=1.0) = 0.0
+    """THIS IS A TEST"""
 
     tf_k_factor: confloat(ge=0) = 0.1
     """
@@ -129,6 +142,16 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     """
 
     prorate_revenue: bool = True
+
+    save_orders: bool = False
+
+    save_all_offers: bool = False
+    """
+    This will save all Offers, including those that would fail fare rules or availability.
+    The output choice set data will have all of these, so you can find first choice demand,
+    recapture, etc.
+    False by default
+    """
 
     dwm_lite: bool = True
     """
@@ -269,6 +292,9 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     APPROXIMATELY this many choice sets (each will have multiple items and all items
     for the choice set will be saved and output)
     """
+
+    capture_choice_set_mkts: list[tuple] | None = []
+    """Capture only these markets (O&D pairs)"""
 
     show_progress_bar: bool = True
     """

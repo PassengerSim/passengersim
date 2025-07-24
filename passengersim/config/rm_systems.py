@@ -15,9 +15,7 @@ RmProcess = ListOfNamed[RmStep]
 class RmSystem(Named, extra="forbid"):
     processes: DictAttr[str, RmProcess]
 
-    availability_control: Literal[
-        "infer", "leg", "cabin", "theft", "bp", "bp_loose", "vn", "none"
-    ] = "infer"
+    availability_control: Literal["infer", "leg", "cabin", "theft", "bp", "bp_loose", "vn", "none"] = "infer"
     """Fare class availability algorithm for carriers using this RmSystem.
 
     The default value will infer the appropriate control based on the steps in
@@ -40,10 +38,17 @@ class RmSystem(Named, extra="forbid"):
     It has no effect on the actual operation of the RM system."""
 
     frat5: str | None = None
-    """Name of the FRAT5 curve to use.
+    """Default Frat5 curve to use for the carrier if not otherwise defined.
 
-    This is the default that will be applied if not found at a more detailed
-    level (e.g. carrier level).
+    Some RM systems strictly require a Frat5 curve to be defined for every
+    carrier and market. This attribute allows the user to define a default
+    Frat5 curve to be used as the global default by any carrier assigned this
+    RM system. If a carrier defines its own global `frat5` then that value will
+    override this default.  If this attribute is set to `None`, then the RM system
+    does not define a default Frat5 curve, and the carrier must define its own
+    `frat5` attribute if necessary. Some RM systems do not require a Frat5 curve
+    to be defined, in which case this attribute can be left as `None` without
+    affecting the operation of the RM system.
     """
 
     @field_validator("processes")

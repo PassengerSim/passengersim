@@ -68,9 +68,7 @@ def test_u10_loader():
     u10_config = Path(__file__).parents[2].joinpath("air-sim/networks/u10-config.yaml")
     if not u10_config.exists():
         pytest.skip("u10-config.yaml not available")
-    u10_network = (
-        Path(__file__).parents[2].joinpath("air-sim/networks/u10-network.yaml.gz")
-    )
+    u10_network = Path(__file__).parents[2].joinpath("air-sim/networks/u10-network.yaml.gz")
     if not u10_network.exists():
         pytest.skip("u10-network.yaml.gz not available")
     with open(u10_config) as f:
@@ -140,7 +138,7 @@ def test_carriers_std_rm():
     content = yaml.safe_load(io.StringIO(demo))
     loaded = Config.model_validate(content)
     assert not loaded.carriers["AL1"].frat5  # no curve on E
-    assert loaded.carriers["AL2"].frat5  # defined on rm_system
+    assert loaded.carriers["AL2"].frat5 == "curve_C"  # inherits from rm_system C
     assert loaded.rm_systems.keys() == {"E", "C"}
 
 

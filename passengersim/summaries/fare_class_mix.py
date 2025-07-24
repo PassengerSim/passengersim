@@ -10,6 +10,8 @@ from .generic import GenericSimulationTables, SimulationTableItem
 from .tools import aggregate_by_summing_dataframe
 
 if TYPE_CHECKING:
+    import altair as alt
+
     from passengersim import Simulation
 
 
@@ -35,9 +37,9 @@ def extract_fare_class_mix(sim: Simulation) -> pd.DataFrame:
             {k: v["revenue"] for k, v in fc.items()},
             name="frequency",
         )
-        result[carrier.name] = pd.concat(
-            [fc_sold, fc_rev], axis=1, keys=["sold", "revenue"]
-        ).rename_axis(index="booking_class")
+        result[carrier.name] = pd.concat([fc_sold, fc_rev], axis=1, keys=["sold", "revenue"]).rename_axis(
+            index="booking_class"
+        )
     if result:
         df = pd.concat(result, axis=0, names=["carrier"])
     else:
@@ -53,9 +55,7 @@ def extract_fare_class_mix(sim: Simulation) -> pd.DataFrame:
 def _fig_fare_class_mix(df: pd.DataFrame, label_threshold: float = 0.06, title=None):
     import altair as alt
 
-    label_threshold_value = (
-        df.groupby("carrier", observed=False).avg_sold.sum().max() * label_threshold
-    )
+    label_threshold_value = df.groupby("carrier", observed=False).avg_sold.sum().max() * label_threshold
     chart = alt.Chart(df, **({"title": title} if title else {})).transform_calculate(
         halfsold="datum.avg_sold / 2.0",
     )
@@ -118,7 +118,26 @@ class SimTabFareClassMix(GenericSimulationTables):
     )
 
     @report_figure
-    def fig_fare_class_mix(self, raw_df=False, label_threshold=0.06):
+    def fig_fare_class_mix(
+        self, *, raw_df: bool = False, also_df: bool = False, label_threshold: float = 0.06
+    ) -> alt.Chart | pd.DataFrame | tuple[alt.Chart, pd.DataFrame]:
+        """
+        Plot the fare class mix data.
+
+        Parameters
+        ----------
+        raw_df : bool, optional
+            If True, return the raw dataframe instead of the figure.
+        also_df : bool, optional
+            If True, return the dataframe as well as the figure.
+        label_threshold : float, optional
+            The threshold for displaying labels on the bars. Default is 0.06.
+
+        Returns
+        -------
+        alt.Chart or pd.DataFrame or tuple[alt.Chart, pd.DataFrame]
+            The fare class mix figure or dataframe.
+        """
         if self.fare_class_mix is not None and self.n_total_samples > 0:
             df = self.fare_class_mix / self.n_total_samples
             df = df.rename(columns={"sold": "avg_sold"})
@@ -128,8 +147,11 @@ class SimTabFareClassMix(GenericSimulationTables):
 
         if raw_df:
             return df
-        return _fig_fare_class_mix(
+        fig = _fig_fare_class_mix(
             df,
             label_threshold=label_threshold,
             title="Fare Class Mix",
         )
+        if also_df:
+            return fig, df
+        return fig

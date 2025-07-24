@@ -36,18 +36,14 @@ def log_to_console(level=None, style: Literal["elapsed", "std"] = "elapsed"):
 
     # avoid creation of multiple stream handlers for logging to console
     for entry in logger.handlers:
-        if (isinstance(entry, logging.StreamHandler)) and (
-            entry.formatter._fmt == CONSOLE_LOG_FORMAT[style]
-        ):
+        if (isinstance(entry, logging.StreamHandler)) and (entry.formatter._fmt == CONSOLE_LOG_FORMAT[style]):
             if level < entry.level:
                 entry.setLevel(level)
             return logger
 
     console_handler = logging.StreamHandler(stream=sys.stdout)
     console_handler.setLevel(level)
-    console_handler.setFormatter(
-        ElapsedTimeFormatter(CONSOLE_LOG_FORMAT[style], style="{")
-    )
+    console_handler.setFormatter(ElapsedTimeFormatter(CONSOLE_LOG_FORMAT[style], style="{"))
     logger.addHandler(console_handler)
 
     return logger
@@ -61,9 +57,7 @@ def log_to_file(filename, level=None):
 
     # avoid creation of multiple file handlers for logging to the same file
     for entry in logger.handlers:
-        if (isinstance(entry, logging.FileHandler)) and (
-            entry.baseFilename == filename
-        ):
+        if (isinstance(entry, logging.FileHandler)) and (entry.baseFilename == filename):
             return logger
 
     file_handler = logging.FileHandler(filename)
@@ -85,14 +79,10 @@ def timing_log(label=""):
     try:
         yield
     except:  # noqa: E722
-        log.critical(
-            f"<TIME ERROR!> {label} <{timesize_stack(time.time() - start_time)}>"
-        )
+        log.critical(f"<TIME ERROR!> {label} <{timesize_stack(time.time() - start_time)}>")
         raise
     else:
-        log.critical(
-            f"< TIME ENDS > {label} <{timesize_stack(time.time() - start_time)}>"
-        )
+        log.critical(f"< TIME ENDS > {label} <{timesize_stack(time.time() - start_time)}>")
 
 
 class TimingLog:
@@ -116,8 +106,7 @@ class TimingLog:
         if self.split_time is not None:
             self.log.log(
                 self.level,
-                f"<SPLIT> {self.label} / Final "
-                f"<{timesize_stack(now - self.split_time)}>",
+                f"<SPLIT> {self.label} / Final " f"<{timesize_stack(now - self.split_time)}>",
             )
         if exc_type is None:
             self.log.log(

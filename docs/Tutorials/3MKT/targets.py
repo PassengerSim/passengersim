@@ -25,15 +25,11 @@ def load(experiment_n: int, config: Config):
     filename = files[experiment_n]
     if not os.path.exists(filename) and os.path.exists(os.path.join("3MKT", filename)):
         filename = os.path.join("3MKT", filename)
-    if not os.path.exists(filename) and os.path.exists(
-        os.path.join("../../../../verification/3MKT", filename)
-    ):
+    if not os.path.exists(filename) and os.path.exists(os.path.join("../../../../verification/3MKT", filename)):
         filename = os.path.join("../../../../verification/3MKT", filename)
     if not os.path.exists(filename):
         raise FileNotFoundError(f"{filename} IN {os.getcwd()}")
     target = vt.pods(filename, config)
     if target.leg_forecasts is not None:
-        target.leg_forecasts.index = target.leg_forecasts.index.set_names(
-            "leg_id", level="flt_no"
-        )
+        target.leg_forecasts.index = target.leg_forecasts.index.set_names("leg_id", level="flt_no")
     return target

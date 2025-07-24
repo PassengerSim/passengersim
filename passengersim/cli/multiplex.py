@@ -29,9 +29,7 @@ def run_task(progress, task_id, job_name: str, config_files: list[str | pathlib.
         cfg.simulation_controls.show_progress_bar = False
         sim = Simulation(cfg)
         sim.sample_done_callback = callback
-        callback(
-            0, cfg.simulation_controls.num_trials * cfg.simulation_controls.num_samples
-        )
+        callback(0, cfg.simulation_controls.num_trials * cfg.simulation_controls.num_samples)
         sim.run(log_reports=False)
     except Exception:
         _logger.exception(f"Error in TASK {task_id}")
@@ -113,17 +111,11 @@ def multi(config_file: pathlib.Path):
                         continue
                     # set visible false so we don't have a lot of bars all at once:
                     task_id = progress.add_task(job_name, visible=False)
-                    futures.append(
-                        executor.submit(run_task, _progress, task_id, job_name, job)
-                    )
+                    futures.append(executor.submit(run_task, _progress, task_id, job_name, job))
 
                 # monitor the progress:
-                while (n_finished := sum([future.done() for future in futures])) < len(
-                    futures
-                ):
-                    progress.update(
-                        overall_progress_task, completed=n_finished, total=len(futures)
-                    )
+                while (n_finished := sum([future.done() for future in futures])) < len(futures):
+                    progress.update(overall_progress_task, completed=n_finished, total=len(futures))
                     for task_id, update_data in _progress.items():
                         latest = update_data["progress"]
                         total = update_data["total"]
@@ -141,6 +133,4 @@ def multi(config_file: pathlib.Path):
 
             # final overall progress update
             n_finished = sum([future.done() for future in futures])
-            progress.update(
-                overall_progress_task, completed=n_finished, total=len(futures)
-            )
+            progress.update(overall_progress_task, completed=n_finished, total=len(futures))

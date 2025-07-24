@@ -55,8 +55,6 @@ class BookingCurve(Named, extra="forbid"):
         sorted_days_prior = reversed(sorted(v.keys()))
         i = 0
         for days_prior in sorted_days_prior:
-            assert (
-                v[days_prior] >= i
-            ), f"booking curve {info.data['name']} moves backwards at dcp {days_prior}"
+            assert v[days_prior] >= i, f"booking curve {info.data['name']} moves backwards at dcp {days_prior}"
             i = v[days_prior]
         return v

@@ -71,9 +71,7 @@ class SummaryTables:
             burn_samples = config.simulation_controls.burn_samples
         except AttributeError:
             scenario = config.get("scenario", "unknown")
-            burn_samples = config.get("simulation_controls", {}).get(
-                "burn_samples", 100
-            )
+            burn_samples = config.get("simulation_controls", {}).get("burn_samples", 100)
 
         summary.load_additional_tables(
             db,
@@ -184,16 +182,10 @@ class SummaryTables:
 
         # demands has some columns that are averages and some that are sums
         demands_avg = sum(
-            s.demands.set_index(["orig", "dest", "segment"])[
-                ["sold", "revenue", "avg_fare"]
-            ]
-            for s in summaries
+            s.demands.set_index(["orig", "dest", "segment"])[["sold", "revenue", "avg_fare"]] for s in summaries
         ) / len(summaries)
         demands_sum = sum(
-            s.demands.set_index(["orig", "dest", "segment"])[
-                ["gt_demand", "gt_sold", "gt_revenue"]
-            ]
-            for s in summaries
+            s.demands.set_index(["orig", "dest", "segment"])[["gt_demand", "gt_sold", "gt_revenue"]] for s in summaries
         )
         demands = pd.concat([demands_avg, demands_sum], axis=1).reset_index()
 
@@ -226,18 +218,14 @@ class SummaryTables:
 
         # these are averages, but need to have the index values excluded
         # TODO: the index values should be set properly on the original dataframes
-        carriers = sum(s.carriers.set_index("carrier") for s in summaries) / len(
+        carriers = sum(s.carriers.set_index("carrier") for s in summaries) / len(summaries)
+        legs = sum(s.legs.set_index(["carrier", "leg_id", "flt_no", "orig", "dest"]) for s in summaries) / len(
             summaries
         )
-        legs = sum(
-            s.legs.set_index(["carrier", "leg_id", "flt_no", "orig", "dest"])
-            for s in summaries
-        ) / len(summaries)
         legs = legs.reset_index()
-        paths = sum(
-            s.paths.set_index(["orig", "dest", "carrier1", "leg_id1", "carrier2"])
-            for s in summaries
-        ) / len(summaries)
+        paths = sum(s.paths.set_index(["orig", "dest", "carrier1", "leg_id1", "carrier2"]) for s in summaries) / len(
+            summaries
+        )
 
         def average(name):
             frames = []
@@ -425,15 +413,11 @@ class SummaryTables:
 
         if "fare_class_mix" in additional and db.is_open:
             logger.info("loading fare_class_mix")
-            self.fare_class_mix = database.common_queries.fare_class_mix(
-                db, scenario, burn_samples=burn_samples
-            )
+            self.fare_class_mix = database.common_queries.fare_class_mix(db, scenario, burn_samples=burn_samples)
             if self.od_fare_class_mix:
                 for orig, dest in list(self.od_fare_class_mix):
-                    self.od_fare_class_mix[(orig, dest)] = (
-                        database.common_queries.od_fare_class_mix(
-                            db, orig, dest, scenario, burn_samples=burn_samples
-                        )
+                    self.od_fare_class_mix[(orig, dest)] = database.common_queries.od_fare_class_mix(
+                        db, orig, dest, scenario, burn_samples=burn_samples
                     )
         # load additional fare class mix tables
         for i in additional:
@@ -442,31 +426,23 @@ class SummaryTables:
                 if self.od_fare_class_mix is None:
                     self.od_fare_class_mix = {}
                 logger.info(f"loading od_fare_class_mix({orig},{dest})")
-                self.od_fare_class_mix[(orig, dest)] = (
-                    database.common_queries.od_fare_class_mix(
-                        db, orig, dest, scenario, burn_samples=burn_samples
-                    )
+                self.od_fare_class_mix[(orig, dest)] = database.common_queries.od_fare_class_mix(
+                    db, orig, dest, scenario, burn_samples=burn_samples
                 )
 
         for i in additional:
             cutoffs = None
             if i == "load_factor_distribution" and db.is_open:
                 cutoffs = (0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95)  # default cutoffs
-            elif (
-                isinstance(i, tuple)
-                and i[0] == "load_factor_distribution"
-                and db.is_open
-            ):
+            elif isinstance(i, tuple) and i[0] == "load_factor_distribution" and db.is_open:
                 cutoffs = ast.literal_eval(i[1])
             if cutoffs is not None:
                 logger.info("loading load_factor_distribution")
-                self.load_factor_distribution = (
-                    database.common_queries.load_factor_distribution(
-                        db,
-                        scenario=scenario,
-                        burn_samples=burn_samples,
-                        cutoffs=cutoffs,
-                    )
+                self.load_factor_distribution = database.common_queries.load_factor_distribution(
+                    db,
+                    scenario=scenario,
+                    burn_samples=burn_samples,
+                    cutoffs=cutoffs,
                 )
 
         if "bookings_by_timeframe" in additional and db.is_open:
@@ -477,15 +453,11 @@ class SummaryTables:
 
         if "total_demand" in additional and db.is_open:
             logger.info("loading total_demand")
-            self.total_demand = database.common_queries.total_demand(
-                db, scenario=scenario, burn_samples=burn_samples
-            )
+            self.total_demand = database.common_queries.total_demand(db, scenario=scenario, burn_samples=burn_samples)
 
         if "leg_forecasts" in additional and db.is_open:
             logger.info("loading leg_forecasts")
-            self.leg_forecasts = database.common_queries.leg_forecasts(
-                db, scenario=scenario, burn_samples=burn_samples
-            )
+            self.leg_forecasts = database.common_queries.leg_forecasts(db, scenario=scenario, burn_samples=burn_samples)
 
         if "path_forecasts" in additional and db.is_open:
             logger.info("loading path_forecasts")
@@ -495,15 +467,11 @@ class SummaryTables:
 
         if "demand_to_come" in additional and db.is_open:
             logger.info("loading demand_to_come")
-            self.demand_to_come = database.common_queries.demand_to_come(
-                db, scenario=scenario
-            )
+            self.demand_to_come = database.common_queries.demand_to_come(db, scenario=scenario)
 
         if "demand_to_come_summary" in additional and db.is_open:
             logger.info("loading demand_to_come_summary")
-            self.demand_to_come_summary = (
-                database.common_queries.demand_to_come_summary(db, scenario=scenario)
-            )
+            self.demand_to_come_summary = database.common_queries.demand_to_come_summary(db, scenario=scenario)
 
         if "carrier_history" in additional and db.is_open:
             logger.info("loading carrier_history")
@@ -537,9 +505,7 @@ class SummaryTables:
 
         if "edgar" in additional and db.is_open:
             logger.info("loading edgar")
-            self.edgar = database.common_queries.edgar(
-                db, scenario=scenario, burn_samples=burn_samples
-            )
+            self.edgar = database.common_queries.edgar(db, scenario=scenario, burn_samples=burn_samples)
 
     def __init__(
         self,
@@ -757,17 +723,11 @@ class SummaryTables:
             report.add_figure(fig)
         return fig
 
-    def _fig_fare_class_mix(
-        self, df: pd.DataFrame, label_threshold: float = 0.06, title=None
-    ):
+    def _fig_fare_class_mix(self, df: pd.DataFrame, label_threshold: float = 0.06, title=None):
         import altair as alt
 
-        label_threshold_value = (
-            df.groupby("carrier", observed=False).avg_sold.sum().max() * label_threshold
-        )
-        chart = alt.Chart(
-            df, **({"title": title} if title else {})
-        ).transform_calculate(
+        label_threshold_value = df.groupby("carrier", observed=False).avg_sold.sum().max() * label_threshold
+        chart = alt.Chart(df, **({"title": title} if title else {})).transform_calculate(
             halfsold="datum.avg_sold / 2.0",
         )
         bars = chart.mark_bar().encode(
@@ -810,9 +770,7 @@ class SummaryTables:
     @report_figure
     def fig_fare_class_mix(self, raw_df=False, label_threshold=0.06):
         if self.fare_class_mix is not None:
-            df = self.fare_class_mix.reset_index()[
-                ["carrier", "booking_class", "avg_sold"]
-            ]
+            df = self.fare_class_mix.reset_index()[["carrier", "booking_class", "avg_sold"]]
         elif self.raw_fare_class_mix is not None and self.n_total_samples > 0:
             df = self.raw_fare_class_mix / self.n_total_samples
             df = df.rename(columns={"sold": "avg_sold"})
@@ -829,17 +787,11 @@ class SummaryTables:
         )
 
     @report_figure
-    def fig_od_fare_class_mix(
-        self, orig: str, dest: str, raw_df=False, label_threshold=0.06
-    ):
-        df = self.od_fare_class_mix[orig, dest].reset_index()[
-            ["carrier", "booking_class", "avg_sold"]
-        ]
+    def fig_od_fare_class_mix(self, orig: str, dest: str, raw_df=False, label_threshold=0.06):
+        df = self.od_fare_class_mix[orig, dest].reset_index()[["carrier", "booking_class", "avg_sold"]]
         if raw_df:
             return df
-        return self._fig_fare_class_mix(
-            df, label_threshold=label_threshold, title=f"Fare Class Mix ({orig}-{dest})"
-        )
+        return self._fig_fare_class_mix(df, label_threshold=label_threshold, title=f"Fare Class Mix ({orig}-{dest})")
 
     @report_figure
     def fig_load_factor_distribution(
@@ -898,8 +850,7 @@ class SummaryTables:
             if source == "raw":
                 if self.raw_load_factor_distribution is None:
                     raise AttributeError(
-                        "raw_load_factor_distribution not found, "
-                        "it is required for using raw source data."
+                        "raw_load_factor_distribution not found, " "it is required for using raw source data."
                     )
                 df_for_chart = (
                     self.raw_load_factor_distribution.rename_axis(columns="carrier")
@@ -911,8 +862,7 @@ class SummaryTables:
             elif source == "leg_avg":
                 if self.leg_avg_load_factor_distribution is None:
                     raise AttributeError(
-                        "leg_avg_load_factor_distribution not found, "
-                        "it is required for using leg_avg source data."
+                        "leg_avg_load_factor_distribution not found, " "it is required for using leg_avg source data."
                     )
                 df_for_chart = (
                     self.leg_avg_load_factor_distribution.rename_axis(columns="carrier")
@@ -952,35 +902,23 @@ class SummaryTables:
                 right=False,
                 labels=labels,
             ).rename("Load Factor Range")
-            df_for_chart = (
-                df_for_chart.groupby(["carrier", breaker], observed=False)
-                .Count.sum()
-                .reset_index()
-            )
+            df_for_chart = df_for_chart.groupby(["carrier", breaker], observed=False).Count.sum().reset_index()
 
         elif source == "db":
             # Older load factor distribution table, taken from database
             if not hasattr(self, "load_factor_distribution"):
-                raise AttributeError(
-                    "load_factor_distribution data not found. Please load it first."
-                )
+                raise AttributeError("load_factor_distribution data not found. Please load it first.")
 
             df_for_chart = self.load_factor_distribution
             df_for_chart.columns.names = ["Load Factor Range"]
             df_for_chart = df_for_chart.set_index("carrier")
-            df_for_chart = (
-                df_for_chart.stack(future_stack=True).rename("Count").reset_index()
-            )
+            df_for_chart = df_for_chart.stack(future_stack=True).rename("Count").reset_index()
 
         else:
             raise ValueError(f"Unknown source {source}, should be 'raw' or 'db'")
 
         if not by_carrier:
-            df_for_chart = (
-                df_for_chart.groupby(["Load Factor Range"], observed=False)
-                .Count.sum()
-                .reset_index()
-            )
+            df_for_chart = df_for_chart.groupby(["Load Factor Range"], observed=False).Count.sum().reset_index()
         elif isinstance(by_carrier, str):
             df_for_chart = df_for_chart[df_for_chart["carrier"] == by_carrier]
             df_for_chart = df_for_chart.drop(columns=["carrier"])
@@ -1066,8 +1004,7 @@ class SummaryTables:
         title = "Local Fraction Frequency"  # default title
         if self.leg_local_fraction_distribution is None:
             raise AttributeError(
-                "leg_local_fraction_distribution not found, "
-                "it is required for using raw source data."
+                "leg_local_fraction_distribution not found, " "it is required for using raw source data."
             )
         df_for_chart = (
             self.leg_local_fraction_distribution.rename_axis(columns="carrier")
@@ -1107,18 +1044,10 @@ class SummaryTables:
             right=False,
             labels=labels,
         ).rename("Leg Local Fraction Range")
-        df_for_chart = (
-            df_for_chart.groupby(["carrier", breaker], observed=False)
-            .Count.sum()
-            .reset_index()
-        )
+        df_for_chart = df_for_chart.groupby(["carrier", breaker], observed=False).Count.sum().reset_index()
 
         if not by_carrier:
-            df_for_chart = (
-                df_for_chart.groupby(["Leg Local Fraction Range"], observed=False)
-                .Count.sum()
-                .reset_index()
-            )
+            df_for_chart = df_for_chart.groupby(["Leg Local Fraction Range"], observed=False).Count.sum().reset_index()
         elif isinstance(by_carrier, str):
             df_for_chart = df_for_chart[df_for_chart["carrier"] == by_carrier]
             df_for_chart = df_for_chart.drop(columns=["carrier"])
@@ -1133,9 +1062,7 @@ class SummaryTables:
                 alt.Chart(df_for_chart)
                 .mark_bar()
                 .encode(
-                    x=alt.X(
-                        "Leg Local Fraction Range", title="Leg Local Fraction Range"
-                    ),
+                    x=alt.X("Leg Local Fraction Range", title="Leg Local Fraction Range"),
                     y=alt.Y("Count:Q", title="Count"),
                     facet=alt.Facet("carrier:N", columns=2, title="Carrier"),
                     tooltip=[
@@ -1150,9 +1077,7 @@ class SummaryTables:
                 alt.Chart(df_for_chart)
                 .mark_bar()
                 .encode(
-                    x=alt.X(
-                        "Leg Local Fraction Range", title="Leg Local Fraction Range"
-                    ),
+                    x=alt.X("Leg Local Fraction Range", title="Leg Local Fraction Range"),
                     y=alt.Y("Count:Q", title="Count"),
                 )
                 .properties(
@@ -1175,9 +1100,7 @@ class SummaryTables:
         if errorbands:
             if by_carrier is True:
                 raise NotImplementedError("error bands for all carriers is messy")
-            return self._fig_bookings_by_timeframe_errorband(
-                by_carrier=by_carrier, raw_df=raw_df
-            )
+            return self._fig_bookings_by_timeframe_errorband(by_carrier=by_carrier, raw_df=raw_df)
 
         def differs(x):
             return x.shift(-1, fill_value=0) - x
@@ -1204,9 +1127,7 @@ class SummaryTables:
                 )
             else:
                 y = (
-                    x.groupby(["trial", "carrier", "days_prior"], observed=False)[
-                        f"avg_{c}"
-                    ]
+                    x.groupby(["trial", "carrier", "days_prior"], observed=False)[f"avg_{c}"]
                     .sum()
                     .unstack(["trial", "carrier"])
                     .sort_index(ascending=False)
@@ -1239,11 +1160,7 @@ class SummaryTables:
             g = ["days_prior", "paxtype"]
             if by_class:
                 g += ["booking_class"]
-            df = (
-                df.groupby(g, observed=False)[["sold", "ci0", "ci1"]]
-                .sum()
-                .reset_index()
-            )
+            df = df.groupby(g, observed=False)[["sold", "ci0", "ci1"]].sum().reset_index()
         if isinstance(by_carrier, str):
             df = df[df["carrier"] == by_carrier]
             df = df.drop(columns=["carrier"])
@@ -1279,13 +1196,9 @@ class SummaryTables:
                 .mark_bar()
                 .encode(
                     color=alt.Color(color).title(color_title),
-                    x=alt.X("days_prior:O")
-                    .scale(reverse=True)
-                    .title("Days Prior to Departure"),
+                    x=alt.X("days_prior:O").scale(reverse=True).title("Days Prior to Departure"),
                     y=alt.Y("sold"),
-                    tooltip=(
-                        [alt.Tooltip("carrier").title("Carrier")] if by_carrier else []
-                    )
+                    tooltip=([alt.Tooltip("carrier").title("Carrier")] if by_carrier else [])
                     + [
                         alt.Tooltip("paxtype", title="Passenger Type"),
                         alt.Tooltip("days_prior", title="DfD"),
@@ -1307,14 +1220,10 @@ class SummaryTables:
                 .mark_line()
                 .encode(
                     color=alt.Color(color).title(color_title),
-                    x=alt.X("days_prior:O")
-                    .scale(reverse=True)
-                    .title("Days Prior to Departure"),
+                    x=alt.X("days_prior:O").scale(reverse=True).title("Days Prior to Departure"),
                     y=alt.Y("sold") if by_class else "sold",
                     strokeDash=alt.StrokeDash("paxtype").title("Passenger Type"),
-                    tooltip=(
-                        [alt.Tooltip("carrier").title("Carrier")] if by_carrier else []
-                    )
+                    tooltip=([alt.Tooltip("carrier").title("Carrier")] if by_carrier else [])
                     + [
                         alt.Tooltip("paxtype", title="Passenger Type"),
                         alt.Tooltip("days_prior", title="DfD"),
@@ -1336,9 +1245,7 @@ class SummaryTables:
             )
         return chart
 
-    def _fig_bookings_by_timeframe_errorband(
-        self, by_carrier: bool | str = True, raw_df=False
-    ):
+    def _fig_bookings_by_timeframe_errorband(self, by_carrier: bool | str = True, raw_df=False):
         def differs(x):
             return x.shift(-1, fill_value=0) - x
 
@@ -1346,9 +1253,7 @@ class SummaryTables:
 
         def _summarize(x, c):
             y = (
-                x.groupby(["trial", "carrier", "days_prior"], observed=False)[
-                    f"avg_{c}"
-                ]
+                x.groupby(["trial", "carrier", "days_prior"], observed=False)[f"avg_{c}"]
                 .sum()
                 .unstack(["trial", "carrier"])
                 .sort_index(ascending=False)
@@ -1364,20 +1269,9 @@ class SummaryTables:
 
         df0 = _summarize(b, "business")
         df1 = _summarize(b, "leisure")
-        df = (
-            pd.concat([df0, df1], axis=0)
-            .rename(columns={"mean": "sold"})
-            .reset_index()
-            .query("days_prior>0")
-        )
+        df = pd.concat([df0, df1], axis=0).rename(columns={"mean": "sold"}).reset_index().query("days_prior>0")
         if not by_carrier:
-            df = (
-                df.groupby(["days_prior", "paxtype"], observed=False)[
-                    ["sold", "ci0", "ci1"]
-                ]
-                .sum()
-                .reset_index()
-            )
+            df = df.groupby(["days_prior", "paxtype"], observed=False)[["sold", "ci0", "ci1"]].sum().reset_index()
         if isinstance(by_carrier, str):
             df = df[df["carrier"] == by_carrier]
             df = df.drop(columns=["carrier"])
@@ -1391,9 +1285,7 @@ class SummaryTables:
             color=alt.Color("carrier:N" if by_carrier else "paxtype").title(
                 "Carrier" if by_carrier else "Passenger Type"
             ),
-            x=alt.X("days_prior:O")
-            .scale(reverse=True)
-            .title("Days Prior to Departure"),
+            x=alt.X("days_prior:O").scale(reverse=True).title("Days Prior to Departure"),
             y="sold",
             strokeDash=alt.StrokeDash("paxtype").title("Passenger Type"),
             tooltip=([alt.Tooltip("carrier").title("Carrier")] if by_carrier else [])
@@ -1408,9 +1300,7 @@ class SummaryTables:
                 "carrier:N" if by_carrier else "paxtype",
                 title="Carrier" if by_carrier else "Passenger Type",
             ),
-            x=alt.X("days_prior:O")
-            .scale(reverse=True)
-            .title("Days Prior to Departure"),
+            x=alt.X("days_prior:O").scale(reverse=True).title("Days Prior to Departure"),
             y="ci0",
             y2="ci1",
             strokeDash=alt.StrokeDash("paxtype").title("Passenger Type"),
@@ -1460,13 +1350,7 @@ class SummaryTables:
                 g += ["booking_class"]
             df = df.groupby(g, observed=False)[[metric]].sum().reset_index()
         if by_carrier and not by_class:
-            df = (
-                df.groupby(["carrier", "days_prior", "segment"], observed=False)[
-                    [metric]
-                ]
-                .sum()
-                .reset_index()
-            )
+            df = df.groupby(["carrier", "days_prior", "segment"], observed=False)[[metric]].sum().reset_index()
         if isinstance(by_carrier, str):
             df = df[df["carrier"] == by_carrier]
             df = df.drop(columns=["carrier"])
@@ -1506,18 +1390,10 @@ class SummaryTables:
             .mark_bar()
             .encode(
                 color=alt.Color(color).title(color_title),
-                x=alt.X("days_prior:O")
-                .scale(reverse=True)
-                .title("Days Prior to Departure"),
+                x=alt.X("days_prior:O").scale(reverse=True).title("Days Prior to Departure"),
                 y=alt.Y(metric),
-                tooltip=(
-                    [alt.Tooltip("carrier").title("Carrier")] if by_carrier else []
-                )
-                + (
-                    [alt.Tooltip("booking_class").title("Booking Class")]
-                    if by_class
-                    else []
-                )
+                tooltip=([alt.Tooltip("carrier").title("Carrier")] if by_carrier else [])
+                + ([alt.Tooltip("booking_class").title("Booking Class")] if by_class else [])
                 + [
                     alt.Tooltip("segment", title="Passenger Type"),
                     alt.Tooltip("days_prior", title="Days Prior"),
@@ -1544,6 +1420,7 @@ class SummaryTables:
         measure_format: str = ".2f",
         orient: Literal["h", "v"] = "h",
         title: str | None = None,
+        also_df: bool = False,
     ):
         df = self.carriers.reset_index()[["carrier", load_measure]]
         if raw_df:
@@ -1557,9 +1434,7 @@ class SummaryTables:
                 y=alt.Y(f"{load_measure}:Q", title=measure_name).stack("zero"),
                 tooltip=[
                     alt.Tooltip("carrier", title="Carrier"),
-                    alt.Tooltip(
-                        f"{load_measure}:Q", title=measure_name, format=measure_format
-                    ),
+                    alt.Tooltip(f"{load_measure}:Q", title=measure_name, format=measure_format),
                 ],
             )
             text = chart.mark_text(dx=0, dy=3, color="white", baseline="top").encode(
@@ -1573,14 +1448,10 @@ class SummaryTables:
                 x=alt.X(f"{load_measure}:Q", title=measure_name).stack("zero"),
                 tooltip=[
                     alt.Tooltip("carrier", title="Carrier"),
-                    alt.Tooltip(
-                        f"{load_measure}:Q", title=measure_name, format=measure_format
-                    ),
+                    alt.Tooltip(f"{load_measure}:Q", title=measure_name, format=measure_format),
                 ],
             )
-            text = chart.mark_text(
-                dx=-5, dy=0, color="white", baseline="middle", align="right"
-            ).encode(
+            text = chart.mark_text(dx=-5, dy=0, color="white", baseline="middle", align="right").encode(
                 y=alt.Y("carrier:N", title="Carrier"),
                 x=alt.X(f"{load_measure}:Q", title=measure_name).stack("zero"),
                 text=alt.Text(f"{load_measure}:Q", format=measure_format),
@@ -1602,38 +1473,39 @@ class SummaryTables:
         )
         if title:
             fig.title = title
+        if also_df:
+            return fig, df
         return fig
 
     @report_figure
     def fig_carrier_load_factors(
-        self, raw_df=False, load_measure: Literal["sys_lf", "avg_leg_lf"] = "sys_lf"
+        self, raw_df=False, load_measure: Literal["sys_lf", "avg_leg_lf"] = "sys_lf", also_df: bool = False
     ):
-        measure_name = (
-            "System Load Factor" if load_measure == "sys_lf" else "Leg Load Factor"
-        )
+        measure_name = "System Load Factor" if load_measure == "sys_lf" else "Leg Load Factor"
         return self._fig_carrier_load_factors(
             raw_df,
             load_measure,
             measure_name,
             title=f"Carrier {measure_name}s",
+            also_df=also_df,
         )
 
     @report_figure
-    def fig_carrier_revenues(self, raw_df=False):
+    def fig_carrier_revenues(self, raw_df=False, also_df: bool = False):
         return self._fig_carrier_load_factors(
-            raw_df, "avg_rev", "Average Revenue", "$.4s", title="Carrier Revenues"
+            raw_df, "avg_rev", "Average Revenue", "$.4s", title="Carrier Revenues", also_df=also_df
         )
 
     @report_figure
-    def fig_carrier_yields(self, raw_df=False):
+    def fig_carrier_yields(self, raw_df=False, also_df: bool = False):
         return self._fig_carrier_load_factors(
-            raw_df, "yield", "Average Yield", "$.4f", title="Carrier Yields"
+            raw_df, "yield", "Average Yield", "$.4f", title="Carrier Yields", also_df=also_df
         )
 
     @report_figure
-    def fig_carrier_total_bookings(self, raw_df=False):
+    def fig_carrier_total_bookings(self, raw_df=False, also_df: bool = False):
         return self._fig_carrier_load_factors(
-            raw_df, "sold", "Total Bookings", ".4s", title="Carrier Total Bookings"
+            raw_df, "sold", "Total Bookings", ".4s", title="Carrier Total Bookings", also_df=also_df
         )
 
     def _fig_forecasts(
@@ -1647,9 +1519,7 @@ class SummaryTables:
         import altair as alt
 
         encoding = dict(
-            x=alt.X("days_prior:O")
-            .scale(reverse=True)
-            .title("Days Prior to Departure"),
+            x=alt.X("days_prior:O").scale(reverse=True).title("Days Prior to Departure"),
             y=alt.Y(f"{y}:Q", title=y_title),
         )
         if color:
@@ -1761,6 +1631,7 @@ class SummaryTables:
         show_stdev: float | bool | None = None,
         cap: Literal["some", "zero", None] = None,
         raw_df=False,
+        also_df: bool = False,
     ):
         if cap is None:
             bp_mean = "bid_price_mean"
@@ -1782,18 +1653,14 @@ class SummaryTables:
             if show_stdev is True:
                 show_stdev = 2
             df["bid_price_upper"] = df[bp_mean] + show_stdev * df["bid_price_stdev"]
-            df["bid_price_lower"] = (
-                df[bp_mean] - show_stdev * df["bid_price_stdev"]
-            ).clip(0, None)
+            df["bid_price_lower"] = (df[bp_mean] - show_stdev * df["bid_price_stdev"]).clip(0, None)
         if raw_df:
             return df
 
         import altair as alt
 
         line_encoding = dict(
-            x=alt.X("days_prior:Q")
-            .scale(reverse=True)
-            .title("Days Prior to Departure"),
+            x=alt.X("days_prior:Q").scale(reverse=True).title("Days Prior to Departure"),
             y=alt.Y(bp_mean, title="Bid Price"),
         )
         if color:
@@ -1802,9 +1669,7 @@ class SummaryTables:
         fig = chart.mark_line(interpolate="step-before").encode(**line_encoding)
         if show_stdev:
             area_encoding = dict(
-                x=alt.X("days_prior:Q")
-                .scale(reverse=True)
-                .title("Days Prior to Departure"),
+                x=alt.X("days_prior:Q").scale(reverse=True).title("Days Prior to Departure"),
                 y=alt.Y("bid_price_lower:Q", title="Bid Price"),
                 y2=alt.Y2("bid_price_upper:Q", title="Bid Price"),
             )
@@ -1812,28 +1677,19 @@ class SummaryTables:
                 opacity=0.1,
                 interpolate="step-before",
             ).encode(**area_encoding)
-            bound_line = chart.mark_line(
-                opacity=0.4, strokeDash=[5, 5], interpolate="step-before"
-            ).encode(
-                x=alt.X("days_prior:Q")
-                .scale(reverse=True)
-                .title("Days Prior to Departure")
+            bound_line = chart.mark_line(opacity=0.4, strokeDash=[5, 5], interpolate="step-before").encode(
+                x=alt.X("days_prior:Q").scale(reverse=True).title("Days Prior to Departure")
             )
-            top_line = bound_line.encode(
-                y=alt.Y("bid_price_lower:Q", title="Bid Price")
-            )
-            bottom_line = bound_line.encode(
-                y=alt.Y("bid_price_upper:Q", title="Bid Price")
-            )
+            top_line = bound_line.encode(y=alt.Y("bid_price_lower:Q", title="Bid Price"))
+            bottom_line = bound_line.encode(y=alt.Y("bid_price_upper:Q", title="Bid Price"))
             fig = fig + bound + top_line + bottom_line
+        if also_df:
+            return fig, df
         return fig
 
     @report_figure
     def fig_displacement_history(
-        self,
-        by_carrier: bool | str = True,
-        show_stdev: float | bool | None = None,
-        raw_df=False,
+        self, by_carrier: bool | str = True, show_stdev: float | bool | None = None, raw_df=False, also_df: bool = False
     ):
         df = self.displacement_history.reset_index()
         color = None
@@ -1846,21 +1702,15 @@ class SummaryTables:
         if show_stdev:
             if show_stdev is True:
                 show_stdev = 2
-            df["displacement_upper"] = (
-                df["displacement_mean"] + show_stdev * df["displacement_stdev"]
-            )
-            df["displacement_lower"] = (
-                df["displacement_mean"] - show_stdev * df["displacement_stdev"]
-            ).clip(0, None)
+            df["displacement_upper"] = df["displacement_mean"] + show_stdev * df["displacement_stdev"]
+            df["displacement_lower"] = (df["displacement_mean"] - show_stdev * df["displacement_stdev"]).clip(0, None)
         if raw_df:
             return df
 
         import altair as alt
 
         line_encoding = dict(
-            x=alt.X("days_prior:Q")
-            .scale(reverse=True)
-            .title("Days Prior to Departure"),
+            x=alt.X("days_prior:Q").scale(reverse=True).title("Days Prior to Departure"),
             y=alt.Y("displacement_mean", title="Displacement Cost"),
         )
         if color:
@@ -1869,9 +1719,7 @@ class SummaryTables:
         fig = chart.mark_line(interpolate="step-before").encode(**line_encoding)
         if show_stdev:
             area_encoding = dict(
-                x=alt.X("days_prior:Q")
-                .scale(reverse=True)
-                .title("Days Prior to Departure"),
+                x=alt.X("days_prior:Q").scale(reverse=True).title("Days Prior to Departure"),
                 y=alt.Y("displacement_lower:Q", title="Displacement Cost"),
                 y2=alt.Y2("displacement_upper:Q", title="Displacement Cost"),
             )
@@ -1879,18 +1727,12 @@ class SummaryTables:
                 opacity=0.1,
                 interpolate="step-before",
             ).encode(**area_encoding)
-            bound_line = chart.mark_line(
-                opacity=0.4, strokeDash=[5, 5], interpolate="step-before"
-            ).encode(
-                x=alt.X("days_prior:Q")
-                .scale(reverse=True)
-                .title("Days Prior to Departure")
+            bound_line = chart.mark_line(opacity=0.4, strokeDash=[5, 5], interpolate="step-before").encode(
+                x=alt.X("days_prior:Q").scale(reverse=True).title("Days Prior to Departure")
             )
-            top_line = bound_line.encode(
-                y=alt.Y("displacement_lower:Q", title="Displacement Cost")
-            )
-            bottom_line = bound_line.encode(
-                y=alt.Y("displacement_upper:Q", title="Displacement Cost")
-            )
+            top_line = bound_line.encode(y=alt.Y("displacement_lower:Q", title="Displacement Cost"))
+            bottom_line = bound_line.encode(y=alt.Y("displacement_upper:Q", title="Displacement Cost"))
             fig = fig + bound + top_line + bottom_line
+        if also_df:
+            return fig, df
         return fig

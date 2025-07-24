@@ -21,6 +21,7 @@ import pandas as pd
 from . import (
     bid_price_history,
     carriers,
+    cp_segmentation,
     demand_to_come,
     demands,
     displacement_history,
@@ -87,10 +88,7 @@ class SimulationTables(*GenericSimulationTables.subclasses()):
         else:
             date_string = datetime.fromisoformat(timestamp).strftime("%Y-%m-%d")
             time_created = f" created on {date_string}"
-        return (
-            f"<passengersim.summaries.SimulationTables{time_created}>\n"
-            f"{table_info}\n<*>"
-        )
+        return f"<passengersim.summaries.SimulationTables{time_created}>\n" f"{table_info}\n<*>"
 
     def dashboard(self):
         """Return a dashboard object for this SimulationTables instance."""

@@ -1,11 +1,10 @@
 import json
 import multiprocessing
-import os
 import pathlib
 import time
 import warnings
 from contextlib import nullcontext
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from rich.progress import (
     BarColumn,
@@ -23,6 +22,7 @@ from .summaries import GenericSimulationTables, SimulationTables
 from .summary import SummaryTables
 from .utils import multiproc
 from .utils.caffeine import keep_awake
+from .utils.tempdir import MaybeTemporaryDirectory
 
 
 class ThrottledUpdater:
@@ -54,21 +54,11 @@ def _subprocess_run_trial(
     callbacks=None,
 ):
     cfg = Config.model_validate(json.loads(cfg_json))
-    if (
-        cfg.db is not None
-        and cfg.db.filename is not None
-        and str(cfg.db.filename) != ":memory:"
-    ):
-        cfg.db.filename = cfg.db.filename.with_suffix(
-            f".trial{trial_id:02}" + cfg.db.filename.suffix
-        )
-    if output_dir is None:
-        import tempfile
+    if cfg.db is not None and cfg.db.filename is not None and str(cfg.db.filename) != ":memory:":
+        cfg.db.filename = cfg.db.filename.with_suffix(f".trial{trial_id:02}" + cfg.db.filename.suffix)
+    output_dir = MaybeTemporaryDirectory(output_dir)
 
-        _tempdir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
-        output_dir = os.path.join(_tempdir.name, f"passengersim-trial-{trial_id:02}")
-
-    sim = Simulation(cfg, output_dir)
+    sim = Simulation(cfg, output_dir.joinpath(f"passengersim-trial-{trial_id:02}"))
     if callbacks is not None:
         for cb in callbacks.get("begin_sample_callbacks", []):
             sim.begin_sample_callback(cb)
@@ -143,9 +133,7 @@ class MultiSimulation(BaseSimulation, CallbackMixin):
             except ImportError:
                 raw_license_certificate = None
             self.config.raw_license_certificate = raw_license_certificate
-        return self.config.model_dump_json(
-            exclude={"outputs": {"html", "pickle", "excel", "log_reports"}}
-        )
+        return self.config.model_dump_json(exclude={"outputs": {"html", "pickle", "excel", "log_reports"}})
 
     def run(
         self,
@@ -176,7 +164,7 @@ class MultiSimulation(BaseSimulation, CallbackMixin):
         SimulationTables or subclass
         """
         run_start = time.time()
-        run_start_str = datetime.fromtimestamp(run_start, timezone.utc).isoformat()
+        run_start_str = datetime.fromtimestamp(run_start, UTC).isoformat()
 
         progress_queue = multiprocessing.Queue()
         processes = []
@@ -205,10 +193,7 @@ class MultiSimulation(BaseSimulation, CallbackMixin):
         with keep_awake():
             with progress_context as progress:
                 task_progress_ids = {
-                    task_id: progress.add_task(
-                        f"[green]Trial {task_id}", total=num_samples
-                    )
-                    for task_id in task_ids
+                    task_id: progress.add_task(f"[green]Trial {task_id}", total=num_samples) for task_id in task_ids
                 }
 
                 try:
@@ -223,10 +208,7 @@ class MultiSimulation(BaseSimulation, CallbackMixin):
                         )
                         processes.append(p)
 
-                    while (
-                        n_processes_started < max_processes
-                        and n_processes_started < len(processes)
-                    ):
+                    while n_processes_started < max_processes and n_processes_started < len(processes):
                         processes[n_processes_started].start()
                         n_processes_started += 1
 
@@ -281,14 +263,11 @@ class MultiSimulation(BaseSimulation, CallbackMixin):
         result._metadata["time.started"] = run_start_str
         run_finished = time.time()
         result._metadata["time.runtime"] = run_finished - run_start
-        result._metadata["time.finished"] = datetime.fromtimestamp(
-            run_finished, timezone.utc
-        ).isoformat()
+        result._metadata["time.finished"] = datetime.fromtimestamp(run_finished, UTC).isoformat()
 
         # write output files if designated
         if self.config.outputs.html and (
-            self.config.outputs.disk is True
-            or self.config.outputs.html.filename == self.config.outputs.disk
+            self.config.outputs.disk is True or self.config.outputs.html.filename == self.config.outputs.disk
         ):
             # this will ensure the html and disk files have the same timestamp
             try:

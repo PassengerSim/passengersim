@@ -16,6 +16,8 @@ from .generic import (
 from .tools import aggregate_by_concat_dataframe
 
 if TYPE_CHECKING:
+    import altair as alt
+
     from passengersim import Simulation
 
     from . import SimulationTables
@@ -45,9 +47,7 @@ def extract_carriers(sim: Simulation) -> pd.DataFrame:
     for carrier in sim.sim.carriers:
         avg_rev = carrier.gt_revenue / num_samples
         rpm = carrier_rpm[carrier.name] / num_samples
-        avg_leg_lf = (
-            100 * carrier_leg_lf[carrier.name] / max(carrier_leg_count[carrier.name], 1)
-        )
+        avg_leg_lf = 100 * carrier_leg_lf[carrier.name] / max(carrier_leg_count[carrier.name], 1)
         # Add up total ancillaries
         tot_anc_rev = 0.0
         for anc in carrier.ancillaries:
@@ -82,9 +82,7 @@ def aggregate_carriers(summaries: list[SimulationTables]) -> pd.DataFrame | None
     for s in summaries:
         frame = s._raw_carriers
         if frame is not None:
-            table_avg.append(
-                frame.set_index(["control", "truncation_rule"], append=True)
-            )
+            table_avg.append(frame.set_index(["control", "truncation_rule"], append=True))
     n = len(table_avg)
     while len(table_avg) > 1:
         table_avg[0] = table_avg[0].add(table_avg.pop(1), fill_value=0)
@@ -116,9 +114,7 @@ def extract_forecast_accuracy(sim: Simulation) -> pd.DataFrame | None:
     if len(combined_data) == 0:
         return None
     df = pd.DataFrame.from_dict(combined_data)
-    df = df.set_index(
-        ["trial", "sample", "carrier", "booking_class", "timeframe"]
-    ).reset_index()
+    df = df.set_index(["trial", "sample", "carrier", "booking_class", "timeframe"]).reset_index()
     return df
 
 
@@ -154,8 +150,7 @@ class SimTabCarriers(GenericSimulationTables):
     carrier_history2: pd.DataFrame | None = SimulationTableItem(
         aggregation_func=aggregate_by_concat_dataframe("carrier_history2"),
         extraction_func=extract_carrier_history2,
-        doc="Carrier-level summary data from each sample, "
-        "new version with counters in CoreCarrier.",
+        doc="Carrier-level summary data from each sample, " "new version with counters in CoreCarrier.",
     )
 
     forecast_accuracy: pd.DataFrame | None = SimulationTableItem(
@@ -172,7 +167,8 @@ class SimTabCarriers(GenericSimulationTables):
         measure_format: str = ".2f",
         orient: Literal["h", "v"] = "h",
         title: str | None = None,
-    ):
+        also_df: bool = False,
+    ) -> alt.Chart | pd.DataFrame | tuple[alt.Chart, pd.DataFrame]:
         df = self.carriers.reset_index()[["carrier", load_measure]]
         if raw_df:
             return df
@@ -186,9 +182,7 @@ class SimTabCarriers(GenericSimulationTables):
                 color=alt.Color("carrier:N", title="Carrier", legend=None),
                 tooltip=[
                     alt.Tooltip("carrier", title="Carrier"),
-                    alt.Tooltip(
-                        f"{load_measure}:Q", title=measure_name, format=measure_format
-                    ),
+                    alt.Tooltip(f"{load_measure}:Q", title=measure_name, format=measure_format),
                 ],
             )
             text = chart.mark_text(dx=0, dy=3, color="white", baseline="top").encode(
@@ -203,14 +197,10 @@ class SimTabCarriers(GenericSimulationTables):
                 color=alt.Color("carrier:N", title="Carrier", legend=None),
                 tooltip=[
                     alt.Tooltip("carrier", title="Carrier"),
-                    alt.Tooltip(
-                        f"{load_measure}:Q", title=measure_name, format=measure_format
-                    ),
+                    alt.Tooltip(f"{load_measure}:Q", title=measure_name, format=measure_format),
                 ],
             )
-            text = chart.mark_text(
-                dx=-5, dy=0, color="white", baseline="middle", align="right"
-            ).encode(
+            text = chart.mark_text(dx=-5, dy=0, color="white", baseline="middle", align="right").encode(
                 y=alt.Y("carrier:N", title="Carrier"),
                 x=alt.X(f"{load_measure}:Q", title=measure_name).stack("zero"),
                 text=alt.Text(f"{load_measure}:Q", format=measure_format),
@@ -232,6 +222,8 @@ class SimTabCarriers(GenericSimulationTables):
         )
         if title:
             fig.title = title
+        if also_df:
+            return fig, df
         return fig
 
     @report_figure
@@ -239,48 +231,45 @@ class SimTabCarriers(GenericSimulationTables):
         self,
         load_measure: Literal["sys_lf", "avg_leg_lf"] = "sys_lf",
         *,
-        raw_df=False,
+        raw_df: bool = False,
+        also_df: bool = False,
     ):
-        measure_name = (
-            "System Load Factor" if load_measure == "sys_lf" else "Leg Load Factor"
-        )
+        measure_name = "System Load Factor" if load_measure == "sys_lf" else "Leg Load Factor"
         return self._fig_carrier_attribute(
             raw_df,
             load_measure,
             measure_name,
             title=f"Carrier {measure_name}s",
+            also_df=also_df,
         )
 
     @report_figure
-    def fig_carrier_revenues(self, *, raw_df=False):
+    def fig_carrier_revenues(self, *, raw_df: bool = False, also_df: bool = False):
         return self._fig_carrier_attribute(
-            raw_df, "avg_rev", "Average Revenue", "$.4s", title="Carrier Revenues"
+            raw_df, "avg_rev", "Average Revenue", "$.4s", title="Carrier Revenues", also_df=also_df
         )
 
     @report_figure
-    def fig_carrier_yields(self, *, raw_df=False):
+    def fig_carrier_yields(self, *, raw_df: bool = False, also_df: bool = False):
         return self._fig_carrier_attribute(
-            raw_df, "yield", "Average Yield", "$.4f", title="Carrier Yields"
+            raw_df, "yield", "Average Yield", "$.4f", title="Carrier Yields", also_df=also_df
         )
 
     @report_figure
-    def fig_carrier_rasm(self, *, raw_df=False):
+    def fig_carrier_rasm(self, *, raw_df: bool = False, also_df: bool = False):
         return self._fig_carrier_attribute(
             raw_df,
             "rasm",
             "Revenue per Available Seat Mile",
             "$.4f",
             title="Carrier Revenue per Available Seat Mile (RASM)",
+            also_df=also_df,
         )
 
     @report_figure
-    def fig_carrier_total_bookings(self: SimulationTables, *, raw_df=False):
+    def fig_carrier_total_bookings(self: SimulationTables, *, raw_df: bool = False, also_df: bool = False):
         return self._fig_carrier_attribute(
-            raw_df,
-            "avg_sold",
-            "Total Bookings",
-            ".4s",
-            title="Carrier Total Bookings",
+            raw_df, "avg_sold", "Total Bookings", ".4s", title="Carrier Total Bookings", also_df=also_df
         )
 
     @report_figure
@@ -288,23 +277,17 @@ class SimTabCarriers(GenericSimulationTables):
         self,
         load_measure: Literal["bookings", "leg_pax"] = "bookings",
         *,
-        raw_df=False,
+        raw_df: bool = False,
+        also_df: bool = False,
     ):
-        measure_name = (
-            "Local Percent of Bookings"
-            if load_measure == "bookings"
-            else "Local Percent of Leg Passengers"
-        )
+        measure_name = "Local Percent of Bookings" if load_measure == "bookings" else "Local Percent of Leg Passengers"
         m = "local_pct_bookings" if load_measure == "bookings" else "local_pct_leg_pax"
-        return self._fig_carrier_attribute(
-            raw_df,
-            m,
-            measure_name,
-            title=f"Carrier {measure_name}",
-        )
+        return self._fig_carrier_attribute(raw_df, m, measure_name, title=f"Carrier {measure_name}", also_df=also_df)
 
     @report_figure
-    def fig_carrier_mileage(self, *, raw_df: bool = False):
+    def fig_carrier_mileage(
+        self, *, raw_df: bool = False, also_df: bool = False
+    ) -> alt.Chart | pd.DataFrame | tuple[alt.Chart, pd.DataFrame]:
         """
         Figure showing mileage by carrier.
 
@@ -365,10 +348,24 @@ class SimTabCarriers(GenericSimulationTables):
                 labelFontSize=15,
             )
         )
+        if also_df:
+            return fig, df
         return fig
 
-    def fig_carrier_revenue_distribution(self, *, raw_df=False):
-        """Figure showing the distribution of carrier revenues."""
+    def fig_carrier_revenue_distribution(self, *, raw_df=False, also_df=False):
+        """Figure showing the distribution of carrier revenues.
+
+        Parameters
+        ----------
+        raw_df : bool, default False
+            Return the raw data for this figure as a pandas DataFrame, instead
+            of generating the figure itself. This is not implemented yet and will
+            raise an error if set.
+        also_df: bool, default False
+            Return the raw data for this figure as a pandas DataFrame, in addition
+            to the figure itself. This is not implemented yet, and will be silently
+            ignored if set.
+        """
         if raw_df:
             raise NotImplementedError("Raw data not available for this figure.")
         import altair as alt
@@ -393,9 +390,7 @@ class SimTabCarriers(GenericSimulationTables):
         )
         return fig
 
-    def fig_carrier_head_to_head_revenue(
-        self, x_carrier: str, y_carrier: str, *, raw_df=False
-    ):
+    def fig_carrier_head_to_head_revenue(self, x_carrier: str, y_carrier: str, *, raw_df=False):
         import altair as alt
 
         df1 = self.carrier_history2.query(f"carrier == '{x_carrier}'")

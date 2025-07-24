@@ -3,6 +3,17 @@ from __future__ import annotations
 from pydantic import BaseModel, field_validator
 
 
+class DemandOverride(BaseModel, extra="forbid"):
+    carrier: str
+    """Carrier code for the override."""
+
+    discount_pct: float = 0.0
+    """Discount percentage to apply for this override."""
+
+    pref_adj: float = 0.0
+    """Preference adjustment to apply for this override."""
+
+
 class Demand(BaseModel, extra="forbid"):
     orig: str
     """Origin location for this demand.
@@ -55,10 +66,9 @@ class Demand(BaseModel, extra="forbid"):
 
     group_sizes: list[float] | None = None
     """Probability of each group size.
-
     i.e. [0.5, 0.3, 0.2] will give 50% one pax, 30% 2 pax, etc"""
 
-    prob_saturday_night: bool = False
+    prob_saturday_night: float = False
     """Probability that the customer has a R/T itinerary with a Saturday night stay.
        Using this for choice modeling and CP experiments"""
 
@@ -67,6 +77,19 @@ class Demand(BaseModel, extra="forbid"):
        [0.1, 0.3, 0.4, 0.2] will have durations of 1, 2, 3, 4 days
        and probability of each is specified explicitly
        Using this for choice modeling and CP experiments"""
+
+    deterministic: bool = False
+    """Whether the total amount of demand generated in each sample should be constant.
+
+    If this is true, there will be no variance in the total demand generated,
+    Which will be equal to the base demand modified by any market multipliers.
+    There still can be some randomness in the timeframe arrival distribution of
+    this demand, but the total demand generated in each sample will be the same.
+    """
+
+    overrides: list[DemandOverride] = []
+    """Used for some specialized tests.
+       Each dictionary should have 'carrier', 'discount_pct' and 'pref_adj'"""
 
     @property
     def choice_model_(self):

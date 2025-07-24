@@ -43,7 +43,10 @@ dynamic = ["version"]
 requires-python = ">=3.12"
 dependencies = [
     "addicty",
+    "altair",
+    "dill",
     "joblib",
+    "lz4",
     "numpy",
     "ortools",
     "pandas",
@@ -51,8 +54,7 @@ dependencies = [
     "pyyaml",
     "scipy",
     "typer",
-    "dill",
-    "lz4",
+    "xmle",
 ]
 
 [project.optional-dependencies]
@@ -84,8 +86,8 @@ author = "PassengerSim LLC"
 
 [tool.ruff]
 fix = true
-line-length = 88
-target-version = "py310"
+line-length = 120
+target-version = "py312"
 
 [tool.ruff.lint]
 ignore = ["B905"]

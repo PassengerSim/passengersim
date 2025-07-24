@@ -50,9 +50,7 @@ def df_const(c):
 
 def test_welford_dataframes():
     w = Welford()
-    df = pd.DataFrame(
-        {"Aa": [1.0, 2.0, 3.0], "Bb": [1.0, 2.0, 3.0], "Cc": [1.0, 2.0, 3.0]}
-    )
+    df = pd.DataFrame({"Aa": [1.0, 2.0, 3.0], "Bb": [1.0, 2.0, 3.0], "Cc": [1.0, 2.0, 3.0]})
     w.update(df)
     w.update(df + 1)
     w.update(df + 2)

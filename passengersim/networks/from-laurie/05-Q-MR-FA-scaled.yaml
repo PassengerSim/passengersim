@@ -15,7 +15,6 @@ rm_systems:
           name: aggregate
           algorithm: mr
           kind: path
-          frat5: curve_C
         - step_type: aggregation
           name: aggregate
         - step_type: emsr

@@ -1,3 +1,4 @@
+import glob
 import os
 import pathlib
 import re
@@ -13,7 +14,7 @@ def test_experiments_interface(tmp_path):
     os.chdir(tmp_path)
     cfg = pax.Config.from_yaml(pax.demo_network("3MKT"))
     cfg.carriers.AL1.rm_system = "E"
-    cfg.carriers.AL2.rm_system = "E"
+    cfg.carriers.AL2.rm_system = "U"  # so bid prices and displacement costs exist
     cfg.simulation_controls.num_trials = 1
     cfg.simulation_controls.num_samples = 50
     cfg.simulation_controls.burn_samples = 30
@@ -34,9 +35,7 @@ def test_experiments_interface(tmp_path):
     summaries = experiments.run()
     assert isinstance(summaries, Contrast)
     assert summaries.keys() == {"baseline", "low_dmd"}
-    assert all(
-        isinstance(summary, pax.SimulationTables) for summary in summaries.values()
-    )
+    assert all(isinstance(summary, pax.SimulationTables) for summary in summaries.values())
 
     # experiments.run should have written a report to the output directory
     assert isinstance(experiments.report_filename, pathlib.Path)
@@ -69,8 +68,26 @@ def test_experiments_interface(tmp_path):
     experiments.run()
     assert experiments.report_filename != filename1
     assert experiments.report_filename.exists()
+
     raw_report = experiments.report_filename.read_text()
     assert re.search(r"Figure 1: </span>Carrier Revenues</h2>", raw_report)
     assert re.search(r"<h1 id=\"bonus-section\">Bonus Section", raw_report)
     assert re.search(r"Figure [1-9]+: </span>Bonus Figure</h2>", raw_report)
     assert re.search(r"Figure [1-9]+: </span>Jedi Mind Trick</h2>", raw_report)
+    assert re.search(r"Figure [1-9]+: </span>Bid Price History</h2>", raw_report)
+
+    raw_report_1_file = summaries["baseline"].config.outputs.html.filename
+    pattern = raw_report_1_file.with_suffix(".*.html")
+    print("pattern\n", pattern)
+    raw_report_1_files = list(glob.glob(str(pattern)))
+    if len(raw_report_1_files) >= 1:
+        raw_report_1_file = sorted(raw_report_1_files)[-1]
+    else:
+        raise FileNotFoundError(raw_report_1_file)
+    raw_report_1 = pathlib.Path(raw_report_1_file).read_text()
+    assert re.search(r"Figure 1: </span>Carrier Revenues</h2>", raw_report_1)
+    assert not re.search(r"<h1 id=\"bonus-section\">Bonus Section", raw_report_1)
+    assert not re.search(r"Figure [1-9]+: </span>Bonus Figure</h2>", raw_report_1)
+    assert not re.search(r"Figure [1-9]+: </span>Jedi Mind Trick</h2>", raw_report_1)
+    assert re.search(r"Figure [1-9]+: </span>Bid Price History</h2>", raw_report_1)
+    assert re.search(r"Figure [1-9]+: </span>Displacement Cost History</h2>", raw_report_1)

@@ -16,7 +16,7 @@ import warnings
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import Mapping
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from math import sqrt
 from typing import TYPE_CHECKING, Any, TypeVar
 
@@ -39,7 +39,6 @@ from passengersim.core import (
     Event,
     Frat5,
     Market,
-    PathClass,
     SimulationEngine,
 )
 from passengersim.summaries import SimulationTables
@@ -48,6 +47,7 @@ from passengersim.summary import SummaryTables
 from passengersim.tracers.generic import GenericTracer
 from passengersim.utils.nested_dict import from_nested_dict  # noqa: F401
 from passengersim.utils.si import si_units  # noqa: F401
+from passengersim.utils.tempdir import MaybeTemporaryDirectory  # noqa: F401
 
 from . import database
 from .callbacks import CallbackData, CallbackMixin
@@ -65,6 +65,20 @@ _warn_skips = (os.path.dirname(__file__), os.path.dirname(contextlib.__file__))
 
 
 def memory_log(tag):
+    """
+    Log memory usage information for debugging purposes.
+
+    Parameters
+    ----------
+    tag : str
+        A label to identify the memory logging point.
+
+    Notes
+    -----
+    This function is currently disabled (pass statement) but can be
+    used to log RSS (Resident Set Size) and VMS (Virtual Memory Size)
+    information using psutil when enabled.
+    """
     pass
     # p = psutil.Process()
     # mem_info = p.memory_info()
@@ -102,20 +116,46 @@ class BaseSimulation(ABC):
         config: Config,
         output_dir: pathlib.Path | None = None,
     ):
-        if output_dir is None:
-            import tempfile
+        """
+        Initialize a BaseSimulation instance.
 
-            self._tempdir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
-            output_dir = os.path.join(self._tempdir.name, "test1")
+        Parameters
+        ----------
+        config : Config
+            The simulation configuration object.
+        output_dir : pathlib.Path or None, optional
+            Directory for output files. If None, a temporary directory
+            will be created automatically.
+        """
         self.cnx = None
-        self.output_dir = output_dir
+        self.output_dir = MaybeTemporaryDirectory(output_dir)
 
     @property
     @abstractmethod
     def _sim(self) -> SimulationEngine:
+        """
+        Access to the underlying simulation engine.
+
+        Returns
+        -------
+        SimulationEngine
+            The core simulation engine instance.
+
+        Notes
+        -----
+        This is an abstract property that must be implemented by subclasses.
+        """
         raise NotImplementedError
 
     def path_names(self):
+        """
+        Get a mapping of path IDs to path names.
+
+        Returns
+        -------
+        dict
+            Dictionary mapping path IDs to string representations of paths.
+        """
         result = {}
         for p in self._sim.paths:
             result[p.path_id] = str(p)
@@ -123,36 +163,83 @@ class BaseSimulation(ABC):
 
     @property
     def markets(self) -> Mapping[str, Market]:
-        """Access markets in the simulation."""
+        """
+        Access markets in the simulation.
+
+        Returns
+        -------
+        Mapping[str, Market]
+            A mapping of market names to Market objects.
+        """
         return self._sim.markets
 
     @property
     def paths(self):
-        """Generator of all paths in the simulation."""
+        """
+        Generator of all paths in the simulation.
+
+        Returns
+        -------
+        generator
+            Generator yielding path objects from the simulation.
+        """
         return self._sim.paths
 
     @property
     def pathclasses(self):
-        """Generator of all path classes in the simulation."""
+        """
+        Generator of all path classes in the simulation.
+
+        Yields
+        ------
+        pathclass
+            Path class objects from all paths in the simulation.
+        """
         for path in self._sim.paths:
             yield from path.pathclasses
 
     def pathclasses_for_carrier(self, carrier: str):
-        """Generator of all path classes for a given carrier."""
+        """
+        Generator of all path classes for a given carrier.
+
+        Parameters
+        ----------
+        carrier : str
+            The carrier name to filter path classes by.
+
+        Yields
+        ------
+        pathclass
+            Path class objects for the specified carrier.
+        """
         for path in self._sim.paths:
             if path.carrier_name == carrier:
                 yield from path.pathclasses
 
     @property
     def demands(self):
-        """Generator of all demands in the simulation."""
+        """
+        Generator of all demands in the simulation.
+
+        Returns
+        -------
+        DemandIterator
+            Iterator object for accessing demand data.
+        """
         from .iterators.demand import DemandIterator
 
         return DemandIterator(self._sim)
 
     @property
     def fares(self):
-        """Generator of all fares in the simulation."""
+        """
+        Generator of all fares in the simulation.
+
+        Returns
+        -------
+        FareIterator
+            Iterator object for accessing fare data.
+        """
         from .iterators.fare import FareIterator
 
         return FareIterator(self._sim)
@@ -164,6 +251,24 @@ class Simulation(BaseSimulation, CallbackMixin):
         config: Config,
         output_dir: pathlib.Path | None = None,
     ):
+        """
+        Initialize a Simulation instance.
+
+        Parameters
+        ----------
+        config : Config
+            The simulation configuration object. Will be revalidated during
+            initialization.
+        output_dir : pathlib.Path or None, optional
+            Directory for output files. If None, a temporary directory
+            will be created automatically.
+
+        Notes
+        -----
+        This initializes the simulation with default parameters including
+        DCP lists, choice models, and various data structures for tracking
+        simulation results.
+        """
         revalidate(config)
         super().__init__(config, output_dir)
         if config.simulation_controls.write_raw_files:
@@ -196,6 +301,7 @@ class Simulation(BaseSimulation, CallbackMixin):
         self.sample_done_callback = lambda n, n_total: None
         self.choice_set_file = None
         self.choice_set_obs = 0
+        self.choice_set_mkts = []
         self.segmentation_data_by_timeframe: dict[int, pd.DataFrame] = {}
         """Bookings and revenue segmentation by timeframe.
 
@@ -235,9 +341,7 @@ class Simulation(BaseSimulation, CallbackMixin):
         if self.cnx.is_open:
             database.tables.create_table_leg_defs(self.cnx._connection, self.sim.legs)
             database.tables.create_table_fare_defs(self.cnx._connection, self.sim.fares)
-            database.tables.create_table_fare_restriction_defs(
-                self.cnx._connection, self._fare_restriction_list
-            )
+            database.tables.create_table_fare_restriction_defs(self.cnx._connection, self._fare_restriction_list)
             database.tables.create_table_path_defs(self.cnx._connection, self.sim.paths)
             if config.db != ":memory:":
                 self.cnx.save_configs(config)
@@ -251,17 +355,39 @@ class Simulation(BaseSimulation, CallbackMixin):
 
     @property
     def _sim(self) -> SimulationEngine:
+        """
+        Access to the underlying simulation engine.
+
+        Returns
+        -------
+        SimulationEngine
+            The core simulation engine instance.
+        """
         return self.sim
 
     @property
     def base_time(self) -> int:
         """
-        The base time for the simulation, in seconds since the epoch.
+        The base time for the simulation.
+
+        Returns
+        -------
+        int
+            The base time in seconds since the epoch.
         """
         return self.sim.base_time
 
     @property
     def snapshot_filters(self) -> list[SnapshotFilter] | None:
+        """
+        Get the snapshot filters for the simulation.
+
+        Returns
+        -------
+        list[SnapshotFilter] or None
+            List of snapshot filter objects, or None if simulation
+            is not initialized.
+        """
         try:
             sim = self.sim
         except AttributeError:
@@ -270,15 +396,41 @@ class Simulation(BaseSimulation, CallbackMixin):
 
     @snapshot_filters.setter
     def snapshot_filters(self, x: list[SnapshotFilter]):
+        """
+        Set the snapshot filters for the simulation.
+
+        Parameters
+        ----------
+        x : list[SnapshotFilter]
+            List of snapshot filter objects to set.
+
+        Raises
+        ------
+        ValueError
+            If the simulation is not initialized.
+        """
         try:
             sim = self.sim
         except AttributeError as err:
-            raise ValueError(
-                "sim not initialized, cannot set snapshot_filters"
-            ) from err
+            raise ValueError("sim not initialized, cannot set snapshot_filters") from err
         sim.snapshot_filters = x
 
     def _initialize(self, config: Config):
+        """
+        Initialize all simulation components.
+
+        Parameters
+        ----------
+        config : Config
+            The simulation configuration object containing all settings
+            and parameters for initialization.
+
+        Notes
+        -----
+        This method orchestrates the initialization of all simulation
+        components in the correct order, including the simulation engine,
+        parameters, carriers, airports, demands, fares, and various curves.
+        """
         self._init_sim_and_parms(config)
         self._init_circuity(config)
         self._init_rm_systems(config)
@@ -297,6 +449,20 @@ class Simulation(BaseSimulation, CallbackMixin):
         self.db_writer = DbWriter("db", config, self.sim)
 
     def _init_sim_and_parms(self, config):
+        """
+        Initialize the simulation engine and parameters.
+
+        Parameters
+        ----------
+        config : Config
+            Configuration object containing simulation parameters and settings.
+
+        Notes
+        -----
+        This method creates the core simulation engine instance and configures
+        it with parameters from the config, including demand/capacity multipliers,
+        random seed, DCP settings, and choice set capture options.
+        """
         logger.info("Initializing simulation engine parameters")
         self.sim = passengersim.core.SimulationEngine(name=config.scenario)
         self.sim.config = config
@@ -322,6 +488,8 @@ class Simulation(BaseSimulation, CallbackMixin):
                     print(tmp, file=self.choice_set_file)
             elif pname == "capture_choice_set_obs":
                 self.choice_set_obs = pvalue
+            elif pname == "capture_choice_set_mkts":
+                self.choice_set_mkts = pvalue
 
             # These parameters are not used directly in the core, but leave them listed
             # for now to not break config files reading
@@ -333,6 +501,8 @@ class Simulation(BaseSimulation, CallbackMixin):
                 "dwm_lite",
                 "show_progress_bar",
                 "simple_k_factor",
+                "segment_k_factor",
+                "simple_cv100",
                 "timeframe_demand_allocation",
                 "tot_z_factor",
                 "allow_unused_restrictions",
@@ -345,9 +515,7 @@ class Simulation(BaseSimulation, CallbackMixin):
             print(f"extra simulation setting: {pname} = ", float(pvalue))
             self.sim.set_parm(pname, float(pvalue))
         if config.simulation_controls.additional_settings:
-            self.sim.additional_settings(
-                **config.simulation_controls.additional_settings
-            )
+            self.sim.additional_settings(**config.simulation_controls.additional_settings)
 
         # There is a default array of DCPs, we'll override it with the data from the
         # input file (if available)
@@ -362,6 +530,19 @@ class Simulation(BaseSimulation, CallbackMixin):
                 self.dcp_list.append(0)
 
     def _init_circuity(self, config):
+        """
+        Initialize circuity rules for the simulation.
+
+        Parameters
+        ----------
+        config : Config
+            Configuration object containing circuity rules.
+
+        Notes
+        -----
+        Circuity rules define how passengers can connect through hubs
+        and intermediate airports in their journey.
+        """
         logger.info("Initializing circuity rules")
         for rule in config.circuity_rules:
             # Flatten the object into a dictionary,
@@ -369,6 +550,24 @@ class Simulation(BaseSimulation, CallbackMixin):
             self.sim.add_circuity_rule(dict(rule))
 
     def _init_rm_system(self, rm_name: str, rm_system: RmSystemConfig, config: Config):
+        """
+        Initialize a revenue management system.
+
+        Parameters
+        ----------
+        rm_name : str
+            Name identifier for the RM system.
+        rm_system : RmSystemConfig
+            Configuration object for the RM system.
+        config : Config
+            Overall simulation configuration.
+
+        Notes
+        -----
+        This method sets up a revenue management system with its availability
+        control settings and associated processes for demand forecasting,
+        optimization, and other RM functions.
+        """
         from passengersim_core.carrier.rm_system import Rm_System
 
         logger.info("Initializing RM system %s", rm_name)
@@ -381,11 +580,37 @@ class Simulation(BaseSimulation, CallbackMixin):
             x.add_process(process_name, step_list)
 
     def _init_rm_systems(self, config):
+        """
+        Initialize all revenue management systems.
+
+        Parameters
+        ----------
+        config : Config
+            Configuration object containing RM system definitions.
+
+        Notes
+        -----
+        This method initializes each RM system defined in the configuration,
+        setting up their availability controls and associated processes.
+        """
         self.rm_systems = {}
         for rm_name, rm_system in config.rm_systems.items():
             self._init_rm_system(rm_name, rm_system, config)
 
     def _init_todd_curves(self, config):
+        """
+        Initialize TODD (Time-Of-Departure Demand) curves.
+
+        Parameters
+        ----------
+        config : Config
+            Configuration object containing TODD curve definitions.
+
+        Notes
+        -----
+        TODD curves model how demand varies as the departure time approaches,
+        which is crucial for revenue management optimization.
+        """
         logger.info("Initializing TODD curves")
         for todd_name, todd in config.todd_curves.items():
             dwm = DecisionWindow(todd_name)
@@ -397,9 +622,24 @@ class Simulation(BaseSimulation, CallbackMixin):
                 dwm.dwm_tod = list(todd.probabilities.values())
             self.todd_curves[todd_name] = dwm
 
-    def _get_fare_restriction_num(
-        self, restriction_name: str, *, ignore_when_missing: bool = False
-    ):
+    def _get_fare_restriction_num(self, restriction_name: str, *, ignore_when_missing: bool = False):
+        """
+        Get the numeric identifier for a fare restriction name.
+
+        Parameters
+        ----------
+        restriction_name : str
+            The name of the fare restriction.
+        ignore_when_missing : bool, default False
+            If True, return None when the restriction is not found instead
+            of creating a new mapping.
+
+        Returns
+        -------
+        int or None
+            The numeric identifier for the restriction, or None if
+            ignore_when_missing is True and the restriction is not found.
+        """
         r = str(restriction_name).casefold()
         if r not in self._fare_restriction_mapping:
             if ignore_when_missing:
@@ -409,7 +649,19 @@ class Simulation(BaseSimulation, CallbackMixin):
         return self._fare_restriction_mapping[r]
 
     def parse_restriction_flags(self, restriction_flags: int) -> list[str]:
-        """Convert restriction flags to a tuple of restriction names."""
+        """
+        Convert restriction flags to a list of restriction names.
+
+        Parameters
+        ----------
+        restriction_flags : int
+            Integer bit flags representing which restrictions are active.
+
+        Returns
+        -------
+        list[str]
+            List of restriction names corresponding to the set flags.
+        """
         result = []
         rest_num = 1
         rest_names = self._fare_restriction_list
@@ -421,17 +673,47 @@ class Simulation(BaseSimulation, CallbackMixin):
         return result
 
     def get_restriction_name(self, restriction_num: int) -> str:
-        """Convert restriction number to a restriction name."""
+        """
+        Convert restriction number to a restriction name.
+
+        Parameters
+        ----------
+        restriction_num : int
+            The numeric identifier for the restriction (must be >= 1).
+
+        Returns
+        -------
+        str
+            The name of the restriction.
+
+        Raises
+        ------
+        IndexError
+            If restriction_num is less than 1 or exceeds the number
+            of defined restrictions.
+        """
         if restriction_num < 1:
             raise IndexError(restriction_num)
         return self._fare_restriction_list[restriction_num - 1]
 
     def _init_choice_models(self, config):
+        """
+        Initialize customer choice models.
+
+        Parameters
+        ----------
+        config : Config
+            Configuration object containing choice model definitions.
+
+        Notes
+        -----
+        Choice models determine how passengers select among available
+        flight options based on factors like price, schedule, and
+        service attributes.
+        """
         logger.info("Initializing choice models")
         for cm_name, cm in config.choice_models.items():
-            x = passengersim.core.ChoiceModel(
-                cm_name, cm.kind, random_generator=self.random_generator
-            )
+            x = passengersim.core.ChoiceModel(cm_name, cm.kind, random_generator=self.random_generator)
             for pname, pvalue in cm:
                 if pname in ("kind", "name") or pvalue is None:
                     continue
@@ -464,6 +746,21 @@ class Simulation(BaseSimulation, CallbackMixin):
             self.choice_models[cm_name] = x
 
     def _init_frat5_curves(self, config):
+        """
+        Initialize FRAT5 curves for revenue management.
+
+        Parameters
+        ----------
+        config : Config
+            Configuration object containing FRAT5 curve definitions.
+
+        Notes
+        -----
+        FRAT5 curves define the fare ratio at which half (0.5) of the
+        customers will buy up to the higher fare. These curves define how
+        fare ratios change over time as departure approaches, used for revenue
+        optimization decisions.
+        """
         logger.info("Initializing Frat5 curves")
         for f5_name, f5_data in config.frat5_curves.items():
             f5 = Frat5(f5_name)
@@ -486,6 +783,21 @@ class Simulation(BaseSimulation, CallbackMixin):
             self.load_factor_curves[lf_name] = lf_curve
 
     def _init_carriers(self, config: Config):
+        """
+        Initialize carriers and their revenue management systems.
+
+        Parameters
+        ----------
+        config : Config
+            Configuration object containing carrier definitions including
+            their associated revenue management systems.
+
+        Notes
+        -----
+        This method sets up each carrier with its revenue management system,
+        creating the necessary objects for managing inventory, pricing,
+        and booking decisions.
+        """
         logger.info("Initializing carriers")
         self.carriers_dict = {}
         for carrier_name, carrier_config in config.carriers.items():
@@ -506,6 +818,7 @@ class Simulation(BaseSimulation, CallbackMixin):
             carrier.truncation_rule = carrier_config.truncation_rule
             carrier.history_length = carrier_config.history_length
             carrier.cp_algorithm = carrier_config.cp_algorithm
+            carrier.cp_record_highest_closed_as_open = carrier_config.cp_record_highest_closed_as_open
             carrier.cp_quantize = carrier_config.cp_quantize
             carrier.cp_scale = carrier_config.cp_scale
             carrier.cp_record = carrier_config.cp_record
@@ -529,10 +842,7 @@ class Simulation(BaseSimulation, CallbackMixin):
                 if carrier_config.fare_adjustment_scale is not None:
                     f5.fare_adjustment_scale = carrier_config.fare_adjustment_scale
                 carrier.frat5 = f5
-            if (
-                carrier_config.load_factor_curve is not None
-                and carrier_config.load_factor_curve != ""
-            ):
+            if carrier_config.load_factor_curve is not None and carrier_config.load_factor_curve != "":
                 lfc = self.load_factor_curves[carrier_config.load_factor_curve]
                 carrier.load_factor_curve = lfc
 
@@ -555,13 +865,31 @@ class Simulation(BaseSimulation, CallbackMixin):
         self.init_rm = {}  # TODO
 
     def _init_airports(self, config: Config):
+        """
+        Initialize airports and their geographic information.
+
+        Parameters
+        ----------
+        config : Config
+            Configuration object containing airport/place definitions
+            with coordinates and minimum connection times.
+
+        Notes
+        -----
+        This method creates Airport objects with geographic coordinates
+        used for distance calculations and minimum connection time (MCT)
+        data for hub operations.
+        """
         logger.info("Initializing airports")
         # Load the places into Airport objects.  We use lat/lon to get
         # great circle distance, and this also has the MCT data
         for code, p in config.places.items():
             assert isinstance(p, passengersim.config.Place)
             a = Airport(code, p.label)
-            a.latitude, a.longitude = p.lat, p.lon
+            if p.lat is not None:
+                a.latitude = p.lat
+            if p.lon is not None:
+                a.longitude = p.lon
             if p.country is not None:
                 a.country = p.country
             if p.state is not None:
@@ -596,9 +924,7 @@ class Simulation(BaseSimulation, CallbackMixin):
         markets = {}
         market_multipliers = {}
         for mkt_config in config.markets:
-            market_multipliers[f"{mkt_config.orig}~{mkt_config.dest}"] = (
-                mkt_config.demand_multiplier
-            )
+            market_multipliers[f"{mkt_config.orig}~{mkt_config.dest}"] = mkt_config.demand_multiplier
         # This simulates PODS' favored carrier logic.  The CALP values are
         # all set to 1.0 in all their networks, so hard-coded for now but
         # we can load from YAML in the future if we need to
@@ -615,12 +941,10 @@ class Simulation(BaseSimulation, CallbackMixin):
                 markets[mkt_ident] = mkt
             else:
                 mkt = markets[mkt_ident]
-            dmd = passengersim.core.Demand(segment=dmd_config.segment, market=mkt)
-            dmd.base_demand = (
-                dmd_config.base_demand
-                * self.demand_multiplier
-                * market_multipliers.get(mkt_ident, 1.0)
+            dmd = passengersim.core.Demand(
+                segment=dmd_config.segment, market=mkt, deterministic=dmd_config.deterministic
             )
+            dmd.base_demand = dmd_config.base_demand * self.demand_multiplier * market_multipliers.get(mkt_ident, 1.0)
             dmd.price = dmd_config.reference_fare
             dmd.reference_fare = dmd_config.reference_fare
             if dmd_config.distance > 0.01:
@@ -634,9 +958,7 @@ class Simulation(BaseSimulation, CallbackMixin):
             if cm is not None:
                 dmd.add_choice_model(cm)
             else:
-                raise ValueError(
-                    f"Choice model {model_name} not found for demand {dmd}"
-                )
+                raise ValueError(f"Choice model {model_name} not found for demand {dmd}")
             if dmd_config.curve:
                 curve_name = str(dmd_config.curve).strip()
                 curve = self.curves[curve_name]
@@ -648,6 +970,9 @@ class Simulation(BaseSimulation, CallbackMixin):
             dmd.prob_saturday_night = dmd_config.prob_saturday_night
             dmd.prob_num_days = dmd_config.prob_num_days
             dmd.prob_favored_carrier = calp
+
+            for o in dmd_config.overrides:
+                dmd.add_override(o.carrier, o.discount_pct, o.pref_adj)
 
             if dmd_config.dwm_tolerance > 0.0:
                 dmd.dwm_tolerance = dmd_config.dwm_tolerance
@@ -680,28 +1005,24 @@ class Simulation(BaseSimulation, CallbackMixin):
                 fare_config.booking_class,
                 fare_config.price,
             )
+            fare.min_stay = fare_config.min_stay
+            fare.saturday_night_required = fare_config.saturday_night_required
             if not disable_ap:
                 fare.adv_purch = fare_config.advance_purchase
             for rest_code in fare_config.restrictions:
-                rest_num = self._get_fare_restriction_num(
-                    rest_code, ignore_when_missing=True
-                )
+                rest_num = self._get_fare_restriction_num(rest_code, ignore_when_missing=True)
                 if rest_num:
                     fare.add_restriction(rest_num)
                     discovered_restrictions.add(str(rest_code).casefold())
                 else:
                     if config.simulation_controls.allow_unused_restrictions:
                         warnings.warn(
-                            f"Restriction {rest_code!r} found in fares "
-                            f"but not used in any choice model",
+                            f"Restriction {rest_code!r} found in fares but not used in any choice model",
                             skip_file_prefixes=_warn_skips,
                             stacklevel=1,
                         )
                     else:
-                        raise ValueError(
-                            f"Restriction {rest_code!r} found in fares but not "
-                            f"used in any choice model"
-                        )
+                        raise ValueError(f"Restriction {rest_code!r} found in fares but not used in any choice model")
             self.sim.add_fare(fare)
             if self.debug:
                 print(f"Added fare: {fare}")
@@ -712,16 +1033,12 @@ class Simulation(BaseSimulation, CallbackMixin):
             if r not in discovered_restrictions:
                 if config.simulation_controls.allow_unused_restrictions:
                     warnings.warn(
-                        f"Restriction {r!r} used in choice models but "
-                        f"not found in fares",
+                        f"Restriction {r!r} used in choice models but not found in fares",
                         skip_file_prefixes=_warn_skips,
                         stacklevel=1,
                     )
                 else:
-                    raise ValueError(
-                        f"Restriction {r!r} used in choice models but not found "
-                        f"in fares"
-                    )
+                    raise ValueError(f"Restriction {r!r} used in choice models but not found in fares")
 
         carriers = {cxr.name: cxr for cxr in self.sim.carriers}
         for path_config in config.paths:
@@ -729,9 +1046,7 @@ class Simulation(BaseSimulation, CallbackMixin):
             p.path_quality_index = path_config.path_quality_index
             leg_index1 = path_config.legs[0]
             tmp_leg = self.legs[leg_index1]
-            assert (
-                tmp_leg.orig == path_config.orig
-            ), "Path statement is corrupted, orig doesn't match"
+            assert tmp_leg.orig == path_config.orig, "Path statement is corrupted, orig doesn't match"
             assert tmp_leg.flt_no == leg_index1
             p.add_leg(tmp_leg)
             if len(path_config.legs) >= 2:
@@ -739,9 +1054,7 @@ class Simulation(BaseSimulation, CallbackMixin):
                 if leg_index2 > 0:
                     tmp_leg = self.legs[leg_index2]
                     p.add_leg(self.legs[leg_index2])
-            assert (
-                tmp_leg.dest == path_config.dest
-            ), "Path statement is corrupted, dest doesn't match"
+            assert tmp_leg.dest == path_config.dest, "Path statement is corrupted, dest doesn't match"
             path_carrier_name = tmp_leg.carrier_name
             if path_carrier_name not in carriers:
                 raise ValueError(f"Carrier {path_carrier_name} not found")
@@ -775,19 +1088,14 @@ class Simulation(BaseSimulation, CallbackMixin):
                         continue
                     if prev_fare is not None:
                         diff = prev_fare.price - fare.price
-                        prev_fare.price_lower_bound = max(
-                            prev_fare.price - diff * cp_bounds, lowest_published
-                        )
-                        fare.price_upper_bound = min(
-                            fare.price + diff * cp_bounds, highest_published
-                        )
+                        prev_fare.price_lower_bound = max(prev_fare.price - diff * cp_bounds, lowest_published)
+                        fare.price_upper_bound = min(fare.price + diff * cp_bounds, highest_published)
                         # This provides a price floor, but will be overwritten
                         # each time through the loop EXCEPT for the lowest fare
-                        fare.price_lower_bound = max(
-                            fare.price - diff * cp_bounds, lowest_published
-                        )
+                        fare.price_lower_bound = max(fare.price - diff * cp_bounds, lowest_published)
                     else:
-                        fare.price_upper_bound = min(fare.price, highest_published)
+                        ub = highest_published * (1.0 + self.config.carriers[cxr.name].cp_upper_bound)
+                        fare.price_upper_bound = min(fare.price, ub)
                     prev_fare = fare
 
         logger.info("Initializing bucket decision fares")
@@ -904,69 +1212,66 @@ class Simulation(BaseSimulation, CallbackMixin):
 
         # initialize pathclasses for each carrier, using settings from the carrier
         # to size the history buffers
+        # Also, Q-demand can be forecasted by pathclass even in the absence of bookings
         for carrier in self.sim.carriers:
             self.sim.initialize_pathclasses(carrier.get_history_def(), carrier.name)
+            try:
+                self.vn_initial_mapping(carrier.name)
+            except Exception as e:
+                print(e)
 
         # TODO: only initialize nonstop linkage when needed?
         self.sim.initialize_nonstop_path_linkage()
 
-        # Airlines using Q-forecasting need to have pathclasses set up for all paths
-        # so Q-demand can be forecasted by pathclass even in the absence of bookings
-        for carrier in self.sim.carriers:
-            if carrier.frat5:
-                logger.info(
-                    f"Setting up path classes for carrier {carrier.name}, "
-                    "which is using a Frat5 curve"
-                )
-                for pth in self.sim.paths:
-                    if pth.carrier_name != carrier.name:
-                        continue
-                    mkt = self.sim.markets[f"{pth.orig}~{pth.dest}"]
-                    for fare in mkt.fares:
-                        if fare.carrier_name == pth.carrier_name:
-                            pthcls = pth.add_booking_class(
-                                fare.booking_class, if_not_found=True
-                            )
-                            if pthcls is not None:
-                                pthcls.add_fare(fare)
-            self.vn_initial_mapping2(carrier.name)
-
-        # This will save approximately the number of choice sets requested
+        # Compute a sampling probability to get approximately the number of
+        # choice sets requested
         if self.choice_set_file is not None and self.choice_set_obs > 0:
             tot_dmd = 0
             for d in self.config.demands:
-                tot_dmd += d.base_demand
-            total_choice_sets = (
-                tot_dmd
-                * self.sim.num_trials
-                * (self.sim.num_samples - self.sim.burn_samples)
-            )
-            prob = (
-                self.choice_set_obs / total_choice_sets if total_choice_sets > 0 else 0
-            )
+                if len(self.choice_set_mkts) == 0 or (d.orig, d.dest) in self.choice_set_mkts:
+                    tot_dmd += d.base_demand
+            usable_samples = self.sim.num_trials * (self.sim.num_samples - self.sim.burn_samples)
+            total_choice_sets = tot_dmd * usable_samples
+            prob = self.choice_set_obs / total_choice_sets if total_choice_sets > 0 else 0
             self.sim.choice_set_sampling_probability = prob
+            self.sim.choice_set_mkts = self.choice_set_mkts
 
-    def vn_initial_mapping(self):
-        vn_carriers = []
-        for carrier in self.sim.carriers:
-            if carrier.control == "vn":
-                vn_carriers.append(carrier.name)
-        for path in self.sim.paths:
-            if path.get_leg_carrier(0) in vn_carriers:
-                for bc in self.classes:
-                    pc = PathClass(bc)
-                    index = int(bc[1])
-                    pc.set_index(0, index)
-                    path.add_path_class(pc)
+    def vn_initial_mapping(self, carrier_code):
+        """
+        Set up initial virtual nesting mapping for a carrier.
 
-    def vn_initial_mapping2(self, carrier_code):
+        Parameters
+        ----------
+        carrier_code : str
+            The carrier code to set up virtual nesting mapping for.
+
+        Notes
+        -----
+        This method assigns index values to path classes for carriers
+        using virtual nesting, which allows revenue management systems
+        to map between physical and virtual booking classes.
+        """
         for path in self.sim.paths:
             if path.get_leg_carrier(0) == carrier_code:
                 for i, pc in enumerate(path.pathclasses):
                     pc.set_index(0, i)
 
     def begin_sample(self, sample: int | None = None):
-        """Beginning of sample processing."""
+        """
+        Begin processing a new sample in the simulation.
+
+        Parameters
+        ----------
+        sample : int or None, optional
+            The sample number to set. If None, the current sample number
+            will be incremented by 1.
+
+        Notes
+        -----
+        This method handles sample initialization including setting the
+        random seed (if configured) and preparing the simulation state
+        for the new sample.
+        """
         if sample is None:
             # when sample is None, we simply increment the current sample number
             self.sim.sample += 1
@@ -985,7 +1290,15 @@ class Simulation(BaseSimulation, CallbackMixin):
         self.generate_demands()
 
     def end_sample(self):
-        """End of sample processing."""
+        """
+        End processing of the current sample.
+
+        Notes
+        -----
+        This method records departure statistics to carrier-level counters,
+        handles choice set and competitor data capture if configured,
+        and performs other end-of-sample cleanup and data collection tasks.
+        """
 
         # Record the departure statistics to carrier-level counters in the simulation
         self.sim.record_departure_statistics()
@@ -1036,6 +1349,7 @@ class Simulation(BaseSimulation, CallbackMixin):
             The trial number.
         """
         self.sim.trial = trial
+        logger.info("beginning trial %d", trial)
         self.sim.reset_trial_counters()
 
         for carrier in self.sim.carriers:
@@ -1065,8 +1379,7 @@ class Simulation(BaseSimulation, CallbackMixin):
             carrier.name: carrier.raw_bid_price_trace() for carrier in self.sim.carriers
         }
         self.displacement_traces[self.sim.trial] = {
-            carrier.name: carrier.raw_displacement_cost_trace()
-            for carrier in self.sim.carriers
+            carrier.name: carrier.raw_displacement_cost_trace() for carrier in self.sim.carriers
         }
         for carrier in self.sim.carriers:
             carrier.reset_bid_price_trace()
@@ -1082,19 +1395,21 @@ class Simulation(BaseSimulation, CallbackMixin):
             data = {}
             for carrier in self.sim.carriers:
                 carrier_data = {}
-                for segment, values in getattr(
-                    carrier, f"raw_{k}_by_segment_fare_dcp"
-                )().items():
+                for segment, values in getattr(carrier, f"raw_{k}_by_segment_fare_dcp")().items():
                     carrier_data[segment] = (
                         pd.DataFrame.from_dict(values, "columns")
                         .rename_axis(index="days_prior", columns="booking_class")
                         .stack()
                     )
                 if carrier_data:
-                    data[carrier.name] = (
-                        pd.concat(carrier_data, axis=1, names=["segment"]).fillna(0)
-                        / num_samples
-                    )
+                    data[carrier.name] = pd.concat(carrier_data, axis=1, names=["segment"]).fillna(0) / num_samples
+            # add non-bookings to the data dict
+            if k == "bookings":
+                non_bookings = pd.DataFrame.from_dict(self.sim.nonbookings_by_segment_dcp(), "columns").rename_axis(
+                    index="days_prior", columns="segment"
+                )
+                non_bookings["booking_class"] = "XX"
+                data["NONE"] = non_bookings.reset_index().set_index(["days_prior", "booking_class"]) / num_samples
             if len(data) == 0:
                 return None
             top_level[k] = pd.concat(data, axis=0, names=["carrier"])
@@ -1118,8 +1433,7 @@ class Simulation(BaseSimulation, CallbackMixin):
         """
         if self.sim.trial < 0:
             warnings.warn(
-                "Trial must be started before running a sample, "
-                "implicitly starting Trial 0",
+                "Trial must be started before running a sample, implicitly starting Trial 0",
                 skip_file_prefixes=_warn_skips,
                 stacklevel=1,
             )
@@ -1129,9 +1443,7 @@ class Simulation(BaseSimulation, CallbackMixin):
             event = self.sim.go()
             self.run_carrier_models(event)
             if event is None or str(event) == "Done" or (event[0] == "Done"):
-                assert (
-                    self.sim.num_events() == 0
-                ), f"Event queue still has {self.sim.num_events()} events"
+                assert self.sim.num_events() == 0, f"Event queue still has {self.sim.num_events()} events"
                 break
         yield self.sim.sample
         self.end_sample()
@@ -1150,18 +1462,17 @@ class Simulation(BaseSimulation, CallbackMixin):
             n_samples_total = self.sim.num_trials * self.sim.num_samples
 
         self.begin_trial(trial)
+        logger.info("running %d samples in trial %d", self.sim.num_samples, trial)
         for sample in range(self.sim.num_samples):
-            t = time.time()
+            sample_start_time = time.time()
             if self.sim.config.simulation_controls.double_capacity_until:
                 # Just trying this, PODS has something similar during burn phase
                 if sample == 0:
                     for leg in self.sim.legs:
-                        leg.capacity = leg.capacity * 2.0
-                elif (
-                    sample == self.sim.config.simulation_controls.double_capacity_until
-                ):
+                        leg.capacity = leg.capacity * 2
+                elif sample == self.sim.config.simulation_controls.double_capacity_until:
                     for leg in self.sim.legs:
-                        leg.capacity = leg.capacity / 2.0
+                        leg.capacity = int(leg.capacity / 2)
 
             self.begin_sample(sample)
             if update_freq is not None and self.sim.sample % update_freq == 0:
@@ -1170,9 +1481,7 @@ class Simulation(BaseSimulation, CallbackMixin):
                 for cxr in self.sim.carriers:
                     total_rev += cxr.revenue
                     n += 1
-                    carrier_info += (
-                        f"{', ' if n > 0 else ''}{cxr.name}=${cxr.revenue:8.0f}"
-                    )
+                    carrier_info += f"{', ' if n > 0 else ''}{cxr.name}=${cxr.revenue:8.0f}"
                 dmd_b, dmd_l = 0, 0
                 for dmd in self.sim.demands:
                     if dmd.business:
@@ -1180,10 +1489,7 @@ class Simulation(BaseSimulation, CallbackMixin):
                     else:
                         dmd_l += dmd.scenario_demand
                 d_info = f", {int(dmd_b)}, {int(dmd_l)}"
-                logger.info(
-                    f"Trial={self.sim.trial}, "
-                    f"Sample={self.sim.sample}{carrier_info}{d_info}"
-                )
+                logger.info(f"Trial={self.sim.trial}, Sample={self.sim.sample}{carrier_info}{d_info}")
 
             # Loop on passengers
             while True:
@@ -1192,9 +1498,7 @@ class Simulation(BaseSimulation, CallbackMixin):
                 self.run_carrier_models(event)
                 memory_log(f"post-run_carrier_models {event}")
                 if event is None or str(event) == "Done" or (event[0] == "Done"):
-                    assert (
-                        self.sim.num_events() == 0
-                    ), f"Event queue still has {self.sim.num_events()} events"
+                    assert self.sim.num_events() == 0, f"Event queue still has {self.sim.num_events()} events"
                     break
 
             n_samples_done += 1
@@ -1202,17 +1506,15 @@ class Simulation(BaseSimulation, CallbackMixin):
             self.end_sample()
             if progress is not None:
                 progress.tick(refresh=(sample == 0))
-            logger.info("completed sample %i in %.2f secs", sample, time.time() - t)
+            t = time.time() - sample_start_time
+            logger.info("completed sample %i in %.2f secs", sample, t)
 
         self.sim.num_trials_completed += 1
         self.end_trial()
 
     def _run_sim(self, rich_progress: ProgressBar | None = None):
         update_freq = self.update_frequency
-        logger.debug(
-            f"run_sim, num_trials = {self.sim.num_trials}, "
-            f"num_samples = {self.sim.num_samples}"
-        )
+        logger.debug(f"run_sim, num_trials = {self.sim.num_trials}, num_samples = {self.sim.num_samples}")
         self.db_writer.update_db_write_flags()
         n_samples_total = self.sim.num_trials * self.sim.num_samples
         n_samples_done = 0
@@ -1226,9 +1528,7 @@ class Simulation(BaseSimulation, CallbackMixin):
             if self.sim.config.simulation_controls.show_progress_bar:
                 # if an external Progress object is provided, generate a
                 # ProgressBar object from it
-                progress = ProgressBar(
-                    total=n_samples_total, external_progress=rich_progress
-                )
+                progress = ProgressBar(total=n_samples_total, external_progress=rich_progress)
             else:
                 progress = DummyProgressBar()
         else:
@@ -1243,9 +1543,7 @@ class Simulation(BaseSimulation, CallbackMixin):
                     update_freq,
                 )
 
-    def _run_sim_single_trial(
-        self, trial: int, *, rich_progress: Progress | None = None
-    ):
+    def _run_sim_single_trial(self, trial: int, *, rich_progress: Progress | None = None):
         update_freq = self.update_frequency
         self.db_writer.update_db_write_flags()
         n_samples_total = self.sim.num_samples
@@ -1254,9 +1552,7 @@ class Simulation(BaseSimulation, CallbackMixin):
         if rich_progress is None:
             progress = DummyProgressBar()
         elif isinstance(rich_progress, Progress):
-            progress = ProgressBar(
-                total=n_samples_total, external_progress=rich_progress
-            )
+            progress = ProgressBar(total=n_samples_total, external_progress=rich_progress)
         else:
             raise TypeError("rich_progress must be a Progress object")
         with progress:
@@ -1269,6 +1565,24 @@ class Simulation(BaseSimulation, CallbackMixin):
             )
 
     def run_carrier_models(self, info: Any = None, departed: bool = False, debug=False):
+        """
+        Run carrier revenue management models in response to events.
+
+        Parameters
+        ----------
+        info : Any, optional
+            Event information including event type and associated data.
+        departed : bool, default False
+            Whether this is a departure event.
+        debug : bool, default False
+            Whether to enable debug output.
+
+        Notes
+        -----
+        This method processes various event types including callbacks,
+        DCP events, passenger arrivals, and departures. It coordinates
+        the execution of revenue management processes for all carriers.
+        """
         what_had_happened_was = []
         try:
             event_type = info[0]
@@ -1280,9 +1594,7 @@ class Simulation(BaseSimulation, CallbackMixin):
                 callback_f = info[1]
                 result = callback_f(self, *info[2:])
                 if isinstance(result, dict):
-                    self.callback_data.update_data(
-                        callback_t, self.sim.trial, self.sim.sample, *info[2:], **result
-                    )
+                    self.callback_data.update_data(callback_t, self.sim.trial, self.sim.sample, *info[2:], **result)
                 return
 
             recording_day = info[1]  # could in theory be non-integer for fractional days
@@ -1357,11 +1669,7 @@ class Simulation(BaseSimulation, CallbackMixin):
 
             # Database capture
             if event_type.lower() == "daily":
-                if (
-                    self.cnx.is_open
-                    and self.sim.save_timeframe_details
-                    and recording_day > 0
-                ):
+                if self.cnx.is_open and self.sim.save_timeframe_details and recording_day > 0:
                     # if self.sim.sample == 101:
                     #     print("write_to_sqlite DAILY")
                     what_had_happened_was.append("write_to_sqlite daily")
@@ -1373,10 +1681,7 @@ class Simulation(BaseSimulation, CallbackMixin):
                         store_displacements=self.sim.config.db.store_displacements,
                     )
             elif event_type.lower() in {"dcp", "done"}:
-                if (
-                    event_type.lower() == "done"
-                    and "forecast_accuracy" in self.config.outputs.reports
-                ):
+                if event_type.lower() == "done" and "forecast_accuracy" in self.config.outputs.reports:
                     self.sim.capture_forecast_accuracy()
                 if self.cnx.is_open:
                     self.cnx.save_details(self.db_writer, self.sim, recording_day)
@@ -1396,12 +1701,37 @@ class Simulation(BaseSimulation, CallbackMixin):
             raise
 
     def capture_competitor_data(self):
+        """
+        Capture competitor pricing data for all markets.
+
+        Notes
+        -----
+        This method shops for the lowest prices in each market and
+        stores competitor pricing information that can be used by
+        revenue management systems for competitive analysis.
+        """
         for mkt in self.sim.markets.values():
             lowest = self.sim.shop(mkt.orig, mkt.dest)
             for cxr, price in lowest:
                 mkt.set_competitor_price(cxr, price)
 
     def capture_dcp_data(self, dcp_index, closures_only=False):
+        """
+        Capture data control point (DCP) data for revenue management.
+
+        Parameters
+        ----------
+        dcp_index : int
+            The index of the data control point.
+        closures_only : bool, default False
+            Whether to capture only closure data or all DCP data.
+
+        Notes
+        -----
+        This method captures seat availability, booking data, and other
+        metrics at specific time points (DCPs) before departure, which
+        is essential for revenue management decision making.
+        """
         for leg in self.sim.legs:
             leg.capture_dcp(dcp_index)
         for path in self.sim.paths:
@@ -1436,14 +1766,14 @@ class Simulation(BaseSimulation, CallbackMixin):
         Also adds events for daily reoptimzation"""
         dcp_hour = self.sim.config.simulation_controls.dcp_hour
         if debug:
-            tmp = datetime.fromtimestamp(self.sim.base_time, tz=timezone.utc)
+            tmp = datetime.fromtimestamp(self.sim.base_time, tz=UTC)
             print(f"Base Time is {tmp.strftime('%Y-%m-%d %H:%M:%S %Z')}")
         for dcp_index, dcp in enumerate(self.dcp_list):
             if dcp == 0:
                 continue
             event_time = int(self.sim.base_time - dcp * 86400 + 3600 * dcp_hour)
             if debug:
-                tmp = datetime.fromtimestamp(event_time, tz=timezone.utc)
+                tmp = datetime.fromtimestamp(event_time, tz=UTC)
                 print(f"Added DCP {dcp} at {tmp.strftime('%Y-%m-%d %H:%M:%S %Z')}")
             info = ("DCP", dcp, dcp_index)
             rm_event = Event(info, event_time)
@@ -1455,9 +1785,7 @@ class Simulation(BaseSimulation, CallbackMixin):
         for days_prior in reversed(range(max_days_prior)):
             if days_prior not in self.dcp_list:
                 info = ("daily", days_prior, dcp_idx)
-                event_time = int(
-                    self.sim.base_time - days_prior * 86400 + 3600 * dcp_hour
-                )
+                event_time = int(self.sim.base_time - days_prior * 86400 + 3600 * dcp_hour)
                 rm_event = Event(info, event_time)
                 self.sim.add_event(rm_event)
             else:
@@ -1467,15 +1795,20 @@ class Simulation(BaseSimulation, CallbackMixin):
         self.add_callback_events()
 
     def generate_demands(self, system_rn=None, debug=False):
-        """Generate demands, following the procedure used in PODS
-        The biggest difference is that we can put all the timeframe (DCP) demands
-        into the event queue before any processing.
-        For large models, I might rewrite this into the C++ core in the future"""
+        """
+        Generate demands following the procedure used in PODS.
+
+        Parameters
+        ----------
+        system_rn : float or None, optional
+            System random number. If None, a new random number will be
+            generated using the simulation's random generator.
+        debug : bool, default False
+            Whether to enable debug output during demand generation.
+        """
         self.generate_dcp_rm_events()
         total_events = 0
-        system_rn = (
-            self.random_generator.get_normal() if system_rn is None else system_rn
-        )
+        system_rn = self.random_generator.get_normal() if system_rn is None else system_rn
 
         # We don't have an O&D object, but we use this to get a market random number
         # per market
@@ -1487,6 +1820,10 @@ class Simulation(BaseSimulation, CallbackMixin):
             "leisure": self.random_generator.get_normal(),
         }
 
+        # this stores a random number per segment
+        srn_ref = {}
+        segment_k_factor = self.sim.config.simulation_controls.segment_k_factor
+
         def get_or_make_random(grouping, key):
             if key not in grouping:
                 grouping[key] = self.random_generator.get_normal()
@@ -1497,58 +1834,57 @@ class Simulation(BaseSimulation, CallbackMixin):
         for dmd in self.sim.demands:
             base = dmd.base_demand
 
-            # Get the random numbers we're going to use to perturb demand
-            trn = get_or_make_random(trn_ref, (dmd.orig, dmd.dest, dmd.segment))
-            mrn = get_or_make_random(mrn_ref, (dmd.orig, dmd.dest))
-            if self.sim.config.simulation_controls.simple_k_factor:
-                urn = (
-                    self.random_generator.get_normal()
-                    * self.sim.config.simulation_controls.simple_k_factor
-                )
+            if dmd.deterministic:
+                # Deterministic demand, no randomness
+                dmd.scenario_demand = base
             else:
-                urn = 0
+                # Get the random numbers we're going to use to perturb demand
+                trn = get_or_make_random(trn_ref, (dmd.orig, dmd.dest, dmd.segment))
+                mrn = get_or_make_random(mrn_ref, (dmd.orig, dmd.dest))
+                if segment_k_factor:
+                    srn = get_or_make_random(srn_ref, dmd.segment)
+                else:
+                    srn = 0
+                if self.sim.config.simulation_controls.simple_cv100 > 0.0:
+                    sigma = self.sim.config.simulation_controls.simple_cv100 * sqrt(base) * 10.0
+                    urn = self.random_generator.get_normal() * sigma
+                elif self.sim.config.simulation_controls.simple_k_factor:
+                    urn = self.random_generator.get_normal() * self.sim.config.simulation_controls.simple_k_factor
+                else:
+                    urn = 0
 
-            mu = base * (
-                1.0
-                + system_rn * self.sim.sys_k_factor
-                + mrn * self.sim.mkt_k_factor
-                + trn * self.sim.pax_type_k_factor
-                + urn
-            )
-            mu = max(mu, 0.0)
-            sigma = sqrt(
-                mu * self.sim.config.simulation_controls.tot_z_factor
-            )  # Correct?
-            n = mu + sigma * self.random_generator.get_normal()
-            dmd.scenario_demand = max(n, 0)
-
-            if debug:
-                logger.debug(
-                    f"DMD,{self.sim.sample},{dmd.orig},{dmd.dest},"
-                    f"{dmd.segment},{dmd.base_demand},"
-                    f"{round(mu,2)},{round(sigma,2)},{round(n,2)}"
+                mu = base * (
+                    1.0
+                    + system_rn * self.sim.sys_k_factor
+                    + mrn * self.sim.mkt_k_factor
+                    + trn * self.sim.pax_type_k_factor
+                    + srn * segment_k_factor
+                    + urn
                 )
+                mu = max(mu, 0.0)
+                sigma = sqrt(mu * self.sim.config.simulation_controls.tot_z_factor)  # Correct?
+                n = mu + sigma * self.random_generator.get_normal()
+                dmd.scenario_demand = max(n, 0)
+
+                if debug:
+                    logger.debug(
+                        f"DMD,{self.sim.sample},{dmd.orig},{dmd.dest},"
+                        f"{dmd.segment},{dmd.base_demand},"
+                        f"{round(mu, 2)},{round(sigma, 2)},{round(n, 2)}"
+                    )
 
             # Now we split it up over timeframes and add it to the simulation
             num_pax = int(dmd.scenario_demand + 0.5)  # rounding
-            if (
-                self.sim.config.simulation_controls.timeframe_demand_allocation
-                == "pods"
-            ):
+            if self.sim.config.simulation_controls.timeframe_demand_allocation == "pods":
                 num_events_by_tf = self.sim.allocate_demand_to_tf_pods(
                     dmd, num_pax, self.sim.tf_k_factor, int(end_time)
                 )
             else:
-                num_events_by_tf = self.sim.allocate_demand_to_tf(
-                    dmd, num_pax, self.sim.tf_k_factor, int(end_time)
-                )
+                num_events_by_tf = self.sim.allocate_demand_to_tf(dmd, num_pax, self.sim.tf_k_factor, int(end_time))
             num_events = sum(num_events_by_tf)
             total_events += num_events
             if num_events != round(num_pax):
-                raise ValueError(
-                    f"Generate demand function, num_pax={num_pax}, "
-                    f"num_events={num_events}"
-                )
+                raise ValueError(f"Generate demand function, num_pax={num_pax}, num_events={num_events}")
 
         return total_events
 
@@ -1568,9 +1904,7 @@ class Simulation(BaseSimulation, CallbackMixin):
             r = gamma.rvs(shape_a, loc, scale_b, size=1)
             num_pax = int(r[0] + 0.5)
             dmd.scenario_demand = num_pax
-            self.sim.allocate_demand_to_tf_pods(
-                dmd, num_pax, self.sim.tf_k_factor, int(end_time)
-            )
+            self.sim.allocate_demand_to_tf_pods(dmd, num_pax, self.sim.tf_k_factor, int(end_time))
         total_events = 0
         return total_events
 
@@ -1586,6 +1920,33 @@ class Simulation(BaseSimulation, CallbackMixin):
             "total_demand",
         ),
     ) -> SummaryTables:
+        """
+        Compute comprehensive simulation reports.
+
+        Parameters
+        ----------
+        sim : SimulationEngine
+            The simulation engine instance to generate reports from.
+        to_log : bool, default True
+            Whether to log report summaries.
+        to_db : bool or database.Database, default True
+            Database connection or boolean indicating whether to write
+            reports to database.
+        additional : tuple, optional
+            Additional report types to include. Options include
+            'fare_class_mix', 'load_factors', 'total_demand'.
+
+        Returns
+        -------
+        SummaryTables
+            Object containing all computed reports including leg, path,
+            carrier, and other summary statistics.
+
+        Raises
+        ------
+        ValueError
+            If no samples have been completed in the simulation.
+        """
         num_samples = sim.num_trials_completed * (sim.num_samples - sim.burn_samples)
         if num_samples <= 0:
             raise ValueError(
@@ -1605,22 +1966,14 @@ class Simulation(BaseSimulation, CallbackMixin):
         path_classes_df = self.compute_path_class_report(sim, to_log, to_db)
         carrier_df = self.compute_carrier_report(sim, to_log, to_db)
         segmentation_df = self.compute_segmentation_by_timeframe()
-        raw_load_factor_dist_df = self.compute_raw_load_factor_distribution(
-            sim, to_log, to_db
-        )
-        leg_avg_load_factor_dist_df = self.compute_leg_avg_load_factor_distribution(
-            sim, to_log, to_db
-        )
+        raw_load_factor_dist_df = self.compute_raw_load_factor_distribution(sim, to_log, to_db)
+        leg_avg_load_factor_dist_df = self.compute_leg_avg_load_factor_distribution(sim, to_log, to_db)
         fare_class_dist_df = self.compute_raw_fare_class_mix(sim, to_log, to_db)
         bid_price_history_df = self.compute_bid_price_history(sim, to_log, to_db)
         displacement_df = self.compute_displacement_history(sim, to_log, to_db)
         demand_to_come_df = self.compute_demand_to_come_summary(sim, to_log, to_db)
-        local_fraction_dist_df = self.compute_leg_local_fraction_distribution(
-            sim, to_log, to_db
-        )
-        local_fraction_by_place = self.compute_local_fraction_by_place(
-            sim, to_log, to_db
-        )
+        local_fraction_dist_df = self.compute_leg_local_fraction_distribution(sim, to_log, to_db)
+        local_fraction_by_place = self.compute_local_fraction_by_place(sim, to_log, to_db)
 
         summary = SummaryTables(
             name=sim.name,
@@ -1647,9 +2000,25 @@ class Simulation(BaseSimulation, CallbackMixin):
         summary.cnx = self.cnx
         return summary
 
-    def compute_demand_report(
-        self, sim: SimulationEngine, to_log=True, to_db: database.Database | None = None
-    ):
+    def compute_demand_report(self, sim: SimulationEngine, to_log=True, to_db: database.Database | None = None):
+        """
+        Compute a demand report for the simulation.
+
+        Parameters
+        ----------
+        sim : SimulationEngine
+            The simulation engine instance to generate the report from.
+        to_log : bool, default True
+            Whether to log the report summary.
+        to_db : database.Database or None, optional
+            Database connection to write the report to.
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame containing demand statistics including origin,
+            destination, segment, sold units, revenue, and other metrics.
+        """
         dmd_df = []
         for m in sim.demands:
             avg_price = m.revenue / m.sold if m.sold > 0 else 0
@@ -1678,9 +2047,7 @@ class Simulation(BaseSimulation, CallbackMixin):
             to_db.save_dataframe("demand_summary", dmd_df)
         return dmd_df
 
-    def compute_class_dist(
-        self, sim: SimulationEngine, to_log=True, to_db: database.Database | None = None
-    ):
+    def compute_class_dist(self, sim: SimulationEngine, to_log=True, to_db: database.Database | None = None):
         # Get unique segments
         segs = set([dmd.segment for dmd in sim.demands])
         dist = defaultdict(int)
@@ -1700,9 +2067,7 @@ class Simulation(BaseSimulation, CallbackMixin):
         class_dist_df = pd.DataFrame(class_dist_df)
         return class_dist_df
 
-    def compute_fare_report(
-        self, sim: SimulationEngine, to_log=True, to_db: database.Database | None = None
-    ):
+    def compute_fare_report(self, sim: SimulationEngine, to_log=True, to_db: database.Database | None = None):
         fare_df = []
         for f in sim.fares:
             for dcp_index, days_prior in enumerate(self.dcp_list):
@@ -1731,9 +2096,7 @@ class Simulation(BaseSimulation, CallbackMixin):
         #            to_db.save_dataframe("fare_summary", fare_df)
         return fare_df
 
-    def compute_leg_report(
-        self, sim: SimulationEngine, to_log=True, to_db: database.Database | None = None
-    ):
+    def compute_leg_report(self, sim: SimulationEngine, to_log=True, to_db: database.Database | None = None):
         num_samples = sim.num_trials_completed * (sim.num_samples - sim.burn_samples)
         leg_df = []
         for leg in sim.legs:
@@ -1772,9 +2135,7 @@ class Simulation(BaseSimulation, CallbackMixin):
             to_db.save_dataframe("leg_summary", leg_df)
         return leg_df
 
-    def compute_path_report(
-        self, sim: SimulationEngine, to_log=True, to_db: database.Database | None = None
-    ):
+    def compute_path_report(self, sim: SimulationEngine, to_log=True, to_db: database.Database | None = None):
         num_samples = sim.num_trials_completed * (sim.num_samples - sim.burn_samples)
         avg_lf, n = 0.0, 0
         for leg in sim.legs:
@@ -1796,9 +2157,7 @@ class Simulation(BaseSimulation, CallbackMixin):
             avg_sold_priceable = path.gt_sold_priceable / num_samples
             avg_rev = path.gt_revenue / num_samples
             if to_log:
-                logger.info(
-                    f"{path}, avg_sold={avg_sold:6.2f}, avg_rev=${avg_rev:10,.2f}"
-                )
+                logger.info(f"{path}, avg_sold={avg_sold:6.2f}, avg_rev=${avg_rev:10,.2f}")
             data = dict(
                 orig=path.orig,
                 dest=path.dest,
@@ -1831,9 +2190,7 @@ class Simulation(BaseSimulation, CallbackMixin):
             to_db.save_dataframe("path_summary", path_df)
         return path_df
 
-    def compute_path_class_report(
-        self, sim: SimulationEngine, to_log=True, to_db: database.Database | None = None
-    ):
+    def compute_path_class_report(self, sim: SimulationEngine, to_log=True, to_db: database.Database | None = None):
         num_samples = sim.num_trials_completed * (sim.num_samples - sim.burn_samples)
 
         path_class_df = []
@@ -1843,9 +2200,7 @@ class Simulation(BaseSimulation, CallbackMixin):
                 avg_sold_priceable = pc.gt_sold_priceable / num_samples
                 avg_rev = pc.gt_revenue / num_samples
                 if to_log:
-                    logger.info(
-                        f"{pc}, avg_sold={avg_sold:6.2f}, avg_rev=${avg_rev:10,.2f}"
-                    )
+                    logger.info(f"{pc}, avg_sold={avg_sold:6.2f}, avg_rev=${avg_rev:10,.2f}")
                 data = dict(
                     orig=path.orig,
                     dest=path.dest,
@@ -1876,9 +2231,7 @@ class Simulation(BaseSimulation, CallbackMixin):
                     raise NotImplementedError("path with more than 3 legs")
         path_class_df = pd.DataFrame(path_class_df)
         if not path_class_df.empty:
-            path_class_df.sort_values(
-                by=["orig", "dest", "carrier1", "leg_id1", "booking_class"]
-            )
+            path_class_df.sort_values(by=["orig", "dest", "carrier1", "leg_id1", "booking_class"])
             #        if to_db and to_db.is_open:
             #            to_db.save_dataframe("path_class_summary", path_class_df)
         return path_class_df
@@ -1910,9 +2263,7 @@ class Simulation(BaseSimulation, CallbackMixin):
         carrier_leg_lf = defaultdict(float)
         carrier_leg_count = defaultdict(float)
         for leg in sim.legs:
-            carrier_name = (
-                leg.carrier_name if hasattr(leg, "carrier_name") else leg.carrier
-            )  # TODO: remove hasattr
+            carrier_name = leg.carrier_name if hasattr(leg, "carrier_name") else leg.carrier  # TODO: remove hasattr
             carrier_asm[carrier_name] += leg.distance * leg.capacity * num_samples
             carrier_rpm[carrier_name] += leg.distance * leg.gt_sold
             carrier_leg_lf[carrier_name] += leg.gt_sold / (leg.capacity * num_samples)
@@ -1928,8 +2279,7 @@ class Simulation(BaseSimulation, CallbackMixin):
             sys_lf = (100.0 * carrier_rpm[cxr.name] / denom) if denom > 0 else 0
             if to_log:
                 logger.info(
-                    f"Carrier: {cxr.name}, AvgSold: {round(avg_sold, 2)}, "
-                    f"LF {sys_lf:.2f}%,  AvgRev ${avg_rev:10,.2f}"
+                    f"Carrier: {cxr.name}, AvgSold: {round(avg_sold, 2)}, LF {sys_lf:.2f}%,  AvgRev ${avg_rev:10,.2f}"
                 )
 
             # Add up total ancillaries
@@ -1943,9 +2293,7 @@ class Simulation(BaseSimulation, CallbackMixin):
                     "carrier": cxr.name,
                     "sold": avg_sold,
                     "sys_lf": sys_lf,
-                    "avg_leg_lf": 100
-                    * carrier_leg_lf[cxr.name]
-                    / max(carrier_leg_count[cxr.name], 1),
+                    "avg_leg_lf": 100 * carrier_leg_lf[cxr.name] / max(carrier_leg_count[cxr.name], 1),
                     "avg_rev": avg_rev,
                     "avg_price": avg_rev / avg_sold if avg_sold > 0 else 0,
                     "asm": asm,
@@ -1996,9 +2344,7 @@ class Simulation(BaseSimulation, CallbackMixin):
         if result:
             df = pd.concat(result, axis=1, names=["carrier"])
         else:
-            df = pd.DataFrame(
-                index=pd.RangeIndex(101, name="leg_load_factor"), columns=[]
-            )
+            df = pd.DataFrame(index=pd.RangeIndex(101, name="leg_load_factor"), columns=[])
         if to_db and to_db.is_open:
             to_db.save_dataframe("raw_load_factor_distribution", df)
         return df
@@ -2027,10 +2373,7 @@ class Simulation(BaseSimulation, CallbackMixin):
         distribution is much lower than the raw load factor distribution.
         """
         idx = pd.RangeIndex(101, name="leg_load_factor")
-        result = {
-            carrier.name: pd.Series(np.zeros(101, dtype=np.int32), index=idx)
-            for carrier in sim.carriers
-        }
+        result = {carrier.name: pd.Series(np.zeros(101, dtype=np.int32), index=idx) for carrier in sim.carriers}
         for leg in sim.legs:
             try:
                 lf = int(np.floor(leg.avg_load_factor()))
@@ -2042,15 +2385,11 @@ class Simulation(BaseSimulation, CallbackMixin):
             if lf < 0:
                 lf = 0
             # TODO remove hasattr
-            result[
-                leg.carrier_name if hasattr(leg, "carrier_name") else leg.carrier
-            ].iloc[lf] += 1
+            result[leg.carrier_name if hasattr(leg, "carrier_name") else leg.carrier].iloc[lf] += 1
         if result:
             df = pd.concat(result, axis=1, names=["carrier"])
         else:
-            df = pd.DataFrame(
-                index=pd.RangeIndex(101, name="leg_load_factor"), columns=[]
-            )
+            df = pd.DataFrame(index=pd.RangeIndex(101, name="leg_load_factor"), columns=[])
         if to_db and to_db.is_open:
             to_db.save_dataframe("leg_avg_load_factor_distribution", df)
         return df
@@ -2081,17 +2420,15 @@ class Simulation(BaseSimulation, CallbackMixin):
                 {k: v["revenue"] for k, v in fc.items()},
                 name="frequency",
             )
-            result[carrier.name] = pd.concat(
-                [fc_sold, fc_rev], axis=1, keys=["sold", "revenue"]
-            ).rename_axis(index="booking_class")
+            result[carrier.name] = pd.concat([fc_sold, fc_rev], axis=1, keys=["sold", "revenue"]).rename_axis(
+                index="booking_class"
+            )
         if result:
             df = pd.concat(result, axis=0, names=["carrier"])
         else:
             df = pd.DataFrame(
                 columns=["sold", "revenue"],
-                index=pd.MultiIndex(
-                    [[], []], [[], []], names=["carrier", "booking_class"]
-                ),
+                index=pd.MultiIndex([[], []], [[], []], names=["carrier", "booking_class"]),
             )
         df = df.fillna(0)
         df["sold"] = df["sold"].astype(int)
@@ -2110,9 +2447,7 @@ class Simulation(BaseSimulation, CallbackMixin):
         for carrier in sim.carriers:
             bp = carrier.raw_bid_price_trace()
             result[carrier.name] = (
-                pd.DataFrame.from_dict(bp, orient="index")
-                .sort_index(ascending=False)
-                .rename_axis(index="days_prior")
+                pd.DataFrame.from_dict(bp, orient="index").sort_index(ascending=False).rename_axis(index="days_prior")
             )
         if result:
             df = pd.concat(result, axis=0, names=["carrier"])
@@ -2126,9 +2461,7 @@ class Simulation(BaseSimulation, CallbackMixin):
                     "fraction_some_cap",
                     "fraction_zero_cap",
                 ],
-                index=pd.MultiIndex(
-                    [[], []], [[], []], names=["carrier", "days_prior"]
-                ),
+                index=pd.MultiIndex([[], []], [[], []], names=["carrier", "days_prior"]),
             )
         df = df.fillna(0)
         if to_db and to_db.is_open:
@@ -2146,9 +2479,7 @@ class Simulation(BaseSimulation, CallbackMixin):
         for carrier in sim.carriers:
             bp = carrier.raw_displacement_cost_trace()
             result[carrier.name] = (
-                pd.DataFrame.from_dict(bp, orient="index")
-                .sort_index(ascending=False)
-                .rename_axis(index="days_prior")
+                pd.DataFrame.from_dict(bp, orient="index").sort_index(ascending=False).rename_axis(index="days_prior")
             )
         if result:
             df = pd.concat(result, axis=0, names=["carrier"])
@@ -2158,9 +2489,7 @@ class Simulation(BaseSimulation, CallbackMixin):
                     "displacement_mean",
                     "displacement_stdev",
                 ],
-                index=pd.MultiIndex(
-                    [[], []], [[], []], names=["carrier", "days_prior"]
-                ),
+                index=pd.MultiIndex([[], []], [[], []], names=["carrier", "days_prior"]),
             )
         df = df.fillna(0)
         if to_db and to_db.is_open:
@@ -2177,9 +2506,7 @@ class Simulation(BaseSimulation, CallbackMixin):
         df = (
             from_nested_dict(raw, ["segment", "days_prior", "metric"])
             .sort_index(ascending=[True, False])
-            .rename(
-                columns={"mean": "mean_future_demand", "stdev": "stdev_future_demand"}
-            )
+            .rename(columns={"mean": "mean_future_demand", "stdev": "stdev_future_demand"})
         )
         return df
 
@@ -2210,9 +2537,7 @@ class Simulation(BaseSimulation, CallbackMixin):
         if result:
             df = pd.concat(result, axis=1, names=["carrier"])
         else:
-            df = pd.DataFrame(
-                index=pd.RangeIndex(101, name="local_fraction"), columns=[]
-            )
+            df = pd.DataFrame(index=pd.RangeIndex(101, name="local_fraction"), columns=[])
         if to_db and to_db.is_open:
             to_db.save_dataframe("leg_local_fraction_distribution", df)
         return df
@@ -2252,6 +2577,20 @@ class Simulation(BaseSimulation, CallbackMixin):
         return df
 
     def reseed(self, seed: int | list[int] | None = 42):
+        """
+        Reseed the simulation's random number generator.
+
+        Parameters
+        ----------
+        seed : int, list[int], or None, default 42
+            Seed value(s) for the random number generator. Can be a single
+            integer, a list of integers, or None.
+
+        Notes
+        -----
+        This method updates the random seed for the simulation's internal
+        random number generator, affecting all subsequent random operations.
+        """
         logger.debug("reseeding random_generator: %s", seed)
         self.sim.random_generator.seed(seed)
 
@@ -2284,9 +2623,7 @@ class Simulation(BaseSimulation, CallbackMixin):
         log_reports: bool = False,
         *,
         single_trial: int | None = None,
-        summarizer: type[SimulationTablesT]
-        | SimulationTablesT
-        | None = SimulationTables,
+        summarizer: type[SimulationTablesT] | SimulationTablesT | None = SimulationTables,
         rich_progress: Progress | None = None,
     ) -> SummaryTables | SimulationTablesT:
         """
@@ -2313,8 +2650,7 @@ class Simulation(BaseSimulation, CallbackMixin):
         """
         if summarizer is None:
             warnings.warn(
-                "Using SummaryTables to compute reports is deprecated, "
-                "prefer SimulationTables in new code.",
+                "Using SummaryTables to compute reports is deprecated, prefer SimulationTables in new code.",
                 DeprecationWarning,
                 stacklevel=2,
             )
@@ -2343,10 +2679,7 @@ class Simulation(BaseSimulation, CallbackMixin):
             elif issubclass(summarizer, GenericSimulationTables):
                 summary = summarizer.extract(self)
             else:
-                raise TypeError(
-                    "summarizer must be an instance or subclass of "
-                    "GenericSimulationTables"
-                )
+                raise TypeError("summarizer must be an instance or subclass of GenericSimulationTables")
 
         # check all callbacks for tracers, and if any are found, write their
         # finalized data to callback_data
@@ -2362,8 +2695,7 @@ class Simulation(BaseSimulation, CallbackMixin):
         # write output files if designated
         if isinstance(summary, GenericSimulationTables):
             if self.config.outputs.html and (
-                self.config.outputs.disk is True
-                or self.config.outputs.html.filename == self.config.outputs.disk
+                self.config.outputs.disk is True or self.config.outputs.html.filename == self.config.outputs.disk
             ):
                 # this will ensure the html and disk files have the same timestamp
                 filenames = summary.save(self.config.outputs.html.filename)
@@ -2382,10 +2714,7 @@ class Simulation(BaseSimulation, CallbackMixin):
             if self.config.outputs.excel:
                 summary.to_xlsx(self.config.outputs.excel)
 
-        logger.info(
-            f"Th' th' that's all folks !!!    "
-            f"(Elapsed time = {round(time.time() - start_time, 2)})"
-        )
+        logger.info(f"Th' th' that's all folks !!!    (Elapsed time = {round(time.time() - start_time, 2)})")
         return summary
 
     def run_trial(self, trial: int, log_reports: bool = False) -> SummaryTables:
@@ -2393,10 +2722,7 @@ class Simulation(BaseSimulation, CallbackMixin):
         self.sim.trial = trial
 
         update_freq = self.update_frequency
-        logger.debug(
-            f"run_sim, num_trials = {self.sim.num_trials}, "
-            f"num_samples = {self.sim.num_samples}"
-        )
+        logger.debug(f"run_sim, num_trials = {self.sim.num_trials}, num_samples = {self.sim.num_samples}")
         self.db_writer.update_db_write_flags()
         n_samples_total = self.sim.num_samples
         n_samples_done = 0
@@ -2430,7 +2756,21 @@ class Simulation(BaseSimulation, CallbackMixin):
         return self.cnx.backup(dst)
 
     def get_choice_parameters(self, choicemodel: str | ChoiceModel):
-        """Get the parameters for a choice model."""
+        """
+        Get the parameters for a choice model.
+
+        Parameters
+        ----------
+        choicemodel : str or ChoiceModel
+            The choice model name (string) or ChoiceModel object to get
+            parameters from.
+
+        Returns
+        -------
+        dict
+            Dictionary containing the choice model parameters, including
+            restrictions and their associated sigma values.
+        """
         if isinstance(choicemodel, str):
             choicemodel = self.choice_models[choicemodel]
         raw = choicemodel.get_parameters()
@@ -2441,10 +2781,18 @@ class Simulation(BaseSimulation, CallbackMixin):
             raw[f"restrictions_{rname}_sigma"] = rsig
         return raw
 
-    def set_choice_parameters(
-        self, choicemodel: str | ChoiceModel, values: dict[str, float]
-    ):
-        """Set the parameters for a choice model."""
+    def set_choice_parameters(self, choicemodel: str | ChoiceModel, values: dict[str, float]):
+        """
+        Set the parameters for a choice model.
+
+        Parameters
+        ----------
+        choicemodel : str or ChoiceModel
+            The choice model name (string) or ChoiceModel object to update.
+        values : dict[str, float]
+            Dictionary of parameter names and their new values. Can include
+            restriction parameters using the format 'restrictions_{name}'.
+        """
         if isinstance(choicemodel, str):
             choicemodel = self.choice_models[choicemodel]
         raw = choicemodel.get_parameters()

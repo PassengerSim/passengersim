@@ -115,12 +115,24 @@ class OutputConfig(PrettyModel, extra="forbid", validate_assignment=True):
     HTML output file, in which case no file will written.
     """
 
+    def _get_disk_filename(self) -> pathlib.Path | None:
+        """Get the filename for the disk output.
+
+        If the disk output is set to `True`, this will return the filename of
+        the HTML output file with the extension `.pxsim`.  If there is no HTML
+        output file, this will return None.
+        """
+        if self.disk is True and self.html.filename is not None:
+            return self.html.filename.with_suffix(".pxsim")
+        elif isinstance(self.disk, pathlib.Path):
+            return self.disk
+        else:
+            return None
+
     # TODO what reports require what database items?
     # e.g. demand_to_come requires we store all `demand` not just demand_final
 
     @field_serializer("reports", when_used="always")
-    def serialize_reports(
-        self, reports: set[str | tuple[str, ...]]
-    ) -> list[str | tuple[str, ...]]:
+    def serialize_reports(self, reports: set[str | tuple[str, ...]]) -> list[str | tuple[str, ...]]:
         # return a sorted list, first simple strings then tuples
         return sorted(reports, key=lambda x: (isinstance(x, tuple), x))

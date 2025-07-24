@@ -10,7 +10,7 @@ import platform
 import time
 import warnings
 from collections.abc import Callable, Collection
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from functools import partialmethod
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, Self
 
@@ -43,7 +43,7 @@ def initialize_metadata() -> dict[str, Any]:
     from passengersim import __version__ as version
 
     metadata = {}
-    metadata["time.created"] = datetime.now(timezone.utc).isoformat()
+    metadata["time.created"] = datetime.now(UTC).isoformat()
     metadata["machine.system"] = platform.system()
     metadata["machine.release"] = platform.release()
     metadata["machine.version"] = platform.version()
@@ -62,9 +62,7 @@ def initialize_metadata() -> dict[str, Any]:
 class SimulationTableItem:
     def __init__(
         self,
-        aggregation_func: Callable[
-            [list[GenericSimulationTables]], pd.DataFrame | None
-        ],
+        aggregation_func: Callable[[list[GenericSimulationTables]], pd.DataFrame | None],
         extraction_func: Callable[[Simulation], pd.DataFrame] = None,
         computed_fields: dict[str, Any] = None,
         doc: str | None = None,
@@ -132,9 +130,7 @@ class DatabaseTableItem:
     def __init__(
         self,
         query_func: Callable[[Database], pd.DataFrame],
-        aggregation_func: Callable[
-            [list[GenericSimulationTables]], pd.DataFrame | None
-        ],
+        aggregation_func: Callable[[list[GenericSimulationTables]], pd.DataFrame | None],
         doc: str | None = None,
     ):
         self._doc = doc
@@ -149,9 +145,7 @@ class DatabaseTableItem:
         setattr(
             owner,
             "_requery_" + name,
-            partialmethod(
-                lambda instance, *arg, **kwarg: self._requery(instance, *arg, **kwarg)
-            ),
+            partialmethod(lambda instance, *arg, **kwarg: self._requery(instance, *arg, **kwarg)),
         )
 
     def __get__(self, instance, owner):
@@ -181,9 +175,7 @@ class DatabaseTableItem:
         df = instance._data.get(self.name, None)
         return df
 
-    def _requery(
-        self, instance: GenericSimulationTables, cnx: Database = None, **kwargs
-    ):
+    def _requery(self, instance: GenericSimulationTables, cnx: Database = None, **kwargs):
         instance.run_queries(cnx=cnx, items=[self.name], **kwargs)
         return self._get_raw(instance)
 
@@ -290,9 +282,7 @@ class GenericSimulationTables:
         else:
             raise AttributeError(f"Cannot set attribute {item!r}")
 
-    _std_agg: dict[
-        str, Callable[[list[GenericSimulationTables]], pd.DataFrame | None]
-    ] = {}
+    _std_agg: dict[str, Callable[[list[GenericSimulationTables]], pd.DataFrame | None]] = {}
     _std_extract: dict[str, Callable[[Simulation], pd.DataFrame]] = {}
     _std_query: dict[str, Callable[..., pd.DataFrame]] = {}
 
@@ -315,7 +305,11 @@ class GenericSimulationTables:
         for name, func in cls._std_extract.items():
             if name in items:
                 if func is not None:
-                    data[name] = func(sim)
+                    try:
+                        data[name] = func(sim)
+                    except Exception as err:
+                        # do not let an exception here take down the whole report
+                        warnings.warn(f"Exception {type(err).__name__} in {name}: {err}", stacklevel=2)
         return cls(
             data,
             sim=sim,
@@ -372,17 +366,11 @@ class GenericSimulationTables:
         for name, query in self._std_query.items():
             if name in items:
                 if cnx is None:
-                    warnings.warn(
-                        f"no database connection available for {name}", stacklevel=2
-                    )
-                    self._data[name] = ValueError(
-                        f"no database connection available for {name}"
-                    )
+                    warnings.warn(f"no database connection available for {name}", stacklevel=2)
+                    self._data[name] = ValueError(f"no database connection available for {name}")
                 else:
                     try:
-                        self._data[name] = query(
-                            cnx, scenario=scenario, burn_samples=burn_samples
-                        )
+                        self._data[name] = query(cnx, scenario=scenario, burn_samples=burn_samples)
                     except Exception as e:
                         warnings.warn(f"error in query for {name}: {e}", stacklevel=2)
                         self._data[name] = e
@@ -559,9 +547,7 @@ class GenericSimulationTables:
                         #     raise TypeError(f"Expected {cls}, got {type(result)}")
                         if hasattr(result, "_metadata"):
                             result._metadata["loaded.filename"] = filename
-                            result._metadata["loaded.time"] = datetime.now(
-                                timezone.utc
-                            ).isoformat()
+                            result._metadata["loaded.time"] = datetime.now(UTC).isoformat()
                         return result
                 except RuntimeError as err:
                     if "LZ4F_decompress failed" in str(err):
@@ -572,9 +558,7 @@ class GenericSimulationTables:
                             #     raise TypeError(f"Expected {cls}, got {type(result)}")
                             if hasattr(result, "_metadata"):
                                 result._metadata["loaded.filename"] = filename
-                                result._metadata["loaded.time"] = datetime.now(
-                                    timezone.utc
-                                ).isoformat()
+                                result._metadata["loaded.time"] = datetime.now(UTC).isoformat()
                             return result
                     raise
             except FileNotFoundError:
@@ -595,7 +579,7 @@ class GenericSimulationTables:
                 raise TypeError(f"Expected {cls}, got {type(result)}")
             if hasattr(result, "_metadata"):
                 result._metadata["loaded.filename"] = filename
-                result._metadata["loaded.time"] = datetime.now(timezone.utc).isoformat()
+                result._metadata["loaded.time"] = datetime.now(UTC).isoformat()
             return result
 
     def to_file(
@@ -650,9 +634,7 @@ class GenericSimulationTables:
         return filename
 
     @classmethod
-    def from_file(
-        cls, filename: str | pathlib.Path, read_latest: bool = True, lazy: bool = True
-    ):
+    def from_file(cls, filename: str | pathlib.Path, read_latest: bool = True, lazy: bool = True):
         """Load the object from a file.
 
         Parameters
@@ -791,14 +773,10 @@ class GenericSimulationTables:
         if make_dirs:
             make_parent_directory(
                 filename,
-                git_ignore_things=False
-                if make_dirs == "git"
-                else ["*.pxsim", "*.html"],
+                git_ignore_things=False if make_dirs == "git" else ["*.pxsim", "*.html"],
             )
         filename = pathlib.Path(filename)
-        filenames = filenames_with_timestamp(
-            filename, timestamp=timestamp, suffix=[".pxsim", ".html"]
-        )
+        filenames = filenames_with_timestamp(filename, timestamp=timestamp, suffix=[".pxsim", ".html"])
         self.to_html(filenames[".html"], cfg=cfg, make_dirs=False, extra=extra_html)
         self.to_file(filenames[".pxsim"], make_dirs=False, add_timestamp_ext=False)
         return filenames

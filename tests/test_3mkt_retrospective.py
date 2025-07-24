@@ -29,12 +29,8 @@ def stored_results(tmp_path_factory) -> Contrast:
     summary2 = Simulation(cfg).run(summarizer=None)
     summary2.cnx.close()
 
-    simple = SummaryTables.from_sqlite(
-        retrospect.joinpath("simple.sqlite"), additional="*"
-    )
-    untrunc = SummaryTables.from_sqlite(
-        retrospect.joinpath("untruncated.sqlite"), additional="*"
-    )
+    simple = SummaryTables.from_sqlite(retrospect.joinpath("simple.sqlite"), additional="*")
+    untrunc = SummaryTables.from_sqlite(retrospect.joinpath("untruncated.sqlite"), additional="*")
 
     comps = Contrast(Simple=simple, Untruncated=untrunc)
     return comps
@@ -66,9 +62,7 @@ def test_fig_fare_class_mix(stored_results, dataframe_regression):
 
 def test_fig_bookings_by_timeframe(stored_results, dataframe_regression):
     assert isinstance(stored_results, Contrast)
-    fig = stored_results.fig_bookings_by_timeframe(
-        by_carrier="AL1", by_class=True, source_labels=True
-    )
+    fig = stored_results.fig_bookings_by_timeframe(by_carrier="AL1", by_class=True, source_labels=True)
     assert isinstance(fig, altair.TopLevelMixin)
     df = stored_results.fig_bookings_by_timeframe(
         by_carrier="AL1", by_class=True, source_labels=True, raw_df=True

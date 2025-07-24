@@ -66,9 +66,7 @@ class Experiment:
             if isinstance(func, Config):
                 return self.func(func.model_copy(deep=True))
             else:
-                raise TypeError(
-                    "Experiment already decorated, expected base_config as input"
-                )
+                raise TypeError("Experiment already decorated, expected base_config as input")
 
 
 class Experiments(CallbackMixin):
@@ -79,7 +77,7 @@ class Experiments(CallbackMixin):
         config: Config,
         output_dir: pathlib.Path | None = None,
         *,
-        pickle: bool | str = "passengersim_output",
+        pickle: bool | str = False,
         html: bool | str = "passengersim_output",
         hide_from_git: bool = True,
     ):
@@ -128,9 +126,7 @@ class Experiments(CallbackMixin):
         # if so, overwrite the existing experiment and warn the user
         for i in range(len(self.experiments)):
             if e.tag == self.experiments[i].tag:
-                warnings.warn(
-                    f"Overwriting existing experiment tag: {e.tag}", stacklevel=2
-                )
+                warnings.warn(f"Overwriting existing experiment tag: {e.tag}", stacklevel=2)
                 self.experiments[i] = e
                 return e
         # otherwise add the new experiment
@@ -170,20 +166,14 @@ class Experiments(CallbackMixin):
         try:
             versions = summary.metadata("version")
         except KeyError:
-            msg = (
-                f"Loaded {tag} from {config.outputs.pickle}, "
-                f"but the PassengerSim version is unknown"
-            )
+            msg = f"Loaded {tag} from {config.outputs.pickle}, " f"but the PassengerSim version is unknown"
             return msg, None
 
         public_version = versions.get("passengersim", None)
         core_version = versions.get("passengersim_core", None)
 
         if check_versions and public_version is None:
-            msg = (
-                f"Loaded {tag} from {config.outputs.pickle}, "
-                f"but the PassengerSim version is unknown"
-            )
+            msg = f"Loaded {tag} from {config.outputs.pickle}, " f"but the PassengerSim version is unknown"
             return msg, None
 
         if check_versions and public_version != _passengersim_version:
@@ -195,10 +185,7 @@ class Experiments(CallbackMixin):
             return msg, None
 
         if check_versions and core_version is None:
-            msg = (
-                f"Loaded {tag} from {config.outputs.pickle}, "
-                f"but the PassengerSim.Core version is unknown"
-            )
+            msg = f"Loaded {tag} from {config.outputs.pickle}, " f"but the PassengerSim.Core version is unknown"
             return msg, None
 
         if check_versions and core_version != _passengersim_core_version:
@@ -210,17 +197,11 @@ class Experiments(CallbackMixin):
             return msg, None
 
         if check_content and check:
-            msg = (
-                f"Loaded {tag} from {config.outputs.pickle}, "
-                f"but the config has changed:\n{check}"
-            )
+            msg = f"Loaded {tag} from {config.outputs.pickle}, " f"but the config has changed:\n{check}"
             return msg, None
 
         if check:
-            msg = (
-                f"Loaded {tag} from {config.outputs.pickle}, "
-                f"although the config has changed:\n{check}"
-            )
+            msg = f"Loaded {tag} from {config.outputs.pickle}, " f"although the config has changed:\n{check}"
         else:
             msg = f"Loaded {tag} from {config.outputs.pickle}"
 
@@ -248,9 +229,9 @@ class Experiments(CallbackMixin):
             If True, load from existing output pickle files if they exist,
             otherwise run the simulation for each experiment.  If False, always
             run the simulation for each experiment. If "ignore", load results
-            from output pickle files if they exist, otherwise skip each
-            experiment.  If "raise", raise an error if the output pickle files
-            do not exist for any experiment.
+            from output pickle or pxsim files if they exist, otherwise skip each
+            experiment.  If "raise", raise an error if the output pickle or pxsim
+            files do not exist for any experiment.
         tag : str, optional
             If provided, only run the experiment with the given tag.
         check_versions : bool, default True
@@ -338,23 +319,17 @@ class Experiments(CallbackMixin):
             use_existing = {}
 
         with live_display:
-            top_task = top_progress.add_task(
-                "[blue]Experiments", total=len(selected_experiments)
-            )
+            top_task = top_progress.add_task("[blue]Experiments", total=len(selected_experiments))
 
             for e in selected_experiments:
-                top_progress.update(
-                    top_task, advance=1, description=f"[bold blue]{e.tag}", refresh=True
-                )
+                top_progress.update(top_task, advance=1, description=f"[bold blue]{e.tag}", refresh=True)
 
                 if e.external:
                     # If an external file is provided, load it and skip the simulation.
                     # This is done without regard for the use_existing parameter, and
                     # the absence of the external file is always an error.
                     summary = SimulationTables.from_pickle(e.external)
-                    live_display.console.print(
-                        f"Loaded experiment {e.tag} from {e.external}"
-                    )
+                    live_display.console.print(f"Loaded experiment {e.tag} from {e.external}")
                     results[e.tag] = summary
                     continue
 
@@ -364,30 +339,40 @@ class Experiments(CallbackMixin):
 
                 # Update the paths for the output files
                 if config.outputs.html.filename:
-                    config.outputs.html.filename = self._rename_file(
-                        e.tag, config.outputs.html.filename
-                    )
+                    config.outputs.html.filename = self._rename_file(e.tag, config.outputs.html.filename)
                 if config.outputs.pickle:
-                    config.outputs.pickle = self._rename_file(
-                        e.tag, config.outputs.pickle
-                    )
+                    config.outputs.pickle = self._rename_file(e.tag, config.outputs.pickle)
                 if config.outputs.excel:
-                    config.outputs.excel = self._rename_file(
-                        e.tag, config.outputs.excel
-                    )
+                    config.outputs.excel = self._rename_file(e.tag, config.outputs.excel)
 
                 summary = None
 
                 e_use_existing = use_existing.get(e.tag, default_use_existing)
                 if e_use_existing:
-                    # Check if the output pickle files already exist
                     try:
-                        summary = SimulationTables.from_pickle(config.outputs.pickle)
+                        # Check if the output pickle files are defined and already exist
+                        if config.outputs.pickle:
+                            summary = SimulationTables.from_pickle(config.outputs.pickle)
+                        else:
+                            raise FileNotFoundError("No output pickle file specified")
                     except FileNotFoundError:
-                        if e_use_existing == "raise":
-                            raise
-                        elif e_use_existing == "ignore":
-                            continue
+                        # At this point either the output pickle file is not defined
+                        # (triggering the explicit FileNotFoundError) or does not exist,
+                        # which raises the FileNotFoundError organically.  Either way,
+                        # we also want to check if the pxsim-format disk file exists.
+                        try:
+                            summary = SimulationTables.from_file(config.outputs._get_disk_filename())
+                        except FileNotFoundError as second_error:
+                            if e_use_existing == "raise":
+                                # Neither the output pickle file nor the pxsim-format disk file
+                                # exist, so we need to raise an error.
+                                raise second_error
+                            elif e_use_existing == "ignore":
+                                # Neither the output pickle file nor the pxsim-format disk file
+                                # exist, but we have been instructed to ignore this.  The
+                                # matching simulation will not be run, and will not be included
+                                # in the results.
+                                continue
                     else:
                         # If we reach this point, we have successfully loaded the
                         # output pickle file. But before we congratulate ourselves,

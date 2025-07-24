@@ -63,9 +63,7 @@ def get_snapshot_instruction(
             if only_type is not None:
                 if sf.type == only_type:
                     # if we're only looking for a specific type, and we found it
-                    snapshot_instruction = sf.run(
-                        sim, leg=leg, path=path, carrier=carrier
-                    )
+                    snapshot_instruction = sf.run(sim, leg=leg, path=path, carrier=carrier)
                     if snapshot_instruction and break_on_first:
                         break
             else:

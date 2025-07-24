@@ -84,8 +84,5 @@ class SimTabPaths(GenericSimulationTables):
         leg_ids = self.path_legs.query("path_id == @path_id")["leg_id"]
         legs = self.legs.query("leg_id in @leg_ids")
         for i in leg_ids:
-            s += (
-                f" ({legs.loc[i, 'carrier']}:{legs.loc[i, 'flt_no']}"
-                f" {legs.loc[i, 'orig']}-{legs.loc[i, 'dest']})"
-            )
+            s += f" ({legs.loc[i, 'carrier']}:{legs.loc[i, 'flt_no']}" f" {legs.loc[i, 'orig']}-{legs.loc[i, 'dest']})"
         return s

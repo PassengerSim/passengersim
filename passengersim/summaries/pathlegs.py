@@ -55,9 +55,7 @@ class SimTabPathLegs(GenericSimulationTables):
 
     pathclasses: pd.DataFrame = SimTabPathClasses.pathclasses
 
-    def select_leg_analysis(
-        self, leg_id: int | ArrayLike[int]
-    ) -> dict[str, pd.DataFrame]:
+    def select_leg_analysis(self, leg_id: int | ArrayLike[int]) -> dict[str, pd.DataFrame]:
         """
         Select path_legs for a specific leg.
 

@@ -142,9 +142,7 @@ def filenames_with_timestamp(
 
     filenames = {s: filename.with_suffix(f".{timestamp}" + s) for s in suffix}
 
-    while (
-        any([fi.exists() for fi in filenames.values()]) and timestamp != "no-timestamp"
-    ):
+    while any([fi.exists() for fi in filenames.values()]) and timestamp != "no-timestamp":
         t0, t1 = timestamp.split("-")
         t1 = str(int(t1) + 1)
         timestamp = f"{t0}-{t1}"
@@ -157,9 +155,7 @@ def filenames_with_timestamp(
     return filenames
 
 
-def make_parent_directory(
-    filename: os.PathLike, git_ignore_things: list[str] | bool | None = None
-) -> None:
+def make_parent_directory(filename: os.PathLike, git_ignore_things: list[str] | bool | None = None) -> None:
     """Create any necessary intermediate directories."""
     filename = pathlib.Path(filename)
     if not filename.parent.exists():

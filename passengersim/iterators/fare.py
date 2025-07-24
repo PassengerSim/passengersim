@@ -66,17 +66,11 @@ class FareIterator:
                 continue
             if self._dest is not None and fare.dest != self._dest:
                 continue
-            if (
-                self._carrier_name is not None
-                and fare.carrier_name != self._carrier_name
-            ):
+            if self._carrier_name is not None and fare.carrier_name != self._carrier_name:
                 continue
             if self._days_prior is not None and self._days_prior < fare.adv_purch:
                 continue
-            if (
-                self._exclude_booking_classes is not None
-                and fare.booking_class in self._exclude_booking_classes
-            ):
+            if self._exclude_booking_classes is not None and fare.booking_class in self._exclude_booking_classes:
                 continue
             return fare
 

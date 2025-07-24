@@ -53,9 +53,9 @@ def aggregate_demand_to_come_summary(
                 ddof=1,
             )
         )
-        df["mean_future_demand"] = (
-            df["mean_future_demand"] * df_n + other["mean_future_demand"] * other_n
-        ) / (df_n + other_n)
+        df["mean_future_demand"] = (df["mean_future_demand"] * df_n + other["mean_future_demand"] * other_n) / (
+            df_n + other_n
+        )
         frames[0] = (df, df_n + other_n)
     if frames:
         return frames[0][0]

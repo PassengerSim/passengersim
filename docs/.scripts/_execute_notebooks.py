@@ -48,15 +48,10 @@ for path in sorted(doc_path.rglob("*.ipynb")):
 
     skip_execution = False
     if not args.run_all:
-        if (
-            path.with_suffix(".hash.txt").exists()
-            and path.with_suffix(".nbconvert.ipynb").exists()
-        ):
+        if path.with_suffix(".hash.txt").exists() and path.with_suffix(".nbconvert.ipynb").exists():
             with open(path.with_suffix(".hash.txt"), encoding="utf-8") as f:
                 if f.read() == hash_value:
-                    print(
-                        "  🌟 The notebook content has not changed. Skipping execution."
-                    )
+                    print("  🌟 The notebook content has not changed. Skipping execution.")
                     skip_execution = True
                 else:
                     print("  💥 The notebook content has changed. Re-executing.")

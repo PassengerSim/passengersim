@@ -104,9 +104,7 @@ class DeepRegressionFixture:
     Implementation of `deepdiff_regression` fixture.
     """
 
-    def __init__(
-        self, datadir: Path, original_datadir: Path, request: pytest.FixtureRequest
-    ) -> None:
+    def __init__(self, datadir: Path, original_datadir: Path, request: pytest.FixtureRequest) -> None:
         self.request = request
         self.datadir = datadir
         self.original_datadir = original_datadir
@@ -161,9 +159,7 @@ class DeepRegressionFixture:
 
 
 @pytest.fixture
-def deep_regression(
-    datadir: Path, original_datadir: Path, request: pytest.FixtureRequest
-) -> DeepRegressionFixture:
+def deep_regression(datadir: Path, original_datadir: Path, request: pytest.FixtureRequest) -> DeepRegressionFixture:
     """
     Fixture used to test arbitrary data against known versions previously
     recorded by this same fixture.

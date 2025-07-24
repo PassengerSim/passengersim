@@ -168,9 +168,7 @@ class Database:
             (
                 cfg.scenario,
                 str(__version__),
-                cfg.model_dump_json(
-                    exclude={"db": "dcp_write_hooks", "raw_license_certificate": True}
-                ),
+                cfg.model_dump_json(exclude={"db": "dcp_write_hooks", "raw_license_certificate": True}),
             ),
         )
 
@@ -180,23 +178,18 @@ class Database:
         if scenario:
             rawjson = next(
                 self.execute(
-                    "SELECT configs, max(updated_at) FROM runtime_configs "
-                    "WHERE scenario = ?1",
+                    "SELECT configs, max(updated_at) FROM runtime_configs " "WHERE scenario = ?1",
                     (scenario,),
                 )
             )[0]
         else:
-            rawjson = next(
-                self.execute("SELECT configs, max(updated_at) FROM runtime_configs")
-            )[0]
+            rawjson = next(self.execute("SELECT configs, max(updated_at) FROM runtime_configs"))[0]
         result = json.loads(rawjson)
         if not isinstance(result, dict):
             warnings.warn("malformed configs, not a mapping", stacklevel=2)
         return result
 
-    def load_configs(
-        self, scenario=None, on_validation_error: Literal["raise", "ignore"] = "raise"
-    ) -> Config | Any:
+    def load_configs(self, scenario=None, on_validation_error: Literal["raise", "ignore"] = "raise") -> Config | Any:
         raw = self.load_raw_configs(scenario)
 
         from pydantic import ValidationError
@@ -210,9 +203,7 @@ class Database:
             else:
                 return raw
 
-    def save_details(
-        self: Database, db_writer: DbWriter, sim: SimulationEngine, dcp: int
-    ):
+    def save_details(self: Database, db_writer: DbWriter, sim: SimulationEngine, dcp: int):
         """
         Save details, can be done at each RRD/DCP and at the end of the run
         """
@@ -243,9 +234,7 @@ class Database:
     def save_final(self: Database, sim: SimulationEngine):
         sim.final_write_to_sqlite(self._connection)
 
-    def dataframe(
-        self, query: str, params: list | tuple | dict | None = None, dtype=None
-    ):
+    def dataframe(self, query: str, params: list | tuple | dict | None = None, dtype=None):
         """Run a SQL query and return the results as a pandas DataFrame."""
         if not self.is_open:
             raise ValueError("database is not open")
@@ -258,9 +247,7 @@ class Database:
         if not self.is_open:
             raise ValueError("database is not open")
         try:
-            return next(
-                self.execute("SELECT sql FROM sqlite_master WHERE name = ?1", (name,))
-            )[0]
+            return next(self.execute("SELECT sql FROM sqlite_master WHERE name = ?1", (name,)))[0]
         except Exception:
             raise
 
@@ -335,9 +322,7 @@ class Database:
         if self._connection.in_transaction:
             self._connection.execute("COMMIT;")
         with dst:
-            self._connection.backup(
-                dst, pages=10000, progress=_progress if show_progress else None
-            )
+            self._connection.backup(dst, pages=10000, progress=_progress if show_progress else None)
         self._connection.execute("BEGIN TRANSACTION;")
         dst.close()
 
@@ -416,9 +401,7 @@ def save_leg(cnx, sim, leg, dcp) -> string:
 leg_bucket_sql = {}
 
 
-def save_leg_bucket_multi(
-    cnx: Database, sim: SimulationEngine, leg, dcp, commit=False
-) -> string:
+def save_leg_bucket_multi(cnx: Database, sim: SimulationEngine, leg, dcp, commit=False) -> string:
     try:
         cursor = cnx.cursor()
         cnx_type = type(cnx).__name__

@@ -6,11 +6,12 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pandas as pd
 
+from passengersim.database import common_queries
 from passengersim.reporting import report_figure
 from passengersim.utils.nested_dict import from_nested_dict
 
-from .generic import GenericSimulationTables, SimulationTableItem
-from .tools import aggregate_by_summing_dataframe, break_on_integer
+from .generic import GenericSimulationTables, DatabaseTableItem, SimulationTableItem
+from .tools import aggregate_by_concat_dataframe, aggregate_by_summing_dataframe, break_on_integer
 
 if TYPE_CHECKING:
     from collections.abc import Collection
@@ -53,9 +54,7 @@ class SimTabLegs(GenericSimulationTables):
     """
 
     legs: pd.DataFrame = SimulationTableItem(
-        aggregation_func=aggregate_by_summing_dataframe(
-            "legs", ["carrier", "flt_no", "orig", "dest", "distance"]
-        ),
+        aggregation_func=aggregate_by_summing_dataframe("legs", ["carrier", "flt_no", "orig", "dest", "distance"]),
         extraction_func=extract_legs,
         computed_fields={
             "avg_load_factor": "100.0 * gt_sold / gt_capacity",
@@ -92,14 +91,11 @@ class SimTabLegs(GenericSimulationTables):
                 places = set(self.legs.orig.unique()) | set(self.legs.dest.unique())
                 for place in places:
                     temp_table = self.legs.loc[
-                        (self.legs.carrier == carrier)
-                        & ((self.legs.orig == place) | (self.legs.dest == place)),
+                        (self.legs.carrier == carrier) & ((self.legs.orig == place) | (self.legs.dest == place)),
                         ["gt_sold", "gt_sold_local"],
                     ].sum()
                     if temp_table["gt_sold"] > 0:
-                        result[carrier][place] = float(
-                            temp_table["gt_sold_local"] / temp_table["gt_sold"]
-                        )
+                        result[carrier][place] = float(temp_table["gt_sold_local"] / temp_table["gt_sold"])
                     else:
                         result[carrier][place] = np.nan
             result = from_nested_dict(result, dims=["carrier", "place"]).T
@@ -116,8 +112,9 @@ class SimTabLegs(GenericSimulationTables):
         breakpoints: Collection[int] = None,
         normalize: bool = False,
         *,
-        raw_df=False,
-    ) -> alt.Chart | pd.DataFrame:
+        raw_df: bool = False,
+        also_df: bool = False,
+    ) -> alt.Chart | pd.DataFrame | tuple[alt.Chart, pd.DataFrame]:
         """
         Figure showing the distribution of leg factors.
 
@@ -147,10 +144,13 @@ class SimTabLegs(GenericSimulationTables):
         raw_df : bool, default False
             Return the raw data for this figure as a pandas DataFrame, instead
             of generating the figure itself.
+        also_df : bool, default False
+            If True, return the raw data for this figure as a pandas DataFrame,
+            in addition to the figure itself.
 
         Returns
         -------
-        altair.Chart or pd.DataFrame
+        alt.Chart or pd.DataFrame or tuple[alt.Chart, pd.DataFrame]
         """
         if breakpoints is None:
             breakpoints = range(25, 100, 5)  # default breakpoints
@@ -173,26 +173,16 @@ class SimTabLegs(GenericSimulationTables):
         )
 
         if normalize and by_carrier:
-            df_for_chart["frequency"] = df_for_chart.groupby("carrier")[
-                "frequency"
-            ].transform(lambda x: x / x.sum())
+            df_for_chart["frequency"] = df_for_chart.groupby("carrier")["frequency"].transform(lambda x: x / x.sum())
         elif not by_carrier:
-            df_for_chart = (
-                df_for_chart.groupby([leg_cat], observed=False)
-                .frequency.sum()
-                .reset_index()
-            )
+            df_for_chart = df_for_chart.groupby([leg_cat], observed=False).frequency.sum().reset_index()
             if normalize:
-                df_for_chart["frequency"] = (
-                    df_for_chart["frequency"] / df_for_chart["frequency"].sum()
-                )
+                df_for_chart["frequency"] = df_for_chart["frequency"] / df_for_chart["frequency"].sum()
         elif isinstance(by_carrier, str):
             df_for_chart = df_for_chart[df_for_chart["carrier"] == by_carrier]
             df_for_chart = df_for_chart.drop(columns=["carrier"])
             if normalize:
-                df_for_chart["frequency"] = (
-                    df_for_chart["frequency"] / df_for_chart["frequency"].sum()
-                )
+                df_for_chart["frequency"] = df_for_chart["frequency"] / df_for_chart["frequency"].sum()
 
         freq_label = "Relative Frequency" if normalize else "Count"
 
@@ -238,6 +228,8 @@ class SimTabLegs(GenericSimulationTables):
                 )
             )
 
+        if also_df:
+            return chart, df_for_chart
         return chart
 
     @report_figure
@@ -247,8 +239,9 @@ class SimTabLegs(GenericSimulationTables):
         breakpoints: Collection[int] = None,
         normalize: bool = False,
         *,
-        raw_df=False,
-    ) -> alt.Chart | pd.DataFrame:
+        raw_df: bool = False,
+        also_df: bool = False,
+    ) -> alt.Chart | pd.DataFrame | tuple[alt.Chart, pd.DataFrame]:
         """
         Figure showing the distribution of leg load factors.
 
@@ -270,10 +263,13 @@ class SimTabLegs(GenericSimulationTables):
         raw_df : bool, default False
             Return the raw data for this figure as a pandas DataFrame, instead
             of generating the figure itself.
+        also_df : bool, default False
+            If True, return the raw data for this figure as a pandas DataFrame,
+            in addition to the figure itself.
 
         Returns
         -------
-        altair.Chart or pd.DataFrame
+        alt.Chart or pd.DataFrame or tuple[alt.Chart, pd.DataFrame]
         """
         title = "Load Factor Frequency"
         if normalize:
@@ -288,6 +284,7 @@ class SimTabLegs(GenericSimulationTables):
             breakpoints=breakpoints,
             normalize=normalize,
             raw_df=raw_df,
+            also_df=also_df,
         )
 
     @report_figure
@@ -298,7 +295,8 @@ class SimTabLegs(GenericSimulationTables):
         normalize: bool = False,
         *,
         raw_df=False,
-    ) -> alt.Chart | pd.DataFrame:
+        also_df: bool = False,
+    ) -> alt.Chart | pd.DataFrame | tuple[alt.Chart, pd.DataFrame]:
         """
         Figure showing the distribution of leg local shares.
 
@@ -323,10 +321,13 @@ class SimTabLegs(GenericSimulationTables):
         raw_df : bool, default False
             Return the raw data for this figure as a pandas DataFrame, instead
             of generating the figure itself.
+        also_df : bool, default False
+            If True, return the raw data for this figure as a pandas DataFrame,
+            in addition to the figure itself.
 
         Returns
         -------
-        altair.Chart or pd.DataFrame
+        alt.Chart or pd.DataFrame
         """
         if breakpoints is None:
             breakpoints = range(0, 100, 10)
@@ -343,6 +344,7 @@ class SimTabLegs(GenericSimulationTables):
             breakpoints=breakpoints,
             normalize=normalize,
             raw_df=raw_df,
+            also_df=also_df,
         )
 
     @report_figure
@@ -354,6 +356,7 @@ class SimTabLegs(GenericSimulationTables):
         place: str | None = None,
         carrier: str | None = None,
         raw_df: bool = False,
+        also_df: bool = False,
         facet_columns: int | None = 2,
         select_leg: bool = False,
     ) -> alt.Chart | pd.DataFrame:
@@ -371,6 +374,11 @@ class SimTabLegs(GenericSimulationTables):
         carrier : str or None, default None
             Filter the data to only include legs operated by this carrier.
         raw_df : bool, default False
+            If True, return the raw data for this figure as a pandas DataFrame,
+            instead of generating the figure itself.
+        also_df : bool, default False
+            If True, return the raw data for this figure as a pandas DataFrame,
+            in addition to the figure itself.
         facet_columns : int or None, default 2
             The number of columns to use for faceting the plot by carrier. If None,
             all facets will appear on one row.
@@ -381,7 +389,7 @@ class SimTabLegs(GenericSimulationTables):
 
         Returns
         -------
-        altair.Chart or pd.DataFrame
+        alt.Chart or pd.DataFrame
         """
         import altair as alt
 
@@ -412,9 +420,7 @@ class SimTabLegs(GenericSimulationTables):
             .encode(
                 x=alt.X("avg_local:Q", title="Leg Local Share"),
                 y=alt.Y("avg_load_factor:Q", title="Leg Load Factor"),
-                size=alt.Size("capacity:Q").scale(
-                    zero=True
-                ),  # set zero to False for more contrast
+                size=alt.Size("capacity:Q").scale(zero=True),  # set zero to False for more contrast
                 facet=alt.Facet("carrier:N", columns=facet_columns),
                 tooltip=[
                     "leg_id",
@@ -443,9 +449,7 @@ class SimTabLegs(GenericSimulationTables):
                 translate="[mousedown[!event.shiftKey], mouseup] > mousemove!",
             )
 
-            chart_widget = alt.JupyterChart(
-                chart.add_params(point_sel).add_params(brush_sel).add_selection(zoom)
-            )
+            chart_widget = alt.JupyterChart(chart.add_params(point_sel).add_params(brush_sel).add_selection(zoom))
 
             from ipywidgets import VBox
 
@@ -480,12 +484,26 @@ class SimTabLegs(GenericSimulationTables):
 
             chart_widget.selections.observe(on_select_point, ["point"])
             chart_widget.selections.observe(on_select_brush, ["brush"])
-            return VBox(
+            chart_stack = VBox(
                 [
                     chart_widget,
                     # table_widget,
                     subchart_widget,
                 ]
             )
+            if also_df:
+                return chart_stack, df
+            return chart_stack
 
+        if also_df:
+            return chart.interactive(), df
         return chart.interactive()
+
+    """Just dump leg_detail"""
+    leg_detail: pd.DataFrame = DatabaseTableItem(
+        aggregation_func=aggregate_by_concat_dataframe("leg_detail"),
+        query_func=common_queries.leg_detail,
+        doc="Sample / DCP level detail for legs - a lot of data",
+    )
+
+

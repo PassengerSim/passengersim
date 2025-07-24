@@ -88,6 +88,8 @@ def test_3mkt_db_detail(fast):
             "updated_at",
             "sold",
             "revenue",
+            "local_sold",
+            "local_revenue",
             "q_demand",
             "untruncated_demand",
             "forecast_mean",
@@ -95,7 +97,7 @@ def test_3mkt_db_detail(fast):
             "displacement",
         ]
     )
-    assert legs.shape == (num_samples * n_dcps * n_legs, 14)  # 3060
+    assert legs.shape == (num_samples * n_dcps * n_legs, 16)  # 3060
     buckets = sim.cnx.dataframe("SELECT * FROM leg_bucket_detail")
     assert all(
         buckets.columns
@@ -106,6 +108,7 @@ def test_3mkt_db_detail(fast):
             "sample",
             "days_prior",
             "leg_id",
+            "cabin_code",
             "bucket_number",
             "name",
             "auth",
@@ -119,6 +122,6 @@ def test_3mkt_db_detail(fast):
             "updated_at",
         ]
     )
-    assert buckets.shape == (num_samples * n_classes * n_dcps * n_legs, 17)  # 30600
+    assert buckets.shape == (num_samples * n_classes * n_dcps * n_legs, 18)  # 30600
     dmds = sim.cnx.dataframe("SELECT * FROM demand_detail")
     assert dmds.shape == (num_samples * n_demands * n_dcps, 13)  # 2040

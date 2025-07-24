@@ -123,9 +123,7 @@ class SnapshotFilter(BaseModel, validate_assignment=True):
         pth.parent.mkdir(parents=True, exist_ok=True)
         return pth.with_suffix(".log")
 
-    def run(
-        self, sim, leg=None, path=None, carrier=None, orig=None, dest=None, why=False
-    ) -> SnapshotInstruction:
+    def run(self, sim, leg=None, path=None, carrier=None, orig=None, dest=None, why=False) -> SnapshotInstruction:
         # Check the filter conditions
         info = ""
 

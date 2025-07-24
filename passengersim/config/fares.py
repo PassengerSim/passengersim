@@ -15,6 +15,8 @@ class Fare(BaseModel, extra="forbid"):
     restrictions: list[str] = []
     category: str | None = None
     cabin: str | None = "Y"
+    min_stay: int = 0
+    saturday_night_required: bool | None = False
 
     @field_validator("restrictions", mode="before")
     @classmethod

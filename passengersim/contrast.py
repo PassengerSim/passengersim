@@ -2,7 +2,7 @@ import pathlib
 import warnings
 from collections.abc import Callable
 from functools import partial
-from typing import Literal
+from typing import Literal, Self
 
 import altair as alt
 import numpy as np
@@ -50,6 +50,40 @@ class Contrast(dict):
         from passengersim.reporting.contrast import to_html
 
         return to_html(self, filename, **kwargs)
+
+    def subset(self, keys=None, *, regex: str = None) -> Self:
+        """Subset the contrast to only include the specified keys.
+
+        Parameters
+        ----------
+        keys : str or list of str, optional
+            The keys to include in the subset. If None, use the `regex` filter.
+        regex : str, optional
+            A regular expression to filter the keys. If None, use the `keys` filter.
+
+        Returns
+        -------
+        Contrast
+        """
+        if keys is not None and regex is not None:
+            raise ValueError("cannot use both keys and regex")
+        if keys is not None:
+            if isinstance(keys, str):
+                keys = [keys]
+            if not isinstance(keys, list | tuple):
+                raise TypeError("keys must be a string or a list of strings")
+            result = type(self)({key: self[key] for key in keys if key in self})
+        else:
+            import re
+
+            matches = []
+            for k in self.keys():
+                if re.match(regex, k):
+                    matches.append(k)
+            result = type(self)({k: self[k] for k in matches})
+        if len(result) == 0:
+            raise ValueError("no matches found")
+        return result
 
 
 class MultiContrast(dict):
@@ -140,9 +174,12 @@ def fig_bookings_by_timeframe(
     summaries: dict[str, SummaryTables],
     by_carrier: bool | str = True,
     by_class: bool | str = False,
+    *,
+    by_segment: str | None = None,
     raw_df=False,
     source_labels: bool = False,
     ratio: str | bool = False,
+    also_df: bool = False,
 ) -> alt.Chart | pd.DataFrame:
     """
     Generate a figure contrasting bookings by timeframe for one or more runs.
@@ -181,9 +218,7 @@ def fig_bookings_by_timeframe(
     """
     if by_carrier is True and by_class is True:
         raise NotImplementedError("comparing by both class and carrier is messy")
-    df = _assemble(
-        summaries, "bookings_by_timeframe", by_carrier=by_carrier, by_class=by_class
-    )
+    df = _assemble(summaries, "bookings_by_timeframe", by_carrier=by_carrier, by_class=by_class)
     source_order = list(summaries.keys())
 
     title = "Bookings by Timeframe"
@@ -194,6 +229,8 @@ def fig_bookings_by_timeframe(
         title_annot.append(by_carrier)
     if isinstance(by_class, str):
         title_annot.append(f"Class {by_class}")
+    if by_segment:
+        title_annot.append(by_segment)
     if title_annot:
         title = f"{title} ({', '.join(title_annot)})"
 
@@ -202,15 +239,15 @@ def fig_bookings_by_timeframe(
     if ratio:
         if isinstance(ratio, str):
             against = ratio
-        idx = list(
-            {"source", "carrier", "segment", "days_prior", "booking_class"}
-            & set(df.columns)
-        )
+        idx = list({"source", "carrier", "segment", "days_prior", "booking_class"} & set(df.columns))
         df_ = df.set_index(idx)
         ratios = df_.div(df_.query(f"source == '{against}'").droplevel("source")) - 1.0
         ratios.columns = ["ratio"]
         df = df.join(ratios, on=idx)
         ratio_tooltips = (alt.Tooltip("ratio:Q", title=f"vs {against}", format=".3%"),)
+
+    if by_segment:
+        df = df[df["segment"] == by_segment]
 
     if raw_df:
         df.attrs["title"] = title
@@ -218,9 +255,7 @@ def fig_bookings_by_timeframe(
 
     if by_class:
         if isinstance(by_class, str):
-            color = alt.Color("source:N", title="Source", sort=source_order).title(
-                "Source"
-            )
+            color = alt.Color("source:N", title="Source", sort=source_order).title("Source")
             tooltips = ()
         else:
             color = alt.Color("booking_class:N").title("Booking Class")
@@ -228,9 +263,7 @@ def fig_bookings_by_timeframe(
         chart = alt.Chart(df.sort_values("source", ascending=False))
         chart_1 = chart.mark_bar().encode(
             color=color,
-            x=alt.X("days_prior:O")
-            .scale(reverse=True)
-            .title("Days Prior to Departure"),
+            x=alt.X("days_prior:O").scale(reverse=True).title("Days Prior to Departure"),
             xOffset=alt.XOffset("source:N", title="Source", sort=source_order),
             y=alt.Y("bookings", stack=True),
             tooltip=[
@@ -251,14 +284,12 @@ def fig_bookings_by_timeframe(
             align="left",
         ).encode(
             text=alt.Text("source:N", title="Source"),
-            x=alt.X("days_prior:O")
-            .scale(reverse=True)
-            .title("Days Prior to Departure"),
+            x=alt.X("days_prior:O").scale(reverse=True).title("Days Prior to Departure"),
             xOffset=alt.XOffset("source:N", title="Source", sort=source_order),
             # shape=alt.Shape("source:N", title="Source", sort=source_order),
             y=alt.Y("sum(bookings)", title=None),
         )
-        return (
+        fig = (
             ((chart_1 + chart_2) if source_labels else chart_1)
             .properties(
                 width=500,
@@ -270,14 +301,12 @@ def fig_bookings_by_timeframe(
             )
         )
     elif by_carrier is True:
-        return (
+        fig = (
             alt.Chart(df.sort_values("source", ascending=False))
             .mark_bar()
             .encode(
                 color=alt.Color("carrier:N").title("Carrier"),
-                x=alt.X("days_prior:O")
-                .scale(reverse=True)
-                .title("Days Prior to Departure"),
+                x=alt.X("days_prior:O").scale(reverse=True).title("Days Prior to Departure"),
                 xOffset=alt.XOffset("source:N", title="Source", sort=source_order),
                 y=alt.Y("bookings", stack=True),
                 tooltip=[
@@ -299,19 +328,15 @@ def fig_bookings_by_timeframe(
             )
         )
     else:
-        return (
+        fig = (
             alt.Chart(df.sort_values("source", ascending=False), title=title)
             .mark_line()
             .encode(
                 color=alt.Color("source:N", title="Source", sort=source_order),
-                x=alt.X("days_prior:O")
-                .scale(reverse=True)
-                .title("Days Prior to Departure"),
+                x=alt.X("days_prior:O").scale(reverse=True).title("Days Prior to Departure"),
                 y="bookings",
                 strokeDash=alt.StrokeDash("segment").title("Passenger Segment"),
-                strokeWidth=alt.StrokeWidth(
-                    "source:N", title="Source", sort=source_order
-                ),
+                strokeWidth=alt.StrokeWidth("source:N", title="Source", sort=source_order),
                 tooltip=[
                     alt.Tooltip("source:N", title="Source"),
                     alt.Tooltip("segment", title="Passenger Segment"),
@@ -333,6 +358,9 @@ def fig_bookings_by_timeframe(
                 labelFontSize=15,
             )
         )
+    if also_df:
+        return fig, df
+    return fig
 
 
 @report_figure
@@ -344,6 +372,7 @@ def fig_segmentation_by_timeframe(
     raw_df=False,
     source_labels: bool = False,
     ratio: str | bool = False,
+    also_df: bool = False,
 ) -> alt.Chart | pd.DataFrame:
     """
     Generate a figure contrasting segmentation by timeframe for one or more runs.
@@ -409,10 +438,7 @@ def fig_segmentation_by_timeframe(
     if ratio:
         if isinstance(ratio, str):
             against = ratio
-        idx = list(
-            {"source", "carrier", "segment", "days_prior", "booking_class"}
-            & set(df.columns)
-        )
+        idx = list({"source", "carrier", "segment", "days_prior", "booking_class"} & set(df.columns))
         df_ = df.set_index(idx)
         ratios = df_.div(df_.query(f"source == '{against}'").droplevel("source")) - 1.0
         ratios.columns = ["ratio"]
@@ -425,9 +451,7 @@ def fig_segmentation_by_timeframe(
 
     if by_class:
         if isinstance(by_class, str):
-            color = alt.Color("source:N", title="Source", sort=source_order).title(
-                "Source"
-            )
+            color = alt.Color("source:N", title="Source", sort=source_order).title("Source")
             tooltips = ()
         else:
             color = alt.Color("booking_class:N").title("Booking Class")
@@ -435,9 +459,7 @@ def fig_segmentation_by_timeframe(
         chart = alt.Chart(df.sort_values("source", ascending=False))
         chart_1 = chart.mark_bar().encode(
             color=color,
-            x=alt.X("days_prior:O")
-            .scale(reverse=True)
-            .title("Days Prior to Departure"),
+            x=alt.X("days_prior:O").scale(reverse=True).title("Days Prior to Departure"),
             xOffset=alt.XOffset("source:N", title="Source", sort=source_order),
             y=alt.Y(metric, stack=True),
             tooltip=[
@@ -458,14 +480,12 @@ def fig_segmentation_by_timeframe(
             align="left",
         ).encode(
             text=alt.Text("source:N", title="Source"),
-            x=alt.X("days_prior:O")
-            .scale(reverse=True)
-            .title("Days Prior to Departure"),
+            x=alt.X("days_prior:O").scale(reverse=True).title("Days Prior to Departure"),
             xOffset=alt.XOffset("source:N", title="Source", sort=source_order),
             # shape=alt.Shape("source:N", title="Source", sort=source_order),
             y=alt.Y(f"sum({metric})", title=None),
         )
-        return (
+        fig = (
             ((chart_1 + chart_2) if source_labels else chart_1)
             .properties(
                 width=500,
@@ -477,14 +497,12 @@ def fig_segmentation_by_timeframe(
             )
         )
     elif by_carrier is True:
-        return (
+        fig = (
             alt.Chart(df.sort_values("source", ascending=False))
             .mark_bar()
             .encode(
                 color=alt.Color("carrier:N").title("Carrier"),
-                x=alt.X("days_prior:O")
-                .scale(reverse=True)
-                .title("Days Prior to Departure"),
+                x=alt.X("days_prior:O").scale(reverse=True).title("Days Prior to Departure"),
                 xOffset=alt.XOffset("source:N", title="Source", sort=source_order),
                 y=alt.Y(metric, stack=True, title=metric.title()),
                 tooltip=[
@@ -506,19 +524,15 @@ def fig_segmentation_by_timeframe(
             )
         )
     else:
-        return (
+        fig = (
             alt.Chart(df.sort_values("source", ascending=False), title=title)
             .mark_line()
             .encode(
                 color=alt.Color("source:N", title="Source", sort=source_order),
-                x=alt.X("days_prior:O")
-                .scale(reverse=True)
-                .title("Days Prior to Departure"),
+                x=alt.X("days_prior:O").scale(reverse=True).title("Days Prior to Departure"),
                 y=metric,
                 strokeDash=alt.StrokeDash("segment").title("Passenger Type"),
-                strokeWidth=alt.StrokeWidth(
-                    "source:N", title="Source", sort=source_order
-                ),
+                strokeWidth=alt.StrokeWidth("source:N", title="Source", sort=source_order),
                 tooltip=[
                     alt.Tooltip("source:N", title="Source"),
                     alt.Tooltip("segment", title="Passenger Type"),
@@ -540,6 +554,9 @@ def fig_segmentation_by_timeframe(
                 labelFontSize=15,
             )
         )
+    if also_df:
+        return fig, df
+    return fig
 
 
 def _fig_carrier_measure(
@@ -562,9 +579,7 @@ def _fig_carrier_measure(
         for n, a in enumerate(source_order):
             df_ = df.set_index(["source", "carrier"])
             ratios = df_.div(df_.query(f"source == '{a}'").droplevel("source")) - 1.0
-            ratios.iloc[:, 0] = ratios.iloc[:, 0].where(
-                ratios.index.get_level_values("source") != a, np.nan
-            )
+            ratios.iloc[:, 0] = ratios.iloc[:, 0].where(ratios.index.get_level_values("source") != a, np.nan)
             ratios.columns = [f"ratio_{n}"]
             queue.append(ratios)
         for q in queue:
@@ -578,13 +593,9 @@ def _fig_carrier_measure(
         df = df.join(ratios, on=["source", "carrier"])
 
     if ratio_label:
-        df["ratio_label"] = df["ratio_0"].apply(
-            lambda x: (" " if np.isnan(x) else f"{x:+.1%}")
-        )
+        df["ratio_label"] = df["ratio_0"].apply(lambda x: (" " if np.isnan(x) else f"{x:+.1%}"))
         for n in range(len(source_order)):
-            df[f"ratio_label_{n}"] = df[f"ratio_{n}"].apply(
-                lambda x: (" " if np.isnan(x) else f"{x:+.1%}")
-            )
+            df[f"ratio_label_{n}"] = df[f"ratio_{n}"].apply(lambda x: (" " if np.isnan(x) else f"{x:+.1%}"))
 
         domain_max = df[load_measure].max() * (1 + (0.07 * (500 / width)))
 
@@ -633,9 +644,7 @@ def _fig_carrier_measure(
             x=alt.X(f"{load_measure}:Q", title=measure_name).stack("zero"),
             tooltip=tooltips,
         )
-        text = chart.mark_text(
-            dx=-5, dy=0, color="white", baseline="middle", align="right"
-        ).encode(
+        text = chart.mark_text(dx=-5, dy=0, color="white", baseline="middle", align="right").encode(
             y=alt.Y("source:N", title=None, sort=source_order),
             x=alt.X(f"{load_measure}:Q", title=measure_name).stack("zero"),
             text=alt.Text(f"{load_measure}:Q", format=measure_format),
@@ -655,14 +664,10 @@ def _fig_carrier_measure(
                 chart.mark_text(dx=5, dy=0, baseline="middle", align="left")
                 .encode(
                     y=alt.Y("source:N", title=None, sort=source_order),
-                    x=alt.X(f"{load_measure}:Q", title=measure_name)
-                    .stack("zero")
-                    .scale(domain=[0, domain_max]),
+                    x=alt.X(f"{load_measure}:Q", title=measure_name).stack("zero").scale(domain=[0, domain_max]),
                     text=alt.Text("reference_source:N"),
                 )
-                .transform_calculate(
-                    reference_source=f'datum["ratio_label_" + {radio_param.name}]'
-                )
+                .transform_calculate(reference_source=f'datum["ratio_label_" + {radio_param.name}]')
                 .add_params(radio_param)
             )
 
@@ -686,6 +691,7 @@ def fig_carrier_revenues(
     ratio: str | bool = "all",
     *,
     width: int = 500,
+    also_df: bool = False,
 ):
     """
     Generate a figure contrasting carrier revenues for one or more runs.
@@ -694,23 +700,27 @@ def fig_carrier_revenues(
     ----------
     summaries : dict[str, SummaryTables]
     raw_df : bool, default False
+        Return only the raw data used to generate the figure.
     orient : {'h', 'v'}, default 'h'
     ratio : bool or str, default True
         Add tooltip(s) giving the percentage change of each carrier's revenue
         to the revenue of the same carrier in the other summaries.  Can be
         the key giving a specific summary to compare against, or 'all' to
         compare against all other summaries.
+    also_df : bool, default False
+        Return the raw data used to generate the figure in addition to the
+        figure itself.
 
     Returns
     -------
-    alt.Chart or pd.DataFrame
+    alt.Chart or pd.DataFrame or tuple[alt.Chart, pd.DataFrame]
     """
     df = _assemble(summaries, "carrier_revenues")
     source_order = list(summaries.keys())
     if raw_df:
         df.attrs["title"] = "Carrier Revenues"
         return df
-    return _fig_carrier_measure(
+    fig = _fig_carrier_measure(
         df,
         source_order,
         load_measure="avg_rev",
@@ -722,6 +732,10 @@ def fig_carrier_revenues(
         ratio_all=(ratio == "all"),
         width=width,
     )
+    if also_df:
+        df.attrs["title"] = "Carrier Revenues"
+        return fig, df
+    return fig
 
 
 @report_figure
@@ -732,6 +746,7 @@ def fig_carrier_yields(
     ratio: str | bool = "all",
     *,
     width: int = 500,
+    also_df: bool = False,
 ):
     """
     Generate a figure contrasting carrier yields for one or more runs.
@@ -757,7 +772,7 @@ def fig_carrier_yields(
     if raw_df:
         df.attrs["title"] = "Carrier Yields"
         return df
-    return _fig_carrier_measure(
+    fig = _fig_carrier_measure(
         df,
         source_order,
         load_measure="yield",
@@ -769,6 +784,10 @@ def fig_carrier_yields(
         ratio_all=(ratio == "all"),
         width=width,
     )
+    if also_df:
+        df.attrs["title"] = "Carrier Yields"
+        return fig, df
+    return fig
 
 
 @report_figure
@@ -779,6 +798,7 @@ def fig_carrier_rasm(
     ratio: str | bool = "all",
     *,
     width: int = 500,
+    also_df: bool = False,
 ):
     """
     Generate a figure contrasting carrier RASM for one or more runs.
@@ -803,7 +823,7 @@ def fig_carrier_rasm(
     if raw_df:
         df.attrs["title"] = "Carrier RASM"
         return df
-    return _fig_carrier_measure(
+    fig = _fig_carrier_measure(
         df,
         source_order,
         load_measure="rasm",
@@ -815,6 +835,10 @@ def fig_carrier_rasm(
         ratio_all=(ratio == "all"),
         width=width,
     )
+    if also_df:
+        df.attrs["title"] = "Carrier RASM"
+        return fig, df
+    return fig
 
 
 @report_figure
@@ -826,6 +850,7 @@ def fig_carrier_local_share(
     ratio: str | bool = "all",
     *,
     width: int = 500,
+    also_df: bool = False,
 ):
     """
     Generate a figure contrasting carrier local shares for one or more runs.
@@ -845,18 +870,14 @@ def fig_carrier_local_share(
     -------
     alt.Chart or pd.DataFrame
     """
-    measure_name = (
-        "Local Percent of Bookings"
-        if load_measure == "bookings"
-        else "Local Percent of Leg Passengers"
-    )
+    measure_name = "Local Percent of Bookings" if load_measure == "bookings" else "Local Percent of Leg Passengers"
     m = "local_pct_bookings" if load_measure == "bookings" else "local_pct_leg_pax"
     df = _assemble(summaries, "carrier_local_share", load_measure=load_measure)
     source_order = list(summaries.keys())
     if raw_df:
-        df.attrs["title"] = "Carrier RASM"
+        df.attrs["title"] = "Carrier Local Share"
         return df
-    return _fig_carrier_measure(
+    fig = _fig_carrier_measure(
         df,
         source_order,
         load_measure=m,
@@ -868,6 +889,10 @@ def fig_carrier_local_share(
         ratio_all=(ratio == "all"),
         width=width,
     )
+    if also_df:
+        df.attrs["title"] = "Carrier Local Share"
+        return fig, df
+    return fig
 
 
 @report_figure
@@ -878,6 +903,7 @@ def fig_carrier_total_bookings(
     ratio: str | bool = "all",
     *,
     width: int = 500,
+    also_df: bool = False,
 ):
     """
     Generate a figure contrasting carrier total bookings for one or more runs.
@@ -911,7 +937,7 @@ def fig_carrier_total_bookings(
     if raw_df:
         df.attrs["title"] = "Carrier Total Bookings"
         return df
-    return _fig_carrier_measure(
+    fig = _fig_carrier_measure(
         df,
         source_order,
         load_measure="avg_sold",
@@ -923,6 +949,10 @@ def fig_carrier_total_bookings(
         ratio_all=(ratio == "all"),
         width=width,
     )
+    if also_df:
+        df.attrs["title"] = "Carrier Total Bookings"
+        return fig, df
+    return fig
 
 
 @report_figure
@@ -934,6 +964,7 @@ def fig_carrier_load_factors(
     ratio: str | bool = "all",
     *,
     width: int = 500,
+    also_df: bool = False,
 ):
     """
     Generate a figure contrasting carrier load factors for one or more runs.
@@ -964,7 +995,7 @@ def fig_carrier_load_factors(
     if raw_df:
         df.attrs["title"] = f"Carrier {measure_name}s"
         return df
-    return _fig_carrier_measure(
+    fig = _fig_carrier_measure(
         df,
         source_order,
         load_measure=load_measure,
@@ -976,10 +1007,14 @@ def fig_carrier_load_factors(
         ratio_all=(ratio == "all"),
         width=width,
     )
+    if also_df:
+        df.attrs["title"] = f"Carrier {measure_name}s"
+        return fig, df
+    return fig
 
 
 @report_figure
-def fig_fare_class_mix(summaries, raw_df=False, label_threshold=0.06):
+def fig_fare_class_mix(summaries, *, raw_df=False, also_df: bool = False, label_threshold: float = 0.06):
     df = _assemble(summaries, "fare_class_mix")
     source_order = list(summaries.keys())
     if raw_df:
@@ -987,9 +1022,7 @@ def fig_fare_class_mix(summaries, raw_df=False, label_threshold=0.06):
         return df
     import altair as alt
 
-    label_threshold_value = (
-        df.groupby(["carrier", "source"]).avg_sold.sum().max() * label_threshold
-    )
+    label_threshold_value = df.groupby(["carrier", "source"]).avg_sold.sum().max() * label_threshold
     chart = alt.Chart(df).transform_calculate(
         halfsold="datum.avg_sold / 2.0",
     )
@@ -1014,7 +1047,7 @@ def fig_fare_class_mix(summaries, raw_df=False, label_threshold=0.06):
         ),
         order=alt.Order("booking_class:N", sort="descending"),
     )
-    return (
+    fig = (
         (bars + text)
         .properties(
             width=200,
@@ -1025,6 +1058,10 @@ def fig_fare_class_mix(summaries, raw_df=False, label_threshold=0.06):
             title="Carrier Fare Class Mix",
         )
     )
+    if also_df:
+        df.attrs["title"] = "Carrier Fare Class Mix"
+        return fig, df
+    return fig
 
 
 def _fig_forecasts(
@@ -1037,14 +1074,10 @@ def _fig_forecasts(
 ):
     import altair as alt
 
-    selection = alt.selection_point(
-        name="pick_booking_class", fields=["booking_class"], bind="legend"
-    )
+    selection = alt.selection_point(name="pick_booking_class", fields=["booking_class"], bind="legend")
 
     encoding = dict(
-        x=alt.X(f"days_prior:{rrd_ntype}")
-        .scale(reverse=True)
-        .title("Days Prior to Departure"),
+        x=alt.X(f"days_prior:{rrd_ntype}").scale(reverse=True).title("Days Prior to Departure"),
         y=alt.Y(f"{y}:Q", title=y_title),
         color="booking_class:N",
         strokeDash=alt.StrokeDash("source:N", title="Source"),
@@ -1077,6 +1110,7 @@ def fig_leg_forecasts(
     by_class: bool | str = True,
     of: Literal["mu", "sigma"] | list[Literal["mu", "sigma"]] = "mu",
     agg_booking_classes: bool = False,
+    also_df: bool = False,
 ):
     if isinstance(of, list):
         if raw_df:
@@ -1106,40 +1140,34 @@ def fig_leg_forecasts(
         except Exception:
             raise
         return fig.properties(title=title)
-    df = _assemble(
-        summaries, "leg_forecasts", by_leg_id=by_leg_id, by_class=by_class, of=of
-    )
+    df = _assemble(summaries, "leg_forecasts", by_leg_id=by_leg_id, by_class=by_class, of=of)
     color = "booking_class:N"
     if isinstance(by_class, str):
         color = "source:N"
     if agg_booking_classes or not by_class:
         color = "source:N"
         if of == "mu":
-            df = (
-                df.groupby(["source", "leg_id", "days_prior"])
-                .forecast_mean.sum()
-                .reset_index()
-            )
+            df = df.groupby(["source", "leg_id", "days_prior"]).forecast_mean.sum().reset_index()
         elif of == "sigma":
 
             def sum_sigma(x):
                 return np.sqrt(sum(x**2))
 
-            df = (
-                df.groupby(["source", "leg_id", "days_prior"])
-                .forecast_stdev.apply(sum_sigma)
-                .reset_index()
-            )
+            df = df.groupby(["source", "leg_id", "days_prior"]).forecast_stdev.apply(sum_sigma).reset_index()
     if raw_df:
         df.attrs["title"] = "Average Leg Forecasts"
         return df
-    return _fig_forecasts(
+    fig = _fig_forecasts(
         df,
         facet_on="flt_no" if not isinstance(by_leg_id, int) else None,
         y="forecast_mean" if of == "mu" else "forecast_stdev",
         y_title="Mean Demand Forecast" if of == "mu" else "Std Dev Demand Forecast",
         color=color,
     )
+    if also_df:
+        df.attrs["title"] = "Average Leg Forecasts"
+        return fig, df
+    return fig
 
 
 ForecastOfT = Literal["mu", "sigma", "closed", "adj_price"]
@@ -1154,6 +1182,7 @@ def fig_path_forecasts(
     agg_booking_classes: bool = False,
     by_class: bool | str = True,
     of: ForecastOfT | list[ForecastOfT] = "mu",
+    also_df: bool = False,
 ):
     if isinstance(of, list):
         if raw_df:
@@ -1193,20 +1222,13 @@ def fig_path_forecasts(
                 first_summary = next(iter(summaries.values()))
                 path_def = first_summary.paths.loc[by_path_id]
                 title += f" ({path_def['orig']}~{path_def['dest']})"
-                for leg_id in first_summary.path_legs.query(
-                    f"path_id == {by_path_id}"
-                ).leg_id:
+                for leg_id in first_summary.path_legs.query(f"path_id == {by_path_id}").leg_id:
                     leg_def = first_summary.legs.loc[leg_id]
-                    title += (
-                        f", {leg_def['carrier']} {leg_def['flt_no']} "
-                        f"({leg_def['orig']}-{leg_def['dest']})"
-                    )
+                    title += f", {leg_def['carrier']} {leg_def['flt_no']} ({leg_def['orig']}-{leg_def['dest']})"
         except Exception:
             raise
         return fig.properties(title=title)
-    df = _assemble(
-        summaries, "path_forecasts", by_path_id=by_path_id, of=of, by_class=by_class
-    )
+    df = _assemble(summaries, "path_forecasts", by_path_id=by_path_id, of=of, by_class=by_class)
     list(summaries.keys())
     if path_names is not None:
         df["path_id"] = df["path_id"].apply(lambda x: path_names.get(x, str(x)))
@@ -1215,27 +1237,15 @@ def fig_path_forecasts(
         color = "source:N"
     if agg_booking_classes:
         if of == "mu":
-            df = (
-                df.groupby(["source", "path_id", "days_prior"])
-                .forecast_mean.sum()
-                .reset_index()
-            )
+            df = df.groupby(["source", "path_id", "days_prior"]).forecast_mean.sum().reset_index()
         elif of == "sigma":
 
             def sum_sigma(x):
                 return np.sqrt(sum(x**2))
 
-            df = (
-                df.groupby(["source", "path_id", "days_prior"])
-                .forecast_stdev.apply(sum_sigma)
-                .reset_index()
-            )
+            df = df.groupby(["source", "path_id", "days_prior"]).forecast_stdev.apply(sum_sigma).reset_index()
         elif of == "closed":
-            df = (
-                df.groupby(["source", "path_id", "days_prior"])
-                .forecast_closed_in_tf.mean()
-                .reset_index()
-            )
+            df = df.groupby(["source", "path_id", "days_prior"]).forecast_closed_in_tf.mean().reset_index()
     if raw_df:
         if of == "mu":
             df.attrs["title"] = "Average Path Forecast Means"
@@ -1261,10 +1271,10 @@ def fig_path_forecasts(
 
     # use ordinal data type for DCP labels unless
     # the underlying data is daily, then use Q
-    rrd_ntype = "O"
+    rrd_ntype: Literal["O", "Q"] = "O"
     if len(df["days_prior"].value_counts()) > 30:
         rrd_ntype = "Q"
-    return _fig_forecasts(
+    fig = _fig_forecasts(
         df,
         facet_on="path_id" if not isinstance(by_path_id, int) else None,
         y=y,
@@ -1272,6 +1282,15 @@ def fig_path_forecasts(
         color=color,
         rrd_ntype=rrd_ntype,
     )
+    if also_df:
+        if of == "mu":
+            df.attrs["title"] = "Average Path Forecast Means"
+        elif of == "sigma":
+            df.attrs["title"] = "Average Path Forecast Standard Deviations"
+        elif of == "closed":
+            df.attrs["title"] = "Average Path Forecast Closed in Timeframe"
+        return fig, df
+    return fig
 
 
 @report_figure
@@ -1283,6 +1302,7 @@ def fig_bid_price_history(
     cap: Literal["some", "zero", None] = None,
     raw_df: bool = False,
     title: str | None = "Bid Price History",
+    also_df: bool = False,
 ):
     if cap is None:
         bp_mean = "bid_price_mean"
@@ -1295,8 +1315,7 @@ def fig_bid_price_history(
 
     if not isinstance(by_carrier, str) and show_stdev:
         raise NotImplementedError(
-            "contrast.fig_bid_price_history with show_stdev requires "
-            "looking at a single carrier (set `by_carrier`)"
+            "contrast.fig_bid_price_history with show_stdev requires looking at a single carrier (set `by_carrier`)"
         )
     df = _assemble(
         summaries,
@@ -1317,9 +1336,7 @@ def fig_bid_price_history(
     fig = chart.mark_line(interpolate="step-before").encode(**line_encoding)
     if show_stdev:
         area_encoding = dict(
-            x=alt.X("days_prior:Q")
-            .scale(reverse=True)
-            .title("Days Prior to Departure"),
+            x=alt.X("days_prior:Q").scale(reverse=True).title("Days Prior to Departure"),
             y=alt.Y("bid_price_lower:Q", title="Bid Price"),
             y2=alt.Y2("bid_price_upper:Q", title="Bid Price"),
             color="source:N",
@@ -1328,12 +1345,8 @@ def fig_bid_price_history(
             opacity=0.1,
             interpolate="step-before",
         ).encode(**area_encoding)
-        bound_line = chart.mark_line(
-            opacity=0.4, strokeDash=[5, 5], interpolate="step-before"
-        ).encode(
-            x=alt.X("days_prior:Q")
-            .scale(reverse=True)
-            .title("Days Prior to Departure"),
+        bound_line = chart.mark_line(opacity=0.4, strokeDash=[5, 5], interpolate="step-before").encode(
+            x=alt.X("days_prior:Q").scale(reverse=True).title("Days Prior to Departure"),
             color="source:N",
         )
         top_line = bound_line.encode(y=alt.Y("bid_price_lower:Q", title="Bid Price"))
@@ -1347,6 +1360,8 @@ def fig_bid_price_history(
         if title:
             title = f"{title} ({by_carrier})"
             fig = fig.properties(title=title)
+    if also_df:
+        return fig, df
     return fig
 
 
@@ -1358,11 +1373,11 @@ def fig_displacement_history(
     show_stdev: float | bool | None = None,
     raw_df: bool = False,
     title: str | None = "Displacement Cost History",
+    also_df: bool = False,
 ):
     if not isinstance(by_carrier, str) and show_stdev:
         raise NotImplementedError(
-            "contrast.fig_displacement_history with show_stdev requires "
-            "looking at a single carrier (set `by_carrier`)"
+            "contrast.fig_displacement_history with show_stdev requires looking at a single carrier (set `by_carrier`)"
         )
     df = _assemble(
         summaries,
@@ -1382,9 +1397,7 @@ def fig_displacement_history(
     fig = chart.mark_line(interpolate="step-before").encode(**line_encoding)
     if show_stdev:
         area_encoding = dict(
-            x=alt.X("days_prior:Q")
-            .scale(reverse=True)
-            .title("Days Prior to Departure"),
+            x=alt.X("days_prior:Q").scale(reverse=True).title("Days Prior to Departure"),
             y=alt.Y("displacement_lower:Q", title="Displacement Cost"),
             y2=alt.Y2("displacement_upper:Q", title="Displacement Cost"),
             color="source:N",
@@ -1393,20 +1406,12 @@ def fig_displacement_history(
             opacity=0.1,
             interpolate="step-before",
         ).encode(**area_encoding)
-        bound_line = chart.mark_line(
-            opacity=0.4, strokeDash=[5, 5], interpolate="step-before"
-        ).encode(
-            x=alt.X("days_prior:Q")
-            .scale(reverse=True)
-            .title("Days Prior to Departure"),
+        bound_line = chart.mark_line(opacity=0.4, strokeDash=[5, 5], interpolate="step-before").encode(
+            x=alt.X("days_prior:Q").scale(reverse=True).title("Days Prior to Departure"),
             color="source:N",
         )
-        top_line = bound_line.encode(
-            y=alt.Y("displacement_lower:Q", title="Displacement Cost")
-        )
-        bottom_line = bound_line.encode(
-            y=alt.Y("displacement_upper:Q", title="Displacement Cost")
-        )
+        top_line = bound_line.encode(y=alt.Y("displacement_lower:Q", title="Displacement Cost"))
+        bottom_line = bound_line.encode(y=alt.Y("displacement_upper:Q", title="Displacement Cost"))
         fig = fig + bound + top_line + bottom_line
     if not isinstance(by_carrier, str):
         fig = fig.properties(height=125, width=225).facet(facet="carrier:N", columns=2)
@@ -1416,6 +1421,8 @@ def fig_displacement_history(
         if title:
             title = f"{title} ({by_carrier})"
             fig = fig.properties(title=title)
+    if also_df:
+        return fig, df
     return fig
 
 
@@ -1426,6 +1433,7 @@ def fig_demand_to_come(
     *,
     raw_df=False,
     title: str | None = "Demand to Come",
+    also_df: bool = False,
 ):
     def dtc_seg(s):
         if s is None:
@@ -1475,16 +1483,12 @@ def fig_demand_to_come(
 
     if func == "mean":
         y_title = "Mean Demand to Come"
-        demand_to_come_by_segment = summaries.apply(
-            lambda s: get_values(s, "mean"), axis=1, warn_if_missing=True
-        )
+        demand_to_come_by_segment = summaries.apply(lambda s: get_values(s, "mean"), axis=1, warn_if_missing=True)
         demand_to_come_by_segment.index.names = ["segment", "days_prior"]
         df = demand_to_come_by_segment.stack().rename("dtc").reset_index()
     elif func == "std":
         y_title = "Std Dev Demand to Come"
-        demand_to_come_by_segment = summaries.apply(
-            lambda s: get_values(s, "std"), axis=1, warn_if_missing=True
-        )
+        demand_to_come_by_segment = summaries.apply(lambda s: get_values(s, "std"), axis=1, warn_if_missing=True)
         demand_to_come_by_segment.index.names = ["segment", "days_prior"]
         df = demand_to_come_by_segment.stack().rename("dtc").reset_index()
     else:
@@ -1495,9 +1499,7 @@ def fig_demand_to_come(
         alt.Chart(df)
         .mark_line()
         .encode(
-            x=alt.X("days_prior:O")
-            .scale(reverse=True)
-            .title("Days Prior to Departure"),
+            x=alt.X("days_prior:O").scale(reverse=True).title("Days Prior to Departure"),
             y=alt.Y("dtc:Q").title(y_title),
             color="segment:N",
             strokeDash="source:N",
@@ -1505,4 +1507,108 @@ def fig_demand_to_come(
     )
     if title:
         fig = fig.properties(title=title)
+    if also_df:
+        return fig, df
     return fig
+
+
+@report_figure
+def fig_cp_segmentation(
+    summaries: Contrast,
+    *,
+    raw_df: bool = False,
+    title: str | None = "Continuous Price Segmentation",
+    also_df: bool = False,
+    height: int = 600,
+    width: int = 300,
+) -> alt.Chart | tuple[alt.Chart, pd.DataFrame] | pd.DataFrame:
+    """
+    Generate a figure contrasting continuous price segmentation for one or more runs.
+
+    Parameters
+    ----------
+    summaries : dict[str, SummaryTables]
+        A dictionary of summary tables for different runs.
+    raw_df : bool, default False
+        If True, return the raw data used to generate the figure.
+    title : str, default "Continuous Price Segmentation"
+        The title of the figure.
+    also_df : bool, default False
+        If True, return the raw data used to generate the figure in addition to the figure itself.
+    height : int, default 600
+        The height of each facet panel of the figure, in pixels.
+    width : int, default 300
+        The width of each facet panel of the figure, in pixels.
+
+    Returns
+    -------
+    alt.Chart or tuple[alt.Chart, pd.DataFrame] or pd.DataFrame
+        The generated Altair chart or the raw data used to generate the figure.
+    """
+    import altair as alt
+
+    df = pd.concat(
+        {k: s.cp_segmentation for k, s in summaries.items() if s.cp_segmentation is not None}, names=["source"]
+    )
+    source_order = list(summaries.keys())
+
+    df = df.reset_index()[["source", "carrier", "booking_class", "sold", "cp_sold"]]
+    if raw_df:
+        return df
+    df["Zero"] = 0
+
+    base_chart = alt.Chart(df)
+
+    # Add a solid border to the "Continuous Priced" bars using stroke/strokeWidth
+    chart = (
+        base_chart.mark_bar()
+        .encode(
+            y=alt.Y("booking_class:N", sort=None, title="Booking Class"),
+            x=alt.X("sold:Q", title="Total Sold", stack=False, axis=alt.Axis()),
+            color=alt.Color("source:N", title="Source"),
+            yOffset=alt.YOffset("source:N", title="Source", sort=source_order),
+            tooltip=[
+                alt.Tooltip("source:N", title="Source"),
+                alt.Tooltip("carrier:N", title="Carrier"),
+                alt.Tooltip("booking_class:N", title="Booking Class"),
+                alt.Tooltip("sold:Q", title="Total Sold", format=","),
+                alt.Tooltip("cp_sold:Q", title="Continuous Priced Sold", format=","),
+            ],
+        )
+        .properties(width=width, height=height)
+    )
+
+    chart_cp = (
+        base_chart.transform_filter(
+            alt.datum.cp_sold > 0  # Only show nonzero counts for cp_sold
+        )
+        .mark_errorbar(extent="ci", ticks=True)
+        .encode(
+            y=alt.Y("booking_class:N", sort=source_order, title="Booking Class"),
+            x=alt.X("cp_sold:Q", title="Continuous Priced Sold"),
+            x2=alt.X2("Zero:Q", title="Zero"),
+            color=alt.value("black"),
+            yOffset=alt.YOffset("source:N", title="Source", sort=source_order),
+            tooltip=[
+                alt.Tooltip("source:N", title="Source"),
+                alt.Tooltip("carrier:N", title="Carrier"),
+                alt.Tooltip("booking_class:N", title="Booking Class"),
+                alt.Tooltip("sold:Q", title="Total Sold", format=","),
+                alt.Tooltip("cp_sold:Q", title="Continuous Priced Sold", format=","),
+            ],
+            strokeWidth=alt.value(2),  # Set stroke width for the error bars
+        )
+        .properties(width=width, height=height)
+    )
+
+    fig = (chart + chart_cp).facet(
+        facet=alt.Facet("carrier:N", title="Carrier"),
+    )
+
+    if title:
+        fig = fig.properties(title=title)
+
+    if also_df:
+        return fig, df
+    else:
+        return fig

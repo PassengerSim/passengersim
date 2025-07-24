@@ -18,6 +18,4 @@ def info():
    [red]This build expires {build_expiration().astimezone()}[/red]"""
     )
     license_info()
-    print(
-        "\n   [link=https://www.passengersim.com/]https://www.passengersim.com[/link]"
-    )
+    print("\n   [link=https://www.passengersim.com/]https://www.passengersim.com[/link]")

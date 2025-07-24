@@ -12,7 +12,7 @@ class ToddCurve(PrettyModel, extra="forbid"):
     name: str = "???"
     min_distance: int = 0
     max_distance: int = 25000
-    k_factor: float = 3.0
+    k_factor: float = 0.3
 
     probabilities: dict[int, float] | list[float] = None
     """Define a TODD curve.

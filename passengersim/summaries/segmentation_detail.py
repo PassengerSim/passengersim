@@ -71,9 +71,7 @@ def detailed_bookings_by_timeframe(
     else:
         params = (burn_samples, scenario)
 
-    return cnx.dataframe(qry, params).set_index(
-        ["trial", "carrier", "orig", "dest", "booking_class", "days_prior"]
-    )
+    return cnx.dataframe(qry, params).set_index(["trial", "carrier", "orig", "dest", "booking_class", "days_prior"])
 
 
 class SimTabSegmentationDetail(GenericSimulationTables):
@@ -97,7 +95,31 @@ class SimTabSegmentationDetail(GenericSimulationTables):
         orig: str | None = None,
         dest: str | None = None,
         raw_df: bool = False,
-    ):
+        also_df: bool = False,
+    ) -> alt.Chart | pd.DataFrame | tuple[alt.Chart, pd.DataFrame]:
+        """
+        Plot the segmentation detail data.
+
+        Parameters
+        ----------
+        by_carrier : bool or str, default True
+            If True, group by carrier. If a string, filter by carrier.
+        by_class : bool or str, default False
+            If True, group by booking class. If a string, filter by booking class.
+        orig : str, optional
+            Filter by origin.
+        dest : str, optional
+            Filter by destination.
+        raw_df : bool, default False
+            If True, return the raw dataframe instead of the figure.
+        also_df : bool, default False
+            If True, return the dataframe as well as the figure.
+
+        Returns
+        -------
+        alt.Chart or pd.DataFrame or tuple[alt.Chart, pd.DataFrame]
+            The segmentation detail figure or dataframe.
+        """
         if self.segmentation_detail is None:
             raise ValueError("segmentation_detail not found")
         metric = "bookings"
@@ -146,13 +168,7 @@ class SimTabSegmentationDetail(GenericSimulationTables):
                 g += ["booking_class"]
             df = df.groupby(g, observed=False)[[metric]].sum().reset_index()
         if by_carrier and not by_class:
-            df = (
-                df.groupby(["carrier", "days_prior", "segment"], observed=False)[
-                    [metric]
-                ]
-                .sum()
-                .reset_index()
-            )
+            df = df.groupby(["carrier", "days_prior", "segment"], observed=False)[[metric]].sum().reset_index()
         if isinstance(by_carrier, str):
             df = df[df["carrier"] == by_carrier]
             df = df.drop(columns=["carrier"])
@@ -190,18 +206,10 @@ class SimTabSegmentationDetail(GenericSimulationTables):
             .mark_bar()
             .encode(
                 color=alt.Color(color).title(color_title),
-                x=alt.X("days_prior:O")
-                .scale(reverse=True)
-                .title("Days Prior to Departure"),
+                x=alt.X("days_prior:O").scale(reverse=True).title("Days Prior to Departure"),
                 y=alt.Y(metric),
-                tooltip=(
-                    [alt.Tooltip("carrier").title("Carrier")] if by_carrier else []
-                )
-                + (
-                    [alt.Tooltip("booking_class").title("Booking Class")]
-                    if by_class
-                    else []
-                )
+                tooltip=([alt.Tooltip("carrier").title("Carrier")] if by_carrier else [])
+                + ([alt.Tooltip("booking_class").title("Booking Class")] if by_class else [])
                 + [
                     alt.Tooltip("segment", title="Passenger Type"),
                     alt.Tooltip("days_prior", title="Days Prior"),
@@ -220,6 +228,8 @@ class SimTabSegmentationDetail(GenericSimulationTables):
             )
         else:
             chart = chart.properties(title=title)
+        if also_df:
+            return chart, df
         return chart
 
 
@@ -232,9 +242,39 @@ def fig_segmentation_detail(
     orig: str | None = None,
     dest: str | None = None,
     raw_df: bool = False,
+    also_df: bool = False,
     width: int | None = 400,
     height: int | None = 180,
-) -> alt.Chart:
+) -> alt.Chart | pd.DataFrame | tuple[alt.Chart, pd.DataFrame]:
+    """
+    Plot the segmentation detail data.
+
+    Parameters
+    ----------
+    summaries : Contrast
+        The contrast object containing the segmentation detail data.
+    by_carrier : bool or str, default True
+        If True, group by carrier. If a string, filter by carrier.
+    by_class : bool or str, default False
+        If True, group by booking class. If a string, filter by booking class.
+    orig : str, optional
+        Filter by origin.
+    dest : str, optional
+        Filter by destination.
+    raw_df : bool, default False
+        If True, return the raw dataframe instead of the figure.
+    also_df : bool, default False
+        If True, return the dataframe as well as the figure.
+    width : int, optional
+        The width of the figure. Default is 400.
+    height : int, optional
+        The height of the figure. Default is 180.
+
+    Returns
+    -------
+    alt.Chart or pd.DataFrame or tuple[alt.Chart, pd.DataFrame]
+        The segmentation detail figure or dataframe.
+    """
     dfs = {
         k: v.fig_segmentation_detail(
             by_carrier=by_carrier,
@@ -289,20 +329,14 @@ def fig_segmentation_detail(
         .mark_bar()
         .encode(
             xOffset=alt.XOffset("source:N"),
-            x=alt.X("days_prior:O")
-            .scale(reverse=True)
-            .title("Days Prior to Departure"),
+            x=alt.X("days_prior:O").scale(reverse=True).title("Days Prior to Departure"),
             y=alt.Y("bookings:Q").title("Bookings"),
             color=alt.Color(color).title(color_title),
             tooltip=[
                 alt.Tooltip("source", title="Source"),
             ]
             + ([alt.Tooltip("carrier").title("Carrier")] if by_carrier else [])
-            + (
-                [alt.Tooltip("booking_class").title("Booking Class")]
-                if by_class
-                else []
-            )
+            + ([alt.Tooltip("booking_class").title("Booking Class")] if by_class else [])
             + [
                 alt.Tooltip("segment", title="Passenger Type"),
                 alt.Tooltip("days_prior", title="Days Prior"),
@@ -322,4 +356,6 @@ def fig_segmentation_detail(
     else:
         fig = fig.properties(title=title, width=width, height=height)
 
+    if also_df:
+        return fig, df
     return fig

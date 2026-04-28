@@ -25,7 +25,6 @@ def test_db_serialization(config: Config):
     assert isinstance(z["db"], dict)
     assert sorted(z["db"].keys()) == [
         "commit_count_delay",
-        "dcp_write_hooks",
         "engine",
         "fast",
         "filename",
@@ -73,12 +72,15 @@ def test_output_serialization(config):
     assert "outputs" in z
     assert isinstance(z["outputs"], dict)
     assert sorted(z["outputs"].keys()) == [
+        "base_dir",
         "disk",
         "excel",
+        "filename_stem",
         "html",
         "log_reports",
         "pickle",
         "reports",
+        "sim_state",
     ]
     assert config.outputs.reports == {"*"}
     assert isinstance(z["outputs"]["reports"], list)
@@ -86,7 +88,7 @@ def test_output_serialization(config):
 
 
 def test_restriction_stripping(config):
-    cfg0 = manipulate.strip_all_restrictions(config)
+    cfg0 = manipulate.strip_fare_restrictions(config)
     assert not cfg0.choice_models.business.restrictions
     assert not cfg0.choice_models.leisure.restrictions
     assert config.choice_models.business.restrictions
@@ -94,7 +96,7 @@ def test_restriction_stripping(config):
     for fare in cfg0.fares:
         assert not fare.restrictions
 
-    cfg1 = manipulate.strip_all_restrictions(config, inplace=True)
+    cfg1 = manipulate.strip_fare_restrictions(config, inplace=True)
     assert not cfg1.choice_models.business.restrictions
     assert not cfg1.choice_models.leisure.restrictions
     assert not config.choice_models.business.restrictions
@@ -103,3 +105,79 @@ def test_restriction_stripping(config):
         assert not fare.restrictions
     for fare in config.fares:
         assert not fare.restrictions
+
+
+def test_reference_price_variation_vs_multiplier(config: Config):
+    """Validate the new check that prevents combining per-OD reference_price
+    variation with a non-trivial choice-model reference_price_multiplier.
+    """
+    # Identify a PODS-style choice model in the fixture to tweak multipliers.
+    cm_name, cm = next(iter(config.choice_models.items()))
+    assert hasattr(cm, "reference_price_multiplier")
+
+    # Baseline: the fixture should validate as-is (any one or zero conditions OK).
+    cfg_ok = Config.model_validate(config.model_dump())
+    assert cfg_ok is not None
+
+    # Condition 1 only: introduce reference_price variation within an OD.
+    data = config.model_dump()
+    # Find at least two demands sharing the same (orig, dest).
+    od_groups: dict[tuple[str, str], list[int]] = {}
+    for i, d in enumerate(data["demands"]):
+        od_groups.setdefault((d["orig"], d["dest"]), []).append(i)
+    shared_od = next((idxs for idxs in od_groups.values() if len(idxs) >= 2), None)
+    assert shared_od is not None, "fixture must have at least two demands in one OD"
+    data["demands"][shared_od[0]]["reference_price"] = 100.0
+    data["demands"][shared_od[1]]["reference_price"] = 200.0
+    # Ensure all choice models have a neutral (1.0) multiplier.
+    for cm_data in data["choice_models"].values():
+        if "reference_price_multiplier" in cm_data:
+            cm_data["reference_price_multiplier"] = 1.0
+    cfg1 = Config.model_validate(data)
+    assert cfg1 is not None  # only condition 1 true: OK
+
+    # Condition 2 only: set a non-trivial multiplier, no OD variation.
+    data2 = config.model_dump()
+    # Normalize: make reference_price constant within every OD group.
+    od_first_price: dict[tuple[str, str], float | None] = {}
+    for d in data2["demands"]:
+        key = (d["orig"], d["dest"])
+        od_first_price.setdefault(key, d.get("reference_price"))
+        d["reference_price"] = od_first_price[key]
+    data2["choice_models"][cm_name]["reference_price_multiplier"] = 1.5
+    cfg2 = Config.model_validate(data2)
+    assert cfg2 is not None  # only condition 2 true: OK
+
+    # Both conditions true -> should raise.
+    data3 = config.model_dump()
+    data3["demands"][shared_od[0]]["reference_price"] = 100.0
+    data3["demands"][shared_od[1]]["reference_price"] = 200.0
+    data3["choice_models"][cm_name]["reference_price_multiplier"] = 1.5
+    with pytest.raises(ValueError, match="reference_price_multiplier"):
+        Config.model_validate(data3)
+
+    # A None multiplier should NOT count as non-trivial, even with OD variation.
+    data4 = config.model_dump()
+    data4["demands"][shared_od[0]]["reference_price"] = 100.0
+    data4["demands"][shared_od[1]]["reference_price"] = 200.0
+    data4["choice_models"][cm_name]["reference_price_multiplier"] = None
+    for name, cm_data in data4["choice_models"].items():
+        if name == cm_name:
+            continue
+        if "reference_price_multiplier" in cm_data:
+            cm_data["reference_price_multiplier"] = 1.0
+    cfg4 = Config.model_validate(data4)
+    assert cfg4 is not None
+
+
+def test_ap_restriction_stripping(config):
+    cfg0 = manipulate.strip_ap_restrictions(config)
+    for fare in cfg0.fares:
+        assert fare.advance_purchase == 0
+    assert any(f.advance_purchase > 0 for f in config.fares)
+
+    cfg1 = manipulate.strip_ap_restrictions(config, inplace=True)
+    for fare in cfg1.fares:
+        assert fare.advance_purchase == 0
+    for fare in config.fares:
+        assert fare.advance_purchase == 0

@@ -1,0 +1,34 @@
+places:
+  BOS:
+    country: null
+    label: Boston Logan International Airport
+    lat: 42.3656
+    lon: -71.0098
+    max_connect_time: null
+    mct: null
+    name: BOS
+    state: null
+    time_zone: America/New_York
+    tz_offset: null
+  LAX:
+    country: null
+    label: Los Angeles International Airport
+    lat: 33.9438
+    lon: -118.4091
+    max_connect_time: null
+    mct: null
+    name: LAX
+    state: null
+    time_zone: America/Los_Angeles
+    tz_offset: null
+  ORD:
+    country: null
+    label: Chicago O'Hare International Airport
+    lat: 41.9802
+    lon: -87.909
+    max_connect_time: null
+    mct: null
+    name: ORD
+    state: null
+    time_zone: America/Chicago
+    tz_offset: null

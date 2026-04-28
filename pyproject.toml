@@ -8,8 +8,9 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
-fallback_version = "0.1.0"
-write_to = "passengersim/_version.py"
+fallback_version = "0.0.404"
+write_to = "src/passengersim/_version.py"
+search_parent_directories = true
 
 [tool.bumpversion]
 parse = "(?P<major>\\d+)\\.(?P<minor>\\d+)"
@@ -35,42 +36,43 @@ post_commit_hooks = []
 name = "passengersim"
 classifiers = [
   "Development Status :: 4 - Beta",
-  "License :: OSI Approved :: BSD License",
   "Programming Language :: Python :: 3.12",
 ]
-license = {file = "LICENSE"}
+license = "BSD-3-Clause"
 dynamic = ["version"]
 requires-python = ">=3.12"
 dependencies = [
     "addicty",
-    "altair",
+    "altair>=5.0",
     "dill",
+    "docutils",
     "joblib",
     "lz4",
     "numpy",
     "ortools",
-    "pandas",
+    "pandas>=2.3.3,<3.0",
     "pydantic>=2.7",
     "pyyaml",
     "scipy",
     "typer",
-    "xmle",
+    "xmle>=0.1.27",
 ]
 
 [project.optional-dependencies]
 test = [
-    "altair>=5.0",
-    "xmle",
     "pytest-regressions ~=2.4",
 ]
-reporting = [
-    "altair>=5.0",
-    "xmle",
-    "docutils",
+lab = [
+    "jupyterlab>=4.4.5",
+    "ipywidgets>=8.1.7",
+]
+mapping = [
+    "geopandas>=1.1.1",
+    "vega-datasets>=0.9.0",
 ]
 
 [tool.setuptools.packages.find]
-where = ["."]  # list of folders that contain the packages (["."] by default)
+where = ["src"]  # list of folders that contain the packages (["."] by default)
 include = ["passengersim*"]  # package names should match these glob patterns (["*"] by default)
 exclude = ["passengersim.tests*"]  # exclude packages matching these glob patterns (empty by default)
 namespaces = false  # to disable scanning PEP 420 namespaces (true by default)
@@ -78,6 +80,7 @@ namespaces = false  # to disable scanning PEP 420 namespaces (true by default)
 [tool.setuptools.package-data]
 passengersim = [
     "networks/*.yaml",
+    "networks/us25/*.pxsim",
 ]
 
 [metadata]
@@ -106,4 +109,13 @@ convention = "numpy"
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "--durations=0 --durations-min=1.0"
+addopts = "-n auto --dist loadfile --durations=0 --durations-min=1.0"
+filterwarnings = [
+    "ignore::DeprecationWarning:importlib._bootstrap",
+]
+markers = [
+    "skip_until: Skip this test until a specific date",
+]
+
+[project.scripts]
+paxlab = "jupyterlab.labapp:main"

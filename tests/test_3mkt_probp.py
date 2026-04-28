@@ -14,11 +14,15 @@ DEFAULT_TOLERANCE = dict(rtol=1e-04, atol=1e-06)
 def config() -> Config:
     input_file = demo_network("3MKT/11-probp-daily")
     cfg = Config.from_yaml(input_file)
+    cfg.carriers.AL1.rm_system_options = {"name": "P", "bid_price_vector": False}
+    cfg.carriers.AL2.rm_system_options = {"name": "P", "bid_price_vector": False}
     cfg.simulation_controls.num_trials = 2
     cfg.simulation_controls.num_samples = 100
     cfg.simulation_controls.burn_samples = 60
+    cfg.simulation_controls.connection_builder.nonstop_leg_path_id_alignment = False
     cfg.outputs.reports.clear()
     cfg.outputs.reports.add("*")
+    cfg.outputs._write_no_files()
     return cfg
 
 
@@ -170,9 +174,9 @@ def test_3mkt_probp_fig_od_fare_class_mix(summary, dataframe_regression):
 
 
 @pytest.mark.parametrize("of", ["mu", "sigma"])
-def test_3mkt_probp_fig_leg_forecasts(summary, dataframe_regression, of: Literal["mu", "sigma"]):
+def test_3mkt_probp_fig_path_forecasts(summary, dataframe_regression, of: Literal["mu", "sigma"]):
     assert isinstance(summary, SimulationTables)
-    fig = summary.fig_leg_forecasts(of=of)
+    fig = summary.fig_path_forecasts(of=of)
     assert isinstance(fig, altair.TopLevelMixin)
-    df = summary.fig_leg_forecasts(of=of, raw_df=True).reset_index(drop=True)
+    df = summary.fig_path_forecasts(of=of, raw_df=True).reset_index(drop=True)
     dataframe_regression.check(df, default_tolerance=DEFAULT_TOLERANCE)

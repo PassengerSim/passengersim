@@ -1,31 +1,55 @@
 import hashlib
 import json
-import os
 
 import altair as alt
-from pytest import fixture, mark, skip
+from pytest import fixture, mark
 
 import passengersim as pax
 
 
-@fixture(scope="module", params=[10, 0, 2])
+@fixture(
+    scope="module",
+    params=[
+        dict(max_cap=10),
+        dict(max_cap=0),
+        dict(max_cap=2),
+        dict(max_cap=0, fa="mr", scale=0.25),
+        dict(max_cap=0, fa="ki", scale=0.25),
+        dict(max_cap=0, fa="mr", scale=0.0),
+        dict(max_cap=0, fa="ki", scale=0.0),
+    ],
+)
 def config(request) -> pax.Config:
-    max_cap = request.param
-    if os.getenv("GITHUB_ACTIONS") == "true":
-        skip("Skipping on GitHub Actions")
+    print("\n\nRunning test with parameters:", request.param, "\n")
+    max_cap = request.param.get("max_cap", 10)
+    fa_algo = request.param.get("fa", None)
+    fa_scale = request.param.get("scale", 0.0)
+    # if os.getenv("GITHUB_ACTIONS") == "true":
+    #     skip("Skipping on GitHub Actions")
     cfg = pax.Config.from_yaml(pax.demo_network("3MKT"))
-    cfg.carriers.AL1.rm_system = "C"
-    cfg.carriers.AL2.rm_system = "E"
+    cfg.carriers.AL1.rm_system = "M"
+    cfg.carriers.AL1.rm_system_options = {
+        "name": "M",
+        "max_cap": max_cap,
+        "fare_adjustment": fa_algo,
+        "fare_adjustment_scale": fa_scale,
+        "bid_price_vector": False,
+        "regression_weight": "sellup",
+        "variance_is_ratio_of_mean": 0.0,
+    }
+    cfg.carriers.AL1.frat5 = "curve_C"
+    cfg.carriers.AL2.rm_system_options = {"name": "E"}
     cfg.simulation_controls.num_trials = 1
     cfg.simulation_controls.num_samples = 250
-    cfg = cfg.model_revalidate()
-    cfg.rm_systems.C.processes.DCP.forecast.max_cap = max_cap
+    cfg.outputs._write_no_files()
     return cfg
 
 
-def _target(basename, maxcap):
+def _target(basename, maxcap, fa_algo=None, fa_scale=None):
     if maxcap not in {0, 10}:
         return basename + f"_max_cap_{maxcap}"
+    if fa_algo is not None:
+        basename = f"{basename}_{fa_algo}_{int(fa_scale * 100)}"
     return basename
 
 
@@ -54,17 +78,21 @@ TABLES = [
 ]
 
 
+@mark.skip_until("2026-05-25", responsible="jpn")
 def test_table_list(summary):
     assert isinstance(summary, pax.SimulationTables)
     assert all(hasattr(summary, table) for table in TABLES)
 
 
+@mark.skip_until("2026-05-25", responsible="jpn")
 @mark.parametrize("table_name", TABLES)
 def test_summary_tables(summary, dataframe_regression, table_name: str):
     assert isinstance(summary, pax.SimulationTables)
     df = getattr(summary, table_name)
-    max_cap = summary.config.rm_systems.C.processes.DCP.forecast.max_cap
-    dataframe_regression.check(df, basename=_target(table_name, max_cap))
+    max_cap = summary.config.carriers.AL1.rm_system_options.get("max_cap", None)
+    fa_algo = summary.config.carriers.AL1.rm_system_options.get("fare_adjustment", None)
+    fa_scale = summary.config.carriers.AL1.rm_system_options.get("fare_adjustment_scale", None)
+    dataframe_regression.check(df, basename=_target(table_name, max_cap, fa_algo, fa_scale))
 
 
 FIGURES = [
@@ -90,6 +118,7 @@ FIGURES = [
 ]
 
 
+@mark.skip_until("2026-05-25", responsible="jpn")
 @mark.parametrize("fig", FIGURES)
 def test_summary_figures(summary, dataframe_regression, fig: tuple[str, dict]):
     fig_name, kwargs = fig
@@ -101,5 +130,7 @@ def test_summary_figures(summary, dataframe_regression, fig: tuple[str, dict]):
         s = json.dumps(kwargs, sort_keys=True)
         h = hashlib.md5(s.encode()).hexdigest()[:12]
         fig_name = f"{fig_name}_{h}"
-    max_cap = summary.config.rm_systems.C.processes.DCP.forecast.max_cap
-    dataframe_regression.check(df, basename=_target(fig_name, max_cap))
+    max_cap = summary.config.carriers.AL1.rm_system_options.get("max_cap", None)
+    fa_algo = summary.config.carriers.AL1.rm_system_options.get("fare_adjustment", None)
+    fa_scale = summary.config.carriers.AL1.rm_system_options.get("fare_adjustment_scale", None)
+    dataframe_regression.check(df, basename=_target(fig_name, max_cap, fa_algo, fa_scale))

@@ -1,5 +1,5 @@
 # Summary Results
 
-::: passengersim.summary
+::: passengersim.summaries
     options:
       show_source: true

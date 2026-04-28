@@ -4,7 +4,6 @@ import pytest
 
 from passengersim import Simulation, demo_network
 from passengersim.config import Config
-from passengersim.database.write_demands import save_demand_to_database
 
 
 def test_3mkt(data_regression):
@@ -14,6 +13,7 @@ def test_3mkt(data_regression):
     config.simulation_controls.num_samples = 10
     config.simulation_controls.burn_samples = 9
     config.simulation_controls.allow_unused_restrictions = True
+    config.outputs._write_no_files()
     print(config.db.filename)
     if config.db.filename:
         f = pathlib.Path(config.db.filename)
@@ -33,6 +33,7 @@ def test_3mkt_alt():
 def test_3mkt_db_detail(fast):
     input_file = demo_network("3mkt-old")
     config = Config.from_yaml(input_file)
+    config.outputs._write_no_files()
 
     n_legs = len(config.legs)
     assert n_legs == 9
@@ -61,13 +62,6 @@ def test_3mkt_db_detail(fast):
     config.db.write_items.add("leg")
     config.db.write_items.add("bucket")
     config.db.write_items.add("demand")
-    if "demand" in config.db.write_items:
-        # remove demand to test plug in hook
-        config.db.write_items.remove("demand")
-    if "demand_final" in config.db.write_items:
-        # remove demand to test plug in hook
-        config.db.write_items.remove("demand_final")
-    config.db.dcp_write_hooks.append(save_demand_to_database)
     config.simulation_controls.write_raw_files = False
     config.simulation_controls.allow_unused_restrictions = True
     sim = Simulation(config, output_dir=None)

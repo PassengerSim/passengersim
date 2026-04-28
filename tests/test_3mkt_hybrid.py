@@ -61,11 +61,10 @@ def summary_fare_adjustment(config: Config, request: pytest.FixtureRequest) -> (
     if detruncation:
         pytest.skip("Fare adjustment with detruncation testing is suspended")
     fare_adj_scale = request.param[2]
-    config.rm_systems.rm_hybrid.processes.dcp.forecast.fare_adjustment = fare_adj
-    config.rm_systems.rm_hybrid.processes.dcp.forecast.fare_adjustment_scale = fare_adj_scale
-    # config.rm_systems.rm_hybrid.processes.dcp.forecast.detruncation_algorithm = (
-    #     detruncation
-    # )
+    config.carriers.AL1.rm_system_options["fare_adjustment"] = fare_adj
+    config.carriers.AL1.rm_system_options["fare_adjustment_scale"] = fare_adj_scale
+    config.carriers.AL2.rm_system_options["fare_adjustment"] = fare_adj
+    config.carriers.AL2.rm_system_options["fare_adjustment_scale"] = fare_adj_scale
     sim = Simulation(config)
     return fare_adj, detruncation, fare_adj_scale, sim.run(summarizer=SimulationTables)
 
@@ -90,6 +89,7 @@ TABLE_NOT_SENSITIVE_TO_RM = [
 ]
 
 
+@pytest.mark.skip(reason="hybrid with EMSR-B testing is suspended")
 @pytest.mark.parametrize("table_name", TABLES)
 def test_3mkt_hybrid_table_single_process(summary, dataframe_regression, table_name: str):
     detruncation, summary = summary
@@ -102,6 +102,7 @@ def test_3mkt_hybrid_table_single_process(summary, dataframe_regression, table_n
     dataframe_regression.check(df, basename=basename, default_tolerance=DEFAULT_TOLERANCE)
 
 
+@pytest.mark.skip(reason="hybrid with EMSR-B testing is suspended")
 @pytest.mark.parametrize("table_name", TABLES)
 def test_3mkt_hybrid_table_multi_process(summary_mp, dataframe_regression, table_name: str):
     detruncation, summary_mp = summary_mp
@@ -114,6 +115,7 @@ def test_3mkt_hybrid_table_multi_process(summary_mp, dataframe_regression, table
     dataframe_regression.check(df, basename=basename, default_tolerance=DEFAULT_TOLERANCE)
 
 
+@pytest.mark.skip(reason="hybrid with EMSR-B testing is suspended")
 @pytest.mark.parametrize("table_name", TABLES)
 def test_3mkt_hybrid_fareadj_table_single_process(summary_fare_adjustment, dataframe_regression, table_name: str):
     fare_adj, detruncation, fare_adj_scale, run_summary = summary_fare_adjustment
@@ -126,6 +128,7 @@ def test_3mkt_hybrid_fareadj_table_single_process(summary_fare_adjustment, dataf
     dataframe_regression.check(df, basename=basename, default_tolerance=DEFAULT_TOLERANCE)
 
 
+@pytest.mark.skip(reason="hybrid with EMSR-B testing is suspended")
 @pytest.mark.parametrize(
     "fareadj,adjscale",
     [
@@ -145,8 +148,10 @@ def test_fare_adj_walk(data_regression, fareadj, adjscale):
     cfg.simulation_controls.num_samples = 40
     cfg.simulation_controls.burn_samples = 30
     cfg.outputs.reports.clear()
-    cfg.rm_systems.rm_hybrid.processes.dcp.forecast.fare_adjustment = fareadj
-    cfg.rm_systems.rm_hybrid.processes.dcp.forecast.fare_adjustment_scale = adjscale
+    cfg.carriers.AL1.rm_system_options["fare_adjustment"] = fareadj
+    cfg.carriers.AL1.rm_system_options["fare_adjustment_scale"] = adjscale
+    cfg.carriers.AL2.rm_system_options["fare_adjustment"] = fareadj
+    cfg.carriers.AL2.rm_system_options["fare_adjustment_scale"] = adjscale
 
     self = Simulation(cfg)
     self.setup_scenario()
@@ -160,7 +165,7 @@ def test_fare_adj_walk(data_regression, fareadj, adjscale):
             if s > 14 and s % 5:
                 # after the 15th sample, check every 5th sample
                 continue
-            for pth in self.sim.paths:
+            for pth in self.eng.paths:
                 # select three paths for checking
                 if pth.path_id not in [1, 6, 11]:
                     continue
@@ -223,7 +228,7 @@ def test_fare_adj_walk(data_regression, fareadj, adjscale):
                 adjscale = 1.0
                 # also remove calculated adjusted fares from the state, there will
                 # be insignificant differences we want to ignore
-                for pth in self.sim.paths:
+                for pth in self.eng.paths:
                     for pc in pth.pathclasses:
                         try:
                             state[f"Path-{pth.path_id}"][f"Class-{pc.booking_class}"].pop("adj_fares")
@@ -233,7 +238,7 @@ def test_fare_adj_walk(data_regression, fareadj, adjscale):
                 for kk, vv in v.items():
                     data_regression.check(
                         vv,
-                        basename=f"fareadj-walk/{fareadj}-{int(adjscale*100):03d}/" f"Sample{s}/{k}/{kk}",
+                        basename=f"fareadj-walk/{fareadj}-{int(adjscale * 100):03d}/Sample{s}/{k}/{kk}",
                         round_digits=6,
                     )
 

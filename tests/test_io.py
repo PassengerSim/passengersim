@@ -1,5 +1,5 @@
 import pandas as pd
-from pytest import approx, fixture, mark
+from pytest import fixture, mark
 
 import passengersim as pax
 
@@ -7,7 +7,7 @@ import passengersim as pax
 # for the MP driver, the callback cannot be a local func inside the test,
 # it needs to be defined at the module level
 def collect_data(sim):
-    if sim.sim.sample % 5 == 0:
+    if sim.eng.sample % 5 == 0:
         data = {}
         for b in sim.legs[101].buckets:
             data[f"{b.name}-value"] = b.prorated_value
@@ -28,6 +28,7 @@ def summary(tmp_path_module):
     cfg.simulation_controls.num_trials = 2
     cfg.db = None
     cfg.outputs.reports.clear()
+    cfg.outputs._write_no_files()
 
     cfg.choice_models.business.restrictions["toxic"] = 99.99
     cfg.choice_models.leisure.restrictions["toxic"] = 99.99
@@ -45,7 +46,7 @@ def summary(tmp_path_module):
 
 
 @mark.parametrize("lazy", [False, True])
-def test_summary_file(summary, tmp_path_module, lazy):
+def test_summary_file(summary, tmp_path_module, lazy, num_regression):
     summary2 = pax.SimulationTables.from_file(tmp_path_module / "summary-io", lazy=lazy)
 
     assert "summary-io." in summary2.metadata("store.filename")
@@ -53,18 +54,7 @@ def test_summary_file(summary, tmp_path_module, lazy):
 
     # check that callback was added on summary
     assert isinstance(summary2.callback_data, pax.callbacks.CallbackData)
-    assert summary2.callback_data.begin_sample[1] == approx(
-        {
-            "trial": 0,
-            "sample": 5,
-            "Y0-value": 282.41525649702044,
-            "Y1-value": 262.9398718320564,
-            "Y2-value": 178.64916602008478,
-            "Y3-value": 135.9406111272244,
-            "Y4-value": 97.39804088978694,
-            "Y5-value": 74.11684420434234,
-        }
-    )
+    num_regression.check(summary2.callback_data.begin_sample[1], basename="begin_sample_callback_data")
     assert len(summary2.callback_data.begin_sample) == 40
 
     # check that some summary is the same

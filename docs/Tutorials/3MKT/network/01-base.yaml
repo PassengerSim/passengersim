@@ -45,6 +45,8 @@ simulation_controls:
   manual_paths: false
   timeframe_demand_allocation: pods
   allow_unused_restrictions: true
+  connection_builder:
+    nonstop_leg_path_id_alignment: false
 
 rm_systems:
   rm_no_detruncation:
@@ -105,11 +107,9 @@ choice_models:
   business:
     kind: pods
     emult: 1.6
-    basefare_mult: 2.5
   leisure:
     kind: pods
     emult: 1.6
-    basefare_mult: 1.0
 
 carriers:
   - name: AL1

@@ -167,6 +167,7 @@ sandbox.py
 *.csv
 *.csv.gz
 *.pxsim
+!src/passengersim/networks/**/*.pxsim
 
 # notebooks executed for documentation
 *.nbconvert.ipynb

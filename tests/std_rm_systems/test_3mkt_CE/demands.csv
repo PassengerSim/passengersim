@@ -1,4 +1,4 @@
-orig,dest,segment,base_demand,reference_fare,distance,gt_demand,gt_revenue,gt_sold,gt_eliminated_no_offers,gt_eliminated_chose_nothing,gt_eliminated_wtp
+orig,dest,segment,base_demand,reference_price,distance,gt_demand,gt_revenue,gt_sold,gt_eliminated_no_offers,gt_eliminated_chose_nothing,gt_eliminated_wtp
 BOS,ORD,business,70,250,863.75328214388333,10354,2730275,9685,166,503,0
 BOS,ORD,leisure,90,100,863.75328214388333,13182,1352125,11019,60,2103,0
 ORD,LAX,business,120,375,1739.7993369537301,17546,7288000,16575,591,380,0

@@ -2,8 +2,8 @@ import pytest
 
 from passengersim import Simulation, demo_network
 from passengersim.config import Config
+from passengersim.rm.specialty_systems.fcfs import FirstComeFirstServed  # noqa: F401
 from passengersim.summaries import SimulationTables
-from passengersim.summary import SummaryTables
 
 DEFAULT_TOLERANCE = dict(rtol=2e-02, atol=1e-06)
 
@@ -43,15 +43,17 @@ def test_carrier_defined_path_truncation_rules(default_config):
 def test_empty_sim_no_database_summary_tables():
     c = Config()
     c.db = None
+    c.outputs._write_no_files()
     s = Simulation(c)
-    summary = s.run(summarizer=None)
-    assert isinstance(summary, SummaryTables)
+    summary = s.run()
+    assert isinstance(summary, SimulationTables)
     assert not summary.cnx.is_open
 
 
 def test_empty_sim_no_database():
     c = Config()
     c.db = None
+    c.outputs._write_no_files()
     s = Simulation(c)
     summary = s.run()
     assert isinstance(summary, SimulationTables)
@@ -61,8 +63,8 @@ def test_empty_sim_no_database():
 def test_automatic_leg_ids():
     from passengersim.config import Config
 
-    carrier1 = dict(name="X1", control="none", rm_system="fcfs")
-    carrier2 = dict(name="X2", control="none", rm_system="fcfs")
+    carrier1 = dict(name="X1", control="none", rm_system=FirstComeFirstServed)
+    carrier2 = dict(name="X2", control="none", rm_system=FirstComeFirstServed)
     leg1 = dict(
         orig="A",
         dest="B",
@@ -83,28 +85,19 @@ def test_automatic_leg_ids():
         arr_time="10:00",
         capacity=100,
     )
-    fcfs = dict(availability_control="leg", processes={})
-    raw = {
-        "legs": [leg1, leg2],
-        "carriers": [carrier1, carrier2],
-        "rm_systems": {"fcfs": fcfs},
-    }
+
+    # These is not really needed for the tests, but it avoids config validation warnings
+    places = [
+        {"name": "A", "label": "Airport-A", "lat": 33.64, "lon": -84.43},
+        {"name": "B", "label": "Airport-B", "lat": 42.3656, "lon": -71.0098},
+    ]
+
+    raw = {"legs": [leg1, leg2], "carriers": [carrier1, carrier2], "dcps": [7, 3, 1], "places": places}
     cfg = Config.model_validate(raw)
     sim = Simulation(cfg)
     assert len(sim.legs) == 2
     assert list(sim.legs.keys()) == [123, 1]
     for leg, leg_id in zip(sim.legs, [123, 1]):
         assert leg == leg_id
-    assert sim.sim.legs[0].leg_id == 123
-    assert sim.sim.legs[1].leg_id == 1
-
-
-def test_rm_system_attribute_editing():
-    cfg = Config.from_yaml(demo_network("3MKT"))
-    cfg.carriers.AL1.rm_system = "L"
-    cfg = cfg.model_revalidate()
-    assert len(cfg.rm_systems["L"].processes["dcp"]) == 4
-    assert cfg.rm_systems.L.processes.dcp[0].step_type == "legvalue"
-    cfg.rm_systems.L.processes.dcp = cfg.rm_systems.L.processes.dcp[1:]
-    assert len(cfg.rm_systems["L"].processes["dcp"]) == 3
-    assert cfg.rm_systems.L.processes.dcp[0].step_type == "untruncation"
+    assert sim.eng.legs[0].leg_id == 123
+    assert sim.eng.legs[1].leg_id == 1

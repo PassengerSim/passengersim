@@ -57,6 +57,7 @@ for path in sorted(sw_path.joinpath("passengersim/config").rglob("*.py")):
         print("      filters:", file=fd)
         print('        - "!^debug.*"', file=fd)
         print('        - "!^_[^_]"', file=fd)
+        print('        - "^__"', file=fd)  # do not include anything beginning with __
         print('        - "!^logger$"', file=fd)
         print('        - "!^TConfig$"', file=fd)
         print('        - "!^web_opener$"', file=fd)

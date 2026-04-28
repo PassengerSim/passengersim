@@ -14,7 +14,7 @@ simulation_controls:
   num_samples: 300
   sys_k_factor: 0.1
   mkt_k_factor: 0.2
-  pax_type_k_factor: 0.4
+  simple_k_factor: 0.4
   tf_k_factor: 0.1
   tot_z_factor: 2.0
   tf_z_factor: 2.0

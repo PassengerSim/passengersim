@@ -1,4 +1,5 @@
 site_name: PassengerSim
+site_url: 'https://www.passengersim.com/'
 theme:
   name: material
   custom_dir: docs/.overrides
@@ -8,8 +9,15 @@ theme:
     - content.code.copy
     - content.code.annotate
     - navigation.tabs
-    - navigation.indexes
+    # - navigation.indexes # not compatible with toc.integrate
     - navigation.prune
+    - toc.integrate
+
+# If we want versioning for the docs, we can use mike to manage it.
+#
+#    extra:
+#      version:
+#        provider: mike
 
 extra_css:
   - stylesheets/extra.css
@@ -26,8 +34,6 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
-#          import:
-#            - https://docs.python-requests.org/en/master/objects.inv
           options:
             show_source: true
             separate_signature: true
@@ -95,6 +101,7 @@ nav:
       - user-guide/rm-systems/emsr.md
       - user-guide/rm-systems/probp.md
     - Writing Configs: user-guide/writing-configs.md
+    - Dynamic Config: user-guide/dynamic-config.nbconvert.ipynb
     - Database:
       - user-guide/database/index.md
       - user-guide/database/carrier_summary.md
@@ -107,28 +114,25 @@ nav:
       - user-guide/database/fare_detail.md
       - user-guide/database/bookings_by_timeframe.md
       - user-guide/database/distance.md
-    - Outputs:
-      - user-guide/processing-outputs/basic-usage.nbconvert.ipynb
-      - user-guide/processing-outputs/callbacks.nbconvert.ipynb
-      - user-guide/viz/carriers.nbconvert.ipynb
+    - Summary Outputs: user-guide/processing-outputs/basic-usage.nbconvert.ipynb
+    - Visualizations:
+      - user-guide/viz/pre-simulation.nbconvert.ipynb
+      - user-guide/viz/single-run.nbconvert.ipynb
+      - user-guide/viz/contrasting.nbconvert.ipynb
     - Experiments: user-guide/experiments.nbconvert.ipynb
+    - Callbacks: user-guide/processing-outputs/callbacks.nbconvert.ipynb
+    - Tracers: user-guide/processing-outputs/tracers.nbconvert.ipynb
+    - Firehose: user-guide/processing-outputs/firehose.nbconvert.ipynb
+
   - Tutorials:
-    - Tutorials/index.md
+    - Tutorials/3MKT/gallery/intro-3mkt.nbconvert.ipynb
     - Tutorials/3MKT/gallery/EE.nbconvert.ipynb
     - Tutorials/3MKT/gallery/PE.nbconvert.ipynb
+    - Tutorials/3MKT/gallery/LL.nbconvert.ipynb
     - Tutorials/3MKT/gallery/QC.nbconvert.ipynb
-    - Tutorials/3MKT/3mkt-01.nbconvert.ipynb
-    - Tutorials/3MKT/3mkt-02.nbconvert.ipynb
-    - Tutorials/3MKT/3mkt-03.nbconvert.ipynb
-    - Tutorials/3MKT/3mkt-04.nbconvert.ipynb
-    - Tutorials/3MKT/3mkt-05.nbconvert.ipynb
-    - Tutorials/3MKT/3mkt-06.nbconvert.ipynb
-    - Tutorials/3MKT/3mkt-07.nbconvert.ipynb
-    - Tutorials/3MKT/3mkt-08.nbconvert.ipynb
-    - Tutorials/3MKT/3mkt-09.nbconvert.ipynb
-    - Tutorials/3MKT/3mkt-10.nbconvert.ipynb
-    - Tutorials/3MKT/3mkt-11.nbconvert.ipynb
-    - Tutorials/3MKT/3mkt-50.nbconvert.ipynb
+    - Tutorials/3MKT/gallery/olympic-fcst.nbconvert.ipynb
+    - Tutorials/3MKT/gallery/blf-curves.nbconvert.ipynb
+
   - API:
     - API/index.md
     - Simulation:
@@ -158,6 +162,14 @@ nav:
       - API/database/common-queries.md
     - API/summary.md
     - API/contrast.md
+    - RM:
+        - API/RM/index.md
+        - API/RM/std_systems.md
+        - "Base Classes": API/RM/bases.md
+        - "Untruncation": API/RM/untruncation.md
+        - "Std Forecasting": API/RM/forecasting.md
+        - "EMSR": API/RM/emsr.md
+        - "ProBP": API/RM/probp.md
     - Core:
       - API/Core/index.md
       - API/Core/00-SimulationEngine.md

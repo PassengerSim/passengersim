@@ -5,39 +5,55 @@ many customers of each type you should expect, so you can tailor the set of
 products being offered to maximize revenue.
 
 In PassengerSim, forecasting is included as a step within an RM system, typically
-within the DCP process, after untruncation and before any optimization.
+after untruncation and before any optimization.
 
-```yaml title="example.yaml" hl_lines="8-10"
-rm_systems:
-  basic_emsr_b:
-    processes:
-      DCP:
-      - step_type: untruncation
-        algorithm: em
-        kind: leg
-      - step_type: forecast #(1)!
-        algorithm: additive_pickup #(2)!
-        kind: leg #(3)!
-      - step_type: emsr
-        algorithm: b
-        kind: leg
+```python title="E.py" hl_lines="10-16"
+from passengersim.rm.emsr import ExpectedMarginalSeatRevenue
+from passengersim.rm.standard_forecasting import StandardLegForecast
+from passengersim.rm.systems import RmSys, RmSysOption, register_rm_system
+from passengersim.rm.untruncation import LegUntruncation
+
+@register_rm_system
+class E(RmSys):
+    actions = [
+        LegUntruncation,
+        StandardLegForecast.configure(  #(1)!
+            algorithm=RmSysOption("forecast_algorithm", default="additive_pickup"),  #(2)!
+            alpha=RmSysOption(
+                "exp_smoothing_alpha", expected_type=float, default=0.15
+            ),
+        ),
+        ExpectedMarginalSeatRevenue.configure(
+            variant=RmSysOption("emsr_variant", default="b"),
+        ),
+    ]
 ```
 { .annotate }
 
-1.  The `step_type` for forecasting must be `forecast`, this is how PassengerSim
-    identifies what to do in this step.
-2.  Several different algorithms are available for forecasting, see
-    [below][passengersim.rm.ForecastStep.algorithm] for details.
-3.  Forecasts can be made at the leg or path level, see
-    [below][passengersim.rm.ForecastStep.kind] for details.
+1.  The forecaster (in this example, a standard leg forecast) is included as a
+    step here.  Selected options are passed to it via the `configure` method,
+    which allows options to be set from the RM system configuration.
+2.  The configurable option name for the RM system is specified here as
+    `"forecast_algorithm"`, to clarify its purpose. The attribute being controlled
+    on the `StandardLegForecast` is simply `algorithm`, which is clear within the
+    context of forecast step alone, but potentially ambiguous in the context of
+    the RM system as a whole.
 
 
-::: passengersim.rm.ForecastStep
+::: passengersim.rm.standard_forecasting.StandardLegForecast
     options:
       show_root_heading: true
       show_root_full_path: false
       show_source: false
       members:
         - algorithm
-        - kind
+        - alpha
+
+::: passengersim.rm.standard_forecasting.StandardPathForecast
+    options:
+      show_root_heading: true
+      show_root_full_path: false
+      show_source: false
+      members:
+        - algorithm
         - alpha

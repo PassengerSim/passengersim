@@ -1,0 +1,65 @@
+carriers:
+  AL1:
+    ancillaries: {}
+    brand_preference: 1.0
+    classes:
+    - Y0
+    - Y1
+    - Y2
+    - Y3
+    - Y4
+    - Y5
+    contextual_optimizer: null
+    control: ''
+    cp_algorithm: null
+    cp_bounds: 1.0
+    cp_elasticity: null
+    cp_quantize: 0
+    cp_record: highest_closed
+    cp_record_highest_closed_as_open: false
+    cp_scale: 1.0
+    cp_upper_bound: 1.0
+    customer_models: []
+    fare_adjustment_scale: 1.0
+    frat5: ''
+    frat5_map: {}
+    history_length: 26
+    load_factor_curve: null
+    name: AL1
+    proration_rule: distance
+    rm_system: E
+    rm_system_options: null
+    store_q_history: false
+    truncation_rule: 3
+  AL2:
+    ancillaries: {}
+    brand_preference: 1.0
+    classes:
+    - Y0
+    - Y1
+    - Y2
+    - Y3
+    - Y4
+    - Y5
+    contextual_optimizer: null
+    control: ''
+    cp_algorithm: null
+    cp_bounds: 1.0
+    cp_elasticity: null
+    cp_quantize: 0
+    cp_record: highest_closed
+    cp_record_highest_closed_as_open: false
+    cp_scale: 1.0
+    cp_upper_bound: 1.0
+    customer_models: []
+    fare_adjustment_scale: 1.0
+    frat5: ''
+    frat5_map: {}
+    history_length: 26
+    load_factor_curve: null
+    name: AL2
+    proration_rule: distance
+    rm_system: E
+    rm_system_options: null
+    store_q_history: false
+    truncation_rule: 3

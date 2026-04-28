@@ -1,0 +1,65 @@
+db: null
+scenario: 3MKT
+simulation_controls:
+  additional_settings: {}
+  allow_unused_restrictions: false
+  base_date: '2020-03-01'
+  burn_samples: 50
+  capacity_multiplier: 1.0
+  capture_choice_set_file: ''
+  capture_choice_set_mkts: []
+  capture_choice_set_obs: null
+  capture_competitor_data: false
+  connection_builder:
+    circuity_function: default_circuity_function
+    existing_paths: keep
+    extra_max_connect_time_per_iteration: 0
+    max_legs: 2
+    max_legs_if_nonstop_exists: 2
+    min_paths_per_market: 1
+    nonstop_leg_path_id_alignment: false
+    verbosity: 0
+  controller_time_zone: -21600
+  dcp_hour: 0.0
+  debug_availability: false
+  debug_choice: false
+  debug_connections: false
+  debug_events: false
+  debug_fares: false
+  debug_offers: false
+  debug_orders: false
+  demand_multiplier: 1.0
+  disable_ap: false
+  double_capacity_until: null
+  dwm_lite: false
+  generate_3seg: false
+  manual_paths: null
+  max_connect_time: 120
+  mkt_k_factor: 0.15
+  num_samples: 400
+  num_trials: 1
+  pax_type_k_factor: 0.0
+  prorate_revenue: true
+  random_seed: 314
+  revenue_alpha: 0.0
+  save_all_offers: false
+  save_orders: false
+  segment_k_factor: 0.0
+  show_progress_bar: true
+  simple_cv100: 0.0
+  simple_k_factor: 0.2
+  speed_limits:
+    LONG_HAUL_MAXIMUM_SPEED: 700.0
+    LONG_HAUL_MINIMUM_SPEED: 300.0
+    LONG_HAUL_MIN_DISTANCE: 1500
+    SHORT_HAUL_MAXIMUM_SPEED: 400.0
+    SHORT_HAUL_MAX_DISTANCE: 500
+    SHORT_HAUL_MINIMUM_SPEED: 50.0
+  sys_k_factor: 0.1
+  tf_k_factor: 0.1
+  tf_z_factor: 1.0
+  timeframe_demand_allocation: pods
+  tot_z_factor: 2.0
+  update_frequency: null
+  write_raw_files: false
+tags: {}

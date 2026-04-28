@@ -10,29 +10,40 @@ TABLE_TOLERANCE = {"local_and_flow_yields": dict(rtol=1e-02, atol=1e-06)}
 
 
 @pytest.fixture(scope="module")
-def config() -> Config:
+def config(tmp_path_factory) -> Config:
     input_file = demo_network("3MKT/08-untrunc-em")
     cfg = Config.from_yaml(input_file)
     cfg.simulation_controls.num_trials = 2
     cfg.simulation_controls.num_samples = 150
     cfg.simulation_controls.burn_samples = 100
+    cfg.simulation_controls.connection_builder.nonstop_leg_path_id_alignment = False
     cfg.outputs.reports.clear()
     cfg.outputs.reports.add("carrier_history")
     cfg.outputs.reports.add("demand_to_come")
     cfg.outputs.reports.add("local_and_flow_yields")
+    tmp_path = tmp_path_factory.mktemp("test_summaries")
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    cfg.db.filename = tmp_path
     return cfg
 
 
 @pytest.fixture(scope="module")
-def summary(config: Config) -> SimulationTables:
+def summary(config: Config, tmp_path_factory) -> SimulationTables:
+    tmp_path = tmp_path_factory.mktemp("test_summaries")
+    config.db.filename = tmp_path / "db0.sqlite"
+    config.outputs.base_dir = tmp_path / "outputs"
     sim = Simulation(config)
     return sim.run(summarizer=SimulationTables)
 
 
 @pytest.fixture(scope="module")
-def summary2(config: Config) -> SimulationTables:
+def summary2(config: Config, tmp_path_factory) -> SimulationTables:
+    tmp_path = tmp_path_factory.mktemp("test_summaries")
+    config.db.filename = tmp_path / "db1.sqlite"
     sim0 = Simulation(config)
     sim0.run_trial(0)
+    config.db.filename = tmp_path / "db2.sqlite"
+    config.outputs.base_dir = tmp_path / "outputs"
     sim1 = Simulation(config)
     sim1.run_trial(1)
     return SimulationTables.aggregate(
@@ -44,7 +55,10 @@ def summary2(config: Config) -> SimulationTables:
 
 
 @pytest.fixture(scope="module")
-def summary_mp(config: Config) -> SimulationTables:
+def summary_mp(config: Config, tmp_path_factory) -> SimulationTables:
+    tmp_path = tmp_path_factory.mktemp("test_summaries")
+    config.db.filename = tmp_path / "dbMP.sqlite"
+    config.outputs.base_dir = tmp_path / "outputs"
     sim = MultiSimulation(config)
     return sim.run(summarizer=SimulationTables)
 
@@ -52,12 +66,12 @@ def summary_mp(config: Config) -> SimulationTables:
 def test_table_basic(summary: SimulationTables):
     assert isinstance(summary, SimulationTables)
     assert isinstance(summary.sim, Simulation)
-    assert isinstance(summary.config, Config.as_reloaded)
+    assert isinstance(summary.config, Config)
 
     # for each leg, check that the sum of gt_sold for all paths equals the leg's gt_sold
-    for leg in summary.sim.sim.legs:
+    for leg in summary.sim.eng.legs:
         local_sold, total_sold = 0, 0
-        for pth in summary.sim.sim.paths:
+        for pth in summary.sim.eng.paths:
             if pth.get_leg_id(0) == leg.leg_id:
                 if pth.num_legs() == 1:
                     local_sold += pth.gt_sold
@@ -160,6 +174,21 @@ def test_table_presence_two_process(summary2, dataframe_regression, table_name: 
     df = getattr(summary2, table_name)
     if df.columns.nlevels > 1:
         df.columns = ["__".join(col).strip() for col in df.columns.values]
+    if "trial" in df.index.names:
+        df = df.sort_index()
+        print("\nSorted by INDEX trial for table:", table_name)
+    if "trial" in df.columns:
+        df = df.sort_values("trial").reset_index(drop=True)
+        print("\nSorted by trial for table:", table_name)
+    else:
+        print("\nNOT Sorted by trial for table:", table_name)
+    print("%%%%% DataFrame info and head %%%%%")
+    print(df.info())
+    print("%%%%% DataFrame HEAD %%%%%")
+    print(df.head())
+    print("%%%%% DataFrame TAIL %%%%%")
+    print(df.tail())
+
     dataframe_regression.check(
         df,
         basename=table_name,

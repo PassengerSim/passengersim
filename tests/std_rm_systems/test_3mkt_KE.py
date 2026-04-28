@@ -8,15 +8,27 @@ import passengersim as pax
 
 
 @fixture(scope="module", params=[10, 0])
-def config(request) -> pax.Config:
+def config(request, tmp_path_factory) -> pax.Config:
     max_cap = request.param
     cfg = pax.Config.from_yaml(pax.demo_network("3MKT"))
-    cfg.carriers.AL1.rm_system = "K"
-    cfg.carriers.AL2.rm_system = "E"
+
+    cfg.carriers.AL1.rm_system = "M"
+    cfg.carriers.AL1.rm_system_options = {
+        "name": "M",
+        "max_cap": max_cap,
+        "fare_adjustment": "ki",
+        "fare_adjustment_scale": 0.25,
+        "bid_price_vector": False,
+        "regression_weight": "sellup",
+        "variance_is_ratio_of_mean": 0.0,
+    }
+    cfg.carriers.AL1.frat5 = "curve_C"
+    cfg.carriers.AL2.rm_system_options = {"name": "E"}
     cfg.simulation_controls.num_trials = 1
     cfg.simulation_controls.num_samples = 250
-    cfg = cfg.model_revalidate()
-    cfg.rm_systems.K.processes.DCP.forecast.max_cap = max_cap
+    cfg.simulation_controls.connection_builder.nonstop_leg_path_id_alignment = False
+    cfg.db.filename = tmp_path_factory.mktemp("test-3mkt-KE") / "db.sqlite"
+    cfg.outputs.base_dir = tmp_path_factory.mktemp("test-3mkt-KE") / "outputs"
     return cfg
 
 
@@ -54,7 +66,9 @@ def test_table_list(summary):
 def test_summary_tables(summary, dataframe_regression, table_name: str):
     assert isinstance(summary, pax.SimulationTables)
     df = getattr(summary, table_name)
-    dataframe_regression.check(df, basename=table_name)
+    max_cap = summary.config.carriers.AL1.rm_system_options["max_cap"]
+    table_file_name = f"{table_name}_max_cap_{max_cap}" if max_cap else table_name
+    dataframe_regression.check(df, basename=table_file_name)
 
 
 FIGURES = [
@@ -91,4 +105,7 @@ def test_summary_figures(summary, dataframe_regression, fig: tuple[str, dict]):
         s = json.dumps(kwargs, sort_keys=True)
         h = hashlib.md5(s.encode()).hexdigest()[:12]
         fig_name = f"{fig_name}_{h}"
+    if fig_name == "fig_bid_price_history":
+        max_cap = summary.config.carriers.AL1.rm_system_options.get("max_cap", None)
+        fig_name = f"{fig_name}_max_cap_{max_cap}" if max_cap else fig_name
     dataframe_regression.check(df, basename=fig_name)

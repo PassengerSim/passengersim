@@ -1,0 +1,37 @@
+outputs:
+  base_dir: null
+  disk: false
+  excel: false
+  filename_stem: passengersim-output
+  html:
+    bid_price_history: true
+    bookings_by_timeframe: true
+    carrier_load_factors: true
+    carrier_local_share: true
+    carrier_rasm: true
+    carrier_revenue_distribution: false
+    carrier_revenues: true
+    carrier_table: true
+    carrier_total_bookings: true
+    carrier_yields: true
+    configs:
+    - carriers
+    - rm_systems
+    - simulation_controls
+    - db
+    - outputs
+    displacement_history: true
+    fare_class_mix: true
+    filename: false
+    leg_load_factor_distribution: true
+    metadata: true
+    other: []
+    segmentation_by_timeframe_table: true
+    title: null
+  log_reports: false
+  pickle: false
+  reports: []
+  sim_state:
+    filename: '[[basename]].pax-state/trial-[[trial]].pax-state'
+    include_trials: null
+    save: false

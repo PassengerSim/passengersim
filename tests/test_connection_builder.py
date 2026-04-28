@@ -30,7 +30,7 @@ def test_simple_mct(cfg):
     assert cfg.places["ORD"].mct.international_domestic == 60
     assert cfg.places["ORD"].mct.international_international == 60
     sim = Simulation(cfg)
-    sim.sim.build_connections()
+    sim.eng.build_connections()
     assert len(sim.paths) == 12
 
 
@@ -41,7 +41,7 @@ def test_quad_list_mct(cfg):
     assert cfg.places["ORD"].mct.international_domestic == 120
     assert cfg.places["ORD"].mct.international_international == 140
     sim = Simulation(cfg)
-    sim.sim.build_connections()
+    sim.eng.build_connections()
     assert len(sim.paths) == 12
 
 
@@ -52,14 +52,14 @@ def test_shorthand_mct(cfg):
     assert cfg.places["ORD"].mct.international_domestic == 120
     assert cfg.places["ORD"].mct.international_international == 140
     sim = Simulation(cfg)
-    sim.sim.build_connections()
+    sim.eng.build_connections()
     assert len(sim.paths) == 12
 
 
 def test_extreme_mct(cfg):
     cfg.places["ORD"].mct = 1440
     sim = Simulation(cfg)
-    sim.sim.build_connections()
+    sim.eng.build_connections()
     # no connections are possible with a 24 hour MCT, but
     # every leg is a non-stop path, so there are still 8 paths
     assert len(sim.paths) == 8

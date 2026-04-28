@@ -8,18 +8,26 @@ import passengersim as pax
 
 
 @fixture(scope="module", params=[True, False])
-def config(request) -> pax.Config:
+def config(request, tmp_path_factory) -> pax.Config:
     assign_frat5 = request.param
     cfg = pax.Config.from_yaml(pax.demo_network("3MKT"))
     cfg.carriers.AL1.rm_system = "U"
+    cfg.carriers.AL1.rm_system_options = {
+        "name": "U",
+        "arrivals_per_time_slice": 0.1,
+        "em_initialization_method": "pods",
+    }
     if assign_frat5:
         # U does not use the frat5 curve, but we want to test that it
         # does not spoil the simulation even if it is assigned
-        cfg.carriers.AL2.frat5 = "curve_C"
+        cfg.carriers.AL1.frat5 = "curve_C"
     cfg.carriers.AL2.rm_system = "E"
     cfg.simulation_controls.num_trials = 1
     cfg.simulation_controls.num_samples = 75
     cfg.simulation_controls.burn_samples = 40
+    cfg.simulation_controls.connection_builder.nonstop_leg_path_id_alignment = False
+    cfg.db.filename = tmp_path_factory.mktemp("test-3mkt-UE") / "db.sqlite"
+    cfg.outputs.base_dir = tmp_path_factory.mktemp("test-3mkt-UE")
     return cfg
 
 

@@ -1,3 +1,3 @@
-,carrier,local_pct_leg_pax
-0,AL1,46.545056548704856
-1,AL2,48.388956966769989
+,carrier,local_pct_leg_pax,rm_system
+0,AL1,46.545056548704856,U
+1,AL2,48.388956966769989,E

@@ -26,7 +26,7 @@ from passengersim.core import __version__ as _passengersim_core_version
 from . import MultiSimulation, Simulation
 from ._types import PathLike
 from .config import Config
-from .driver import check_summarizer
+from .driver import check_summarizer, get_default_summarizer
 from .mp_executor import JobExecutor
 from .summaries import SimulationTables
 
@@ -57,7 +57,8 @@ class Experiment:
             generating an HTML report of the experiment results.  If not provided,
             the tag is used as the title in reporting.
         tag : str, optional
-            A short machine-friendly tag for the experiment.  This tag is used as a key
+            A short machine-friendly tag for the experiment. Ideally this tag will not have
+            spaces or other special character other than underscores. This tag is used as a key
             in the results dictionary returned by `Experiments.run()`, and it is used in
             generating filenames for the experiment outputs.  If not provided, the name of
             the decorated function is used as the tag.
@@ -450,7 +451,7 @@ class Experiments(CallbackMixin):
                     # If an external file is provided, load it and skip the simulation.
                     # This is done without regard for the use_existing parameter, and
                     # the absence of the external file is always an error.
-                    summary = SimulationTables.from_file(e.external)
+                    summary = get_default_summarizer().from_file(e.external)
                     live_display.console.print(f"Loaded experiment {e.tag} from {e.external}")
                     results[e.tag] = summary
                     continue
@@ -474,7 +475,7 @@ class Experiments(CallbackMixin):
                     try:
                         # Check if the output pickle files are defined and already exist
                         if config.outputs.pickle:
-                            summary = SimulationTables.from_pickle(config.outputs.pickle)
+                            summary = get_default_summarizer().from_pickle(config.outputs.pickle)
                         else:
                             raise FileNotFoundError("No output pickle file specified")
                     except FileNotFoundError:
@@ -486,7 +487,7 @@ class Experiments(CallbackMixin):
                         try:
                             second_file = config.outputs._get_disk_filename()
                             if second_file:
-                                summary = SimulationTables.from_file(second_file)
+                                summary = get_default_summarizer().from_file(second_file)
                             else:
                                 raise FileNotFoundError("No output disk file specified")
                         except FileNotFoundError as second_error:
@@ -664,13 +665,18 @@ class Experiments(CallbackMixin):
                 # If an external file is provided, load it and skip the simulation.
                 # This is done without regard for the use_existing parameter, and
                 # the absence of the external file is always an error.
-                summary = SimulationTables.from_file(e.external)
+                summary = get_default_summarizer().from_file(e.external)
                 jobber.rich_progress.console.print(f"Loaded experiment {e.tag} from {e.external}")
                 results[e.tag] = summary
                 continue
 
             # Create the modified config for this experiment
             config = e.func(self.base_config.model_copy(deep=True))
+            # Revalidate the config now, which will ensure that all the changes that occur during validation
+            # are captured. For example, the Experiment function might change a carrier to assign a standard
+            # Frat5 curve, but that still needs to be loaded.
+            config = config.model_validate(config)
+            # make the config's title consistent with the experiment title or tag
             config.outputs.html.title = e.title or e.tag
 
             # Update the paths for the output files
@@ -700,7 +706,7 @@ class Experiments(CallbackMixin):
                 try:
                     disk_file = config.outputs.get_output_filename("disk", make_dirs=False)
                     if disk_file:
-                        summary = SimulationTables.from_file(disk_file)
+                        summary = get_default_summarizer().from_file(disk_file)
                     else:
                         raise FileNotFoundError("No output disk file specified")
                 except FileNotFoundError as second_error:
@@ -862,3 +868,26 @@ class Experiments(CallbackMixin):
         if self._report_filename is None:
             raise ValueError("no report has been written")
         return self._report_filename
+
+    def validate(self):
+        """Validate the experiments.
+
+        This checks that all the experiments can be initialized with the base config,
+        and that there are no duplicate tags.  This does not check that the modified
+        configs are valid, since some modifications might be mutually incompatible
+        but still be useful for comparison.
+        """
+        tags = set()
+        for e in self.experiments:
+            if e.tag is None:
+                if e.title is None:
+                    raise ValueError("Experiment missing tag and title")
+                raise ValueError("Experiment missing tag: " + e.title)
+            if e.tag in tags:
+                raise ValueError("Duplicate experiment tag: " + e.tag)
+            tags.add(e.tag)
+            try:
+                config = e.func(self.base_config.model_copy(deep=True))
+                config = config.model_validate(config)
+            except Exception as ex:
+                raise ValueError(f"Experiment {e.tag} failed to validate") from ex

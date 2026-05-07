@@ -393,6 +393,7 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
                 "connection_builder",
                 "manual_paths",
                 "speed_limits",
+                "use_standard_todd_curves",
             ]:
                 pass
             else:
@@ -454,13 +455,12 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
         """
         logger.info("Initializing TODD curves")
         for todd_name, todd in config.todd_curves.items():
-            dwm = DecisionWindow(todd_name)
-            if todd.k_factor:
-                dwm.k_factor = todd.k_factor
-            if todd.min_distance:
-                dwm.min_distance = todd.min_distance
-            if todd.probabilities:
-                dwm.dwm_tod = list(todd.probabilities.values())
+            dwm = DecisionWindow(
+                todd_name,
+                k_factor=todd.k_factor,
+                min_distance=todd.min_distance,
+                dwm_tod=[todd.probabilities.get(j) for j in range(24)],
+            )
             self.todd_curves[todd_name] = dwm
 
     def _get_fare_restriction_num(self, restriction_name: str, *, ignore_when_missing: bool = False):
@@ -639,6 +639,9 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
                 cp_record=carrier_config.cp_record,
                 cp_elasticity=carrier_config.cp_elasticity,
             )
+            carrier.metadata = {
+                "rm_system": {"name": carrier_config.rm_system, "options": carrier_config.rm_system_options},
+            }
             self.carriers_dict[carrier_name] = carrier
             carrier.rm_sys = rm_sys
             self.daily_callback(rm_sys)
@@ -796,7 +799,7 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
                 curve = self.curves[curve_name]
                 dmd.add_curve(curve)
             if dmd_config.todd_curve in self.todd_curves:
-                dmd.add_dwm(self.todd_curves[dmd_config.todd_curve])
+                dmd.dwm = self.todd_curves[dmd_config.todd_curve]
             if dmd_config.group_sizes is not None:
                 dmd.add_group_sizes(dmd_config.group_sizes)
             dmd.prob_saturday_night = dmd_config.prob_saturday_night

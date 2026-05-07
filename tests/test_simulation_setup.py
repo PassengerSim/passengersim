@@ -101,3 +101,27 @@ def test_automatic_leg_ids():
         assert leg == leg_id
     assert sim.eng.legs[0].leg_id == 123
     assert sim.eng.legs[1].leg_id == 1
+
+
+def test_rm_sys_variant():
+
+    from passengersim.rm import make_rm_system_variant
+    from passengersim.rm.q_forecasting import QPathForecast
+    from passengersim.rm.standard_systems import Qu
+
+    @make_rm_system_variant
+    class Qu25_variant(Qu):
+        fare_adjustment_scale = 0.212
+        fare_adjustment = "ki"
+
+    cfg = Config.from_yaml(demo_network("3MKT/DEMO"))
+    cfg.carriers.AL1.rm_system = "Qu25_variant"
+    cfg.carriers.AL1.frat5 = "curve_C"
+    cfg.carriers.AL1.store_q_history = True
+
+    cfg = Config.model_validate(cfg)
+    sim = Simulation(cfg)
+
+    assert isinstance(sim.carriers_dict["AL1"].rm_sys.action_queue[2], QPathForecast)
+    assert sim.carriers_dict["AL1"].rm_sys.action_queue[2].fare_adjustment == "ki"
+    assert sim.carriers_dict["AL1"].rm_sys.action_queue[2].fare_adjustment_scale == 0.212

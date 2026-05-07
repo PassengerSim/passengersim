@@ -63,6 +63,14 @@ def _subprocess_run_trial(
         if exported_rm_systems:
             restore_registered_rm_systems(exported_rm_systems)
         cfg = Config.model_validate(json.loads(cfg_json))
+        # Never write basic outputs to disk from a subprocess, except possibly for sim_state
+        cfg.outputs.disk = False
+        cfg.outputs.html.filename = False
+        cfg.outputs.pickle = False
+        cfg.outputs.excel = False
+        # Writing to database is not a "output" and so is still allowed
+        # but we need to make sure that each subprocess has a unique database file
+        # because SQLite does not like multiple processes writing to the same database file.
         if cfg.db is not None and cfg.db.filename is not None and str(cfg.db.filename) != ":memory:":
             cfg.db.filename = cfg.db.filename.with_suffix(f".trial{trial_id:02}" + cfg.db.filename.suffix)
         output_dir = MaybeTemporaryDirectory(output_dir)
@@ -185,7 +193,7 @@ class MultiSimulation(BaseSimulation, CallbackMixin):
             except ImportError:
                 raw_license_certificate = None
             self.config.raw_license_certificate = raw_license_certificate
-        return self.config.model_dump_json(exclude={"outputs": {"html", "pickle", "excel", "log_reports"}})
+        return self.config.model_dump_json(exclude={"outputs": {"html", "pickle", "excel", "log_reports", "disk"}})
 
     def _run_asynchronously(
         self,

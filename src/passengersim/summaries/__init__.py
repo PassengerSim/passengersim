@@ -36,6 +36,7 @@ from . import (
     paths,
     segmentation_by_timeframe,
     segmentation_detail,
+    services,
 )
 from .generic import GenericSimulationTables
 

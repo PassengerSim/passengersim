@@ -150,10 +150,20 @@ class Place(BaseModel, extra="forbid", validate_assignment=True):
         return v
 
     @property
-    def time_zone_info(self):
+    def time_zone_info(self) -> ZoneInfo | None:
         if self.time_zone is None:
             return None  # No time zone set
         return ZoneInfo(self.time_zone)
+
+    @property
+    def latitude(self) -> float:
+        """Alias for `lat`."""
+        return self.lat
+
+    @property
+    def longitude(self) -> float:
+        """Alias for `lon`."""
+        return self.lon
 
 
 def great_circle(lat1: float, lon1: float, lat2: float, lon2: float) -> float:

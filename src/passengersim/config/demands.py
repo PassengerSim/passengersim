@@ -1,8 +1,13 @@
 from __future__ import annotations
 
 import warnings
+from typing import TYPE_CHECKING
 
+import numpy as np
 from pydantic import BaseModel, field_validator, model_validator
+
+if TYPE_CHECKING:
+    from .base import Config
 
 _REFERENCE_FARE_DEPRECATION_MSG = (
     "The 'reference_fare' field on Demand is deprecated and has been renamed "
@@ -172,3 +177,60 @@ class Demand(BaseModel, extra="forbid"):
             )
             key = "reference_price"
         super().__setattr__(key, value)
+
+
+def assign_standard_todd_curves(cfg: Config) -> Config:
+    """For all demands with no TODD curve, assign the appropriate standard TODD curve."""
+
+    if not cfg.simulation_controls.use_standard_todd_curves:
+        # if disabled, do nothing
+        return cfg
+
+    todd_curve_queue = set()
+
+    # for each demand, check if it has a defined TODD curve.
+    # if not, assign the Standard_TODD_Curve based on the mkt.delta_t
+    for dmd in cfg.demands:
+        if dmd.todd_curve is None:
+            mkt = cfg.markets_dict[f"{dmd.orig}~{dmd.dest}"]
+            todd_curve = f"Standard_TODD_Curve_{mkt.delta_t:02d}"
+            dmd.todd_curve = todd_curve
+            if todd_curve not in cfg.todd_curves:
+                todd_curve_queue.add(todd_curve)
+
+    # load all required standard configs
+    if todd_curve_queue:
+        from passengersim import Config, demo_network
+
+        std_cfg = Config.from_yaml(demo_network("standard-todd.yaml"))
+        for q in todd_curve_queue:
+            cfg.todd_curves[q] = std_cfg.todd_curves[q].model_copy(deep=True)
+
+    return cfg
+
+
+def assign_standard_dwm_tolerances(cfg: Config, segment_mapping: dict[str, str] | None = None) -> Config:
+    """For all demands with no DWM tolerance, assign the appropriate standard DWM tolerance."""
+
+    if not cfg.simulation_controls.use_standard_todd_curves:
+        # if disabled, do nothing
+        return cfg
+
+    if segment_mapping is None:
+        segment_mapping = {}
+
+    std_tols = {
+        "business": [1.240, 3.318, 3.544, 3.765, 3.971, 4.159, 5.356, 10.5, 10.78, 10.96, 24],
+        "leisure": [2.034, 4.617, 4.936, 5.245, 5.536, 5.801, 6.379, 12.7, 13.04, 13.327, 24],
+    }
+    std_miles = [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, np.inf]
+
+    for dmd in cfg.demands:
+        if not dmd.dwm_tolerance:
+            segment = segment_mapping.get(dmd.segment, dmd.segment)
+            if segment not in std_tols:
+                segment = "leisure"
+            mile_category = np.searchsorted(std_miles, dmd.distance or 0)
+            dmd.dwm_tolerance = std_tols[segment][mile_category]
+
+    return cfg

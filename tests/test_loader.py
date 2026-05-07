@@ -189,3 +189,16 @@ def test_format_tags():
     loaded = Config.model_validate(content)
     assert loaded.carriers["AL1"].classes == ["Z0", "Z1", "Z2"]
     assert loaded.carriers["AL2"].classes == ["F1999", "Zzz", "Prince"]
+
+
+def test_carriers_rm_name_typo():
+    demo = """
+    carriers:
+      AL1:
+        rm_system: E_
+      AL2:
+        rm_system: E
+    """
+    content = yaml.safe_load(io.StringIO(demo))
+    with pytest.raises(ValueError, match=r"unknown RM system E_, did you mean 'E'\?"):
+        _loaded = Config.model_validate(content)

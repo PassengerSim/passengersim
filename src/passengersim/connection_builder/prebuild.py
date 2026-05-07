@@ -1,6 +1,12 @@
-from passengersim.config import Config
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from passengersim.config.paths import Path
 from passengersim.driver import Simulation
+
+if TYPE_CHECKING:
+    from passengersim.config import Config
 
 
 def prebuild_connections(cfg: Config, **kwargs) -> Config:

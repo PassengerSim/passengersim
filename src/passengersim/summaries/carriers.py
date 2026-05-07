@@ -69,6 +69,7 @@ def extract_carriers(sim: Simulation) -> pd.DataFrame:
                 "avg_total_leg_pax": carrier_total_leg_pax[carrier.name] / num_samples,
                 "cp_sold": gt_cp_sold / num_samples,
                 "cp_revenue": gt_cp_revenue / num_samples,
+                "rm_system": carrier.metadata.get("rm_system", {}).get("name"),
             }
         )
     if len(carrier_data) == 0:
@@ -82,13 +83,18 @@ def aggregate_carriers(summaries: list[SimulationTables]) -> pd.DataFrame | None
     for s in summaries:
         frame = s._raw_carriers
         if frame is not None:
-            table_avg.append(frame.set_index(["control", "truncation_rule"], append=True))
+            # The keys in the set_index below represent qualitative string attributes that should be
+            # consistent across all the tables we are collecting to aggregate.  We will group by these
+            # attributes and average the numeric values within each group, becase getting the
+            # "average" of these string attributes doesn't make sense numerically. But conceptually
+            # the average of strings that are all the same is just that string.
+            table_avg.append(frame.set_index(["control", "truncation_rule", "rm_system"], append=True))
     n = len(table_avg)
     while len(table_avg) > 1:
         table_avg[0] = table_avg[0].add(table_avg.pop(1), fill_value=0)
     if table_avg:
         table_avg[0] /= n
-        return table_avg[0].reset_index(["control", "truncation_rule"])
+        return table_avg[0].reset_index(["control", "truncation_rule", "rm_system"])
     return None
 
 
@@ -169,7 +175,11 @@ class SimTabCarriers(GenericSimulationTables):
         title: str | None = None,
         also_df: bool = False,
     ) -> alt.Chart | pd.DataFrame | tuple[alt.Chart, pd.DataFrame]:
-        df = self.carriers.reset_index()[["carrier", load_measure]]
+        if "rm_system" not in self.carriers.columns:
+            # TODO: remove this once no longer using older cached data
+            df = self.carriers.reset_index()[["carrier", load_measure]].assign(rm_system="Unknown")
+        else:
+            df = self.carriers.reset_index()[["carrier", load_measure, "rm_system"]]
         if raw_df:
             return df
         import altair as alt
@@ -178,31 +188,33 @@ class SimTabCarriers(GenericSimulationTables):
         if orient == "v":
             bars = chart.mark_bar().encode(
                 x=alt.X("carrier:N", title="Carrier"),
-                y=alt.Y(f"{load_measure}:Q", title=measure_name).stack("zero"),
-                color=alt.Color("carrier:N", title="Carrier", legend=None),
+                y=alt.Y(f"{load_measure}:Q", title=measure_name, axis=alt.Axis(format=measure_format)).stack("zero"),
+                color=alt.Color("rm_system:N", title="RM System"),
                 tooltip=[
                     alt.Tooltip("carrier", title="Carrier"),
+                    alt.Tooltip("rm_system", title="RM System"),
                     alt.Tooltip(f"{load_measure}:Q", title=measure_name, format=measure_format),
                 ],
             )
             text = chart.mark_text(dx=0, dy=3, color="white", baseline="top").encode(
                 x=alt.X("carrier:N", title="Carrier"),
-                y=alt.Y(f"{load_measure}:Q", title=measure_name).stack("zero"),
+                y=alt.Y(f"{load_measure}:Q", title=measure_name, axis=alt.Axis(format=measure_format)).stack("zero"),
                 text=alt.Text(f"{load_measure}:Q", format=measure_format),
             )
         else:
             bars = chart.mark_bar().encode(
                 y=alt.Y("carrier:N", title="Carrier"),
-                x=alt.X(f"{load_measure}:Q", title=measure_name).stack("zero"),
-                color=alt.Color("carrier:N", title="Carrier", legend=None),
+                x=alt.X(f"{load_measure}:Q", title=measure_name, axis=alt.Axis(format=measure_format)).stack("zero"),
+                color=alt.Color("rm_system:N", title="RM System"),
                 tooltip=[
                     alt.Tooltip("carrier", title="Carrier"),
+                    alt.Tooltip("rm_system", title="RM System"),
                     alt.Tooltip(f"{load_measure}:Q", title=measure_name, format=measure_format),
                 ],
             )
             text = chart.mark_text(dx=-5, dy=0, color="white", baseline="middle", align="right").encode(
                 y=alt.Y("carrier:N", title="Carrier"),
-                x=alt.X(f"{load_measure}:Q", title=measure_name).stack("zero"),
+                x=alt.X(f"{load_measure}:Q", title=measure_name, axis=alt.Axis(format=measure_format)).stack("zero"),
                 text=alt.Text(f"{load_measure}:Q", format=measure_format),
             )
         fig = (

@@ -267,10 +267,14 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     """
 
     dwm_lite: bool = True
-    """
-    Use the "lite" decision window model.
+    """Deprecated, has no effect."""
 
-    The structure of this model is the same as that use by Boeing.
+    use_standard_todd_curves: bool = True
+    """
+    Use the "standard" time of day departure (TODD) curves.
+
+    Each demand, unless otherwise given an explicit TODD curve to use, will use the
+    standard TODD curve associated with the market's `delta_t`.
     """
 
     max_connect_time: conint(ge=0) = 240
@@ -439,6 +443,12 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
 
     capture_choice_set_mkts: list[tuple] | None = []
     """Capture only these markets (O&D pairs)"""
+
+    capture_demand_history: bool = False
+    """Store the demand history for each demand.
+
+    This can be activated to populate the `demand_history` summary table, if desired.
+    """
 
     show_progress_bar: bool = True
     """

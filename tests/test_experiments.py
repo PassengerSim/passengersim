@@ -125,7 +125,7 @@ def test_experiments_rerun(tmp_path):
         assert "low_dmd" in summary_1
         assert isinstance(summary_1["low_dmd"], pax.summaries.SimulationTables)
 
-        # our second run should not need to rerun anything,
+        # our second run should not need to rerun anything, it's got cached results
         # so calling with "raise" not not raise any error
         summary_2 = experiments.run(use_existing="raise")
         assert "low_dmd" in summary_2
@@ -146,3 +146,17 @@ def test_experiments_rerun(tmp_path):
         summary_3 = experiments.run(use_existing="raise", check_content=False)
         assert "low_dmd" in summary_3
         assert isinstance(summary_3["low_dmd"], pax.summaries.SimulationTables)
+
+        # if the cache is missing, but the file is on disk, it should be able to use that
+        experiments.experiments[0].cached = None
+        summary_4 = experiments.run(use_existing="raise", check_content=False)
+        assert "low_dmd" in summary_4
+        assert isinstance(summary_4["low_dmd"], pax.summaries.SimulationTables)
+        assert "available in file storage" in repr(summary_4["low_dmd"])
+
+        # if the disk file is missing, and also the cache is missing, we should get an error
+        experiments.experiments[0].cached = None
+        for pxfile in experiments.output_dir.joinpath("low_dmd").rglob("*.pxsim"):
+            pxfile.unlink()
+        with raises(FileNotFoundError, match="demo-output-2/low_dmd/.*.pxsim"):
+            _ = experiments.run(use_existing="raise", check_content=False)

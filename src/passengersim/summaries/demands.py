@@ -8,7 +8,7 @@ import pandas as pd
 from passengersim.reporting import report_figure
 
 from .generic import GenericSimulationTables, SimulationTableItem
-from .tools import aggregate_by_summing_dataframe
+from .tools import aggregate_by_concat_dataframe, aggregate_by_summing_dataframe
 
 if TYPE_CHECKING:
     from passengersim import Simulation
@@ -39,6 +39,19 @@ def extract_demands(sim: Simulation) -> pd.DataFrame | None:
     return pd.DataFrame(dmd_data).set_index(["orig", "dest", "segment"])
 
 
+def extract_demand_history(sim: Simulation) -> pd.DataFrame | None:
+    """Extract demand_history from the Demand class."""
+    combined_data = []
+    for dmd in sim.eng.demands:
+        hist = dmd.get_demand_history()
+        combined_data += hist
+    if len(combined_data) == 0:
+        return None
+    df = pd.DataFrame.from_dict(combined_data)
+    df = df.set_index(["trial", "sample", "orig", "dest", "segment"])
+    return df
+
+
 class SimTabDemands(GenericSimulationTables):
     """Container for summary tables and figures extracted from a Simulation.
 
@@ -55,6 +68,12 @@ class SimTabDemands(GenericSimulationTables):
         ),  # don't sum extra_idxs, they should be identical over trials
         extraction_func=extract_demands,
         doc="Demand-level summary data.",
+    )
+
+    demand_history: pd.DataFrame | None = SimulationTableItem(
+        aggregation_func=aggregate_by_concat_dataframe("demand_history"),
+        extraction_func=extract_demand_history,
+        doc="Demand-level summary data from each sample.",
     )
 
     @report_figure

@@ -27,8 +27,10 @@ def make_core_choice_model(
         if pname in ("kind", "name") or pvalue is None:
             continue
         if pname == "todd_curve":
-            tmp_dwm = todd_curves[pvalue]
-            x.add_dwm(tmp_dwm)
+            try:
+                x.dwm = todd_curves[pvalue]
+            except KeyError as err:
+                raise ValueError(f"choice model uses todd_curve {pvalue!r} which is not defined") from err
         elif pname == "early_dep" and pvalue is not None:
             x.early_dep_offset = pvalue["offset"]
             x.early_dep_slope = pvalue["slope"]
@@ -246,7 +248,7 @@ def make_core_demand(
 
     if todd_curves is not None:
         if dmd_config.todd_curve in todd_curves:
-            dmd.add_dwm(todd_curves[dmd_config.todd_curve])
+            dmd.dwm = todd_curves[dmd_config.todd_curve]
 
     if dmd_config.group_sizes is not None:
         dmd.add_group_sizes(dmd_config.group_sizes)

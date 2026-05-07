@@ -37,6 +37,7 @@ class FareIterator:
         dest: str | None = None,
         carrier: str | Carrier | None = None,
         days_prior: int | None = None,
+        booking_class: str | None = None,
         exclude_booking_classes: Collection[str] | None = None,
     ):
         self._obj = sim
@@ -48,6 +49,7 @@ class FareIterator:
         else:
             self._carrier_name = carrier.name
         self._days_prior = days_prior
+        self._booking_class = booking_class
         if isinstance(exclude_booking_classes, str):
             exclude_booking_classes = {exclude_booking_classes}
         if exclude_booking_classes is None:
@@ -69,6 +71,8 @@ class FareIterator:
             if self._carrier_name is not None and fare.carrier_name != self._carrier_name:
                 continue
             if self._days_prior is not None and self._days_prior < fare.adv_purch:
+                continue
+            if self._booking_class is not None and fare.booking_class != self._booking_class:
                 continue
             if self._exclude_booking_classes is not None and fare.booking_class in self._exclude_booking_classes:
                 continue

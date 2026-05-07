@@ -3,7 +3,15 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel, ValidationInfo, field_serializer, field_validator
+from pydantic import (
+    BaseModel,
+    SerializationInfo,
+    SerializerFunctionWrapHandler,
+    ValidationInfo,
+    field_serializer,
+    field_validator,
+    model_serializer,
+)
 
 
 def create_timestamp(base_date, offset, hh, mm) -> int:
@@ -64,7 +72,8 @@ class Leg(BaseModel, extra="forbid"):
     flight departs on March 1st in the late evening from New York and arrives
     in London in the early morning of March 2nd, the `arr_day` would be +1,
     even though if you look only at UTC, the departure and arrival might
-    be on the same day.
+    be on the same day. This should correspond to the number of days (plus
+    or minus) that would typically be shown the a customer booking on this leg.
 
     This will usually be zero (arrival date is same as departure date) but will
     sometimes be 1 (arrives next day) or in a few pathological cases -1 or +2
@@ -195,3 +204,67 @@ class Leg(BaseModel, extra="forbid"):
         minutes = minutes % 60
         s += f" [{self.distance:5.0f} miles, {hours}h {minutes:02d}m, {self.capacity:3d} seats]"
         return s
+
+    def __repr__(self) -> str:
+        arr_day = f", arr_day={self.arr_day:+d}" if self.arr_day else ""
+        distance = f", distance={round(self.distance, 3):g}" if self.distance else ""
+        tags = f", tags={self.tags}" if self.tags else ""
+        return (
+            f"Leg("
+            f"leg_id={self.leg_id}, "
+            f"carrier='{self.carrier}', "
+            f"fltno={self.fltno}, "
+            f"orig={self.orig!r}, "
+            f"dest={self.dest!r}, "
+            f"date={self.date.strftime('%Y-%m-%d')!r}, "
+            f"dep_time={self.dep_localtime.strftime('%H:%M')!r}, "
+            f"arr_time={self.arr_localtime.strftime('%H:%M')!r}{arr_day}, "
+            f"capacity={self.capacity}"
+            f"{distance}{tags}"
+            f")"
+        )
+
+    @model_serializer(mode="wrap")
+    def serialize_leg(self, nxt: SerializerFunctionWrapHandler, info: SerializationInfo) -> dict:
+        # check if the context is asking for human readable serialized outputs.
+        if isinstance(info.context, dict) and info.context.get("human_readable", False):
+            out = {}
+
+            # basic data remains as-is
+            out["leg_id"] = self.leg_id
+            out["carrier"] = self.carrier
+            out["fltno"] = self.fltno
+            out["orig"] = self.orig
+            out["dest"] = self.dest
+            out["capacity"] = self.capacity
+            if self.distance:
+                out["distance"] = round(self.distance, 3)
+
+            # convert the departure date in local time to YYYY-MM-DD
+            dep_date = self.dep_localtime.strftime("%Y-%m-%d")
+            arr_date = self.arr_localtime.strftime("%Y-%m-%d")
+            out["date"] = dep_date
+            # convert dep_time to a string "HH:MM" in 24h local time at the origin
+            out["dep_time"] = self.dep_localtime.strftime("%H:%M")
+            if self.orig_timezone:
+                out["orig_timezone"] = self.orig_timezone
+            # convert arr_time to a string "HH:MM" in 24h local time at the destination
+            out["arr_time"] = self.arr_localtime.strftime("%H:%M")
+            if self.dest_timezone:
+                out["dest_timezone"] = self.dest_timezone
+
+            # include add_day only if nonzero
+            days = (datetime.fromisoformat(arr_date) - datetime.fromisoformat(dep_date)).days
+            if days:
+                out["arr_day"] = f"{days:+d}"
+
+            if self.tags:
+                out["tags"] = self.tags.copy()
+
+            # do not serialize time_adjusted, dep_time_offset, or arr_time_offset, these are
+            # created automatically during validation.
+            return out
+
+        # otherwise, normal serialization
+        serialized = nxt(self)
+        return serialized

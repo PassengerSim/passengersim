@@ -233,3 +233,54 @@ def restore_registered_rm_systems(data: bytes) -> None:
     """
     global _REGISTERED_SYSTEMS
     _REGISTERED_SYSTEMS.update(dill.loads(data))
+
+
+def make_rm_system_variant(new_cls: type[RmSys]) -> type[RmSys]:
+    """Define a named variant of an existing RM system, with particular options.
+
+    Use this decorator on a class which defines alternative default values
+    for RmSys options, and which inherits from an existing RmSys class.
+    This will create a new RM system class with these defined values as the
+    defaults, and register it with the name of the new class.
+
+    Raises
+    ------
+    ValueError
+        The an RM system class with the given name is already registered.
+
+    Examples
+    --------
+    To start with the existing `Qu` system, but change the default fare adjustment
+    algorithm to `ki` and the fare adjustment to 0.25, do
+
+    >>> from passengersim.rm.standard_systems import Qu
+    >>> @make_rm_system_variant
+    ... class Qu25(Qu):
+    ...     fare_adjustment = "ki"
+    ...     fare_adjustment_scale = 0.25
+
+    """
+
+    # the new class must be defined with exactly one base class, so we can easily determine which kwargs are new
+    if len(new_cls.__bases__) != 1:
+        raise ValueError(
+            f"A new variant RmSys must have exactly one base class, but {new_cls} has {len(new_cls.__bases__)}"
+        )
+
+    base_cls = new_cls.__bases__[0]
+
+    variant_defines = {
+        k: v
+        for k, v in new_cls.__dict__.items()
+        if not k.startswith("__")  # Exclude magic methods/docs
+    }
+
+    def _new_init(self, *args, **kwargs):
+        for k, v in variant_defines.items():
+            if k not in kwargs:
+                kwargs[k] = v
+        super(base_cls, self).__init__(*args, **kwargs)
+
+    final_cls = type(new_cls.__name__, (base_cls,), {"__init__": _new_init})
+
+    return register_rm_system(final_cls)

@@ -8,10 +8,10 @@ import altair as alt
 import numpy as np
 import pandas as pd
 
-from ._types import PathLike
-from .reporting import report_figure
-from .summaries import SimulationTables
-from .summaries.demand_to_come import SimTabDemandToCome
+from passengersim._types import PathLike
+from passengersim.reporting import report_figure
+from passengersim.summaries import SimulationTables
+from passengersim.summaries.demand_to_come import SimTabDemandToCome
 
 
 class Contrast(dict):
@@ -577,7 +577,7 @@ def _fig_carrier_measure(
     if ratio_all:
         queue = []
         for n, a in enumerate(source_order):
-            df_ = df.set_index(["source", "carrier"])
+            df_ = df.set_index(["source", "carrier"]).drop(columns="rm_system")
             ratios = df_.div(df_.query(f"source == '{a}'").droplevel("source")) - 1.0
             ratios.iloc[:, 0] = ratios.iloc[:, 0].where(ratios.index.get_level_values("source") != a, np.nan)
             ratios.columns = [f"ratio_{n}"]
@@ -587,7 +587,7 @@ def _fig_carrier_measure(
     elif ratio:
         if isinstance(ratio, str):
             against = ratio
-        df_ = df.set_index(["source", "carrier"])
+        df_ = df.set_index(["source", "carrier", "rm_system"])
         ratios = df_.div(df_.query(f"source == '{against}'").droplevel("source")) - 1.0
         ratios.columns = ["ratio_0"]
         df = df.join(ratios, on=["source", "carrier"])
@@ -606,6 +606,7 @@ def _fig_carrier_measure(
     tooltips = [
         alt.Tooltip("source", title=None),
         alt.Tooltip("carrier", title="Carrier"),
+        alt.Tooltip("rm_system", title="RM System"),
         alt.Tooltip(f"{load_measure}:Q", title=measure_name, format=measure_format),
     ]
     if ratio_all:
@@ -619,14 +620,14 @@ def _fig_carrier_measure(
         )
     if orient == "v":
         bars = chart.mark_bar().encode(
-            color=alt.Color("source:N", title="Source"),
+            color=alt.Color("rm_system:N", title="RM System"),
             x=alt.X("source:N", title=None, sort=source_order),
-            y=alt.Y(f"{load_measure}:Q", title=measure_name).stack("zero"),
+            y=alt.Y(f"{load_measure}:Q", title=measure_name, axis=alt.Axis(format=measure_format)).stack("zero"),
             tooltip=tooltips,
         )
         text = chart.mark_text(dx=0, dy=3, color="white", baseline="top").encode(
             x=alt.X("source:N", title=None, sort=source_order),
-            y=alt.Y(f"{load_measure}:Q", title=measure_name).stack("zero"),
+            y=alt.Y(f"{load_measure}:Q", title=measure_name, axis=alt.Axis(format=measure_format)).stack("zero"),
             text=alt.Text(f"{load_measure}:Q", format=measure_format),
         )
         return (
@@ -639,14 +640,14 @@ def _fig_carrier_measure(
         )
     else:
         bars = chart.mark_bar().encode(
-            color=alt.Color("source:N", title="Source"),
+            color=alt.Color("rm_system:N", title="RM System"),
             y=alt.Y("source:N", title=None, sort=source_order),
-            x=alt.X(f"{load_measure}:Q", title=measure_name).stack("zero"),
+            x=alt.X(f"{load_measure}:Q", title=measure_name, axis=alt.Axis(format=measure_format)).stack("zero"),
             tooltip=tooltips,
         )
         text = chart.mark_text(dx=-5, dy=0, color="white", baseline="middle", align="right").encode(
             y=alt.Y("source:N", title=None, sort=source_order),
-            x=alt.X(f"{load_measure}:Q", title=measure_name).stack("zero"),
+            x=alt.X(f"{load_measure}:Q", title=measure_name, axis=alt.Axis(format=measure_format)).stack("zero"),
             text=alt.Text(f"{load_measure}:Q", format=measure_format),
         )
         if ratio_label:

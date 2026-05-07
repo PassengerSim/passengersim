@@ -63,7 +63,7 @@ class SimulationTableItem:
     def __init__(
         self,
         aggregation_func: Callable[[list[GenericSimulationTables]], pd.DataFrame | None],
-        extraction_func: Callable[[Simulation], pd.DataFrame] = None,
+        extraction_func: Callable[[Simulation], pd.DataFrame | None] = None,
         computed_fields: dict[str, Any] = None,
         doc: str | None = None,
     ):

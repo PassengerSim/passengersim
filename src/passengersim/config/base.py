@@ -12,6 +12,7 @@ import warnings
 from datetime import UTC, datetime
 from typing import Any, ClassVar
 from urllib.request import urlopen
+from zoneinfo import ZoneInfo
 
 import addicty
 import yaml
@@ -25,7 +26,8 @@ from pydantic import (
 )
 
 from passengersim.pseudonym import random_label
-from passengersim.rm.systems import check_registered_rm_system
+from passengersim.rm.systems import check_registered_rm_system, list_registered_rm_systems
+from passengersim.utils.close_matching import did_you_mean
 from passengersim.utils.compression import (
     deserialize_from_file,
     serialize_to_file,
@@ -33,6 +35,7 @@ from passengersim.utils.compression import (
 )
 from passengersim.utils.file_freshness import check_modification_times, preprocess_filenames
 
+from ._preprocess import preprocess_config
 from .blf_curves import BlfCurve
 from .booking_curves import BookingCurve
 from .carriers import Carrier
@@ -279,6 +282,7 @@ class YamlConfig(PrettyModel):
         exclude_defaults: bool = False,
         exclude_none: bool = False,
         warnings: bool = True,
+        human_readable: bool = True,
     ) -> None | bytes:
         """
         Write a config to YAML format.
@@ -305,6 +309,10 @@ class YamlConfig(PrettyModel):
             Whether to exclude fields that have a value of `None` from the output.
         warnings : bool, default True
             Whether to log warnings when invalid fields are encountered.
+        human_readable : bool, default True
+            Whether to write the YAML files in a human-readable format.  This will
+            reformat inputs back to normal human-readable values (e.g. leg departure
+            times as 'HH:MN' in local time, not an integer giving unix time.
 
         Returns
         -------
@@ -321,6 +329,7 @@ class YamlConfig(PrettyModel):
                 exclude_defaults=exclude_defaults,
                 exclude_none=exclude_none,
                 warnings=warnings,
+                context={"human_readable": True} if human_readable else {},
             )
         )
         b = yaml.dump(y, encoding="utf8", Dumper=yaml.CSafeDumper)
@@ -350,6 +359,7 @@ class YamlConfig(PrettyModel):
         exclude_none: bool = False,
         warnings: bool = True,
         general_config: tuple[str] = ("simulation_controls", "tags"),
+        human_readable: bool = True,
     ) -> None:
         """Write to a set of YAML files, one for each top level key.
 
@@ -375,6 +385,13 @@ class YamlConfig(PrettyModel):
             Whether to exclude fields that have a value of `None` from the output.
         warnings : bool, default True
             Whether to log warnings when invalid fields are encountered.
+        general_config : tuple[str], default ("simulation_controls", "tags")
+            The top-level keys to write to the general config file (general.yaml)
+            instead of their own files.
+        human_readable : bool, default True
+            Whether to write the YAML files in a human-readable format.  This will
+            reformat inputs back to normal human-readable values (e.g. leg departure
+            times as 'HH:MN' in local time, not an integer giving unix time.
         """
         if isinstance(directory, str):
             directory = pathlib.Path(directory)
@@ -388,6 +405,7 @@ class YamlConfig(PrettyModel):
                 exclude_defaults=exclude_defaults,
                 exclude_none=exclude_none,
                 warnings=warnings,
+                context={"human_readable": True} if human_readable else {},
             )
         )
         remainder = {}
@@ -719,6 +737,24 @@ class Config(YamlConfig, extra="forbid"):
         return result
 
     @model_validator(mode="after")
+    def _all_demands_have_markets(self) -> Self:
+        """All demands must have a market that matches one of the markets defined in the config.
+
+        It is valid to have markets not defined in the raw input, in which case a default-initialized
+        market will be created for any market that appears in the demands but not in the markets list.
+        This allows users to only specify markets that they want to customize, and not have to define
+        a market for every single OD pair in the network.
+        """
+        market_idents = {f"{m.orig}~{m.dest}" for m in self.markets}
+        for d in self.demands:
+            ident = f"{d.orig}~{d.dest}"
+            if ident not in market_idents:
+                mkt = Market(orig=d.orig, dest=d.dest)
+                self.markets.append(mkt)
+                market_idents.add(ident)
+        return self
+
+    @model_validator(mode="after")
     def _fare_ap_restrictions_must_match_dcps(self) -> Self:
         """AP restrictions on fare can only be invoked at the DCPs."""
         for f in self.fares:
@@ -838,7 +874,13 @@ class Config(YamlConfig, extra="forbid"):
                 # the named system is not a registered callback-style system, or the user has explicitly
                 # disabled callback-style RM systems for this carrier
                 # so it must be defined in rm_systems, or be an old-style standard RM system we can load
-                raise ValueError(f"Carrier {carrier.name} has unknown RM system {carrier.rm_system}") from None
+                raise ValueError(
+                    did_you_mean(
+                        f"Carrier {carrier.name} has unknown RM system {carrier.rm_system}",
+                        carrier.rm_system,
+                        list_registered_rm_systems(),
+                    )
+                ) from None
         return self
 
     def _load_std_frat5(self, std_name: str):
@@ -874,6 +916,33 @@ class Config(YamlConfig, extra="forbid"):
         for leg in self.legs:
             if leg.carrier not in self.carriers:
                 raise ValueError(f"Carrier for leg {leg.carrier} {leg.fltno} is not defined")
+        return self
+
+    @model_validator(mode="after")
+    def _legs_have_unique_leg_ids(self) -> Self:
+        """Check that all legs have a unique leg_id."""
+        all_leg_ids = set()
+        # First, scan for duplicate assigned leg_ids, which is an error.
+        for leg in self.legs:
+            if leg.leg_id is not None:
+                if leg.leg_id in all_leg_ids:
+                    raise ValueError(f"Leg ID {leg.leg_id} is duplicated")
+                else:
+                    all_leg_ids.add(leg.leg_id)
+        # Then, for all legs without a leg_id but with a flt_no,
+        # if the flt_no is available make it the leg_id
+        for leg in self.legs:
+            if leg.leg_id is None and leg.fltno is not None and leg.fltno not in all_leg_ids:
+                leg.leg_id = leg.fltno
+                all_leg_ids.add(leg.leg_id)
+        # Finally, for all remaining legs, assign them a new unique leg_id
+        next_available_id = 1
+        for leg in self.legs:
+            if leg.leg_id is None:
+                while next_available_id in all_leg_ids:
+                    next_available_id += 1
+                leg.leg_id = next_available_id
+                all_leg_ids.add(leg.leg_id)
         return self
 
     @model_validator(mode="after")
@@ -1148,39 +1217,57 @@ class Config(YamlConfig, extra="forbid"):
         negative_duration_legs = []
         unreasonable_leg_speeds = []
 
+        def adjust_time_zone(t, place, explicit_tz: str | None = None):
+            if place is not None:
+                if (
+                    explicit_tz is not None
+                    and place.time_zone_info is not None
+                    and str(explicit_tz) != str(place.time_zone_info)
+                ):
+                    warnings.warn(
+                        f"Explicit time zone {explicit_tz} does not match place "
+                        f"time zone {place.time_zone_info}, using explicit time zone",
+                        stacklevel=2,
+                    )
+                tz = explicit_tz or place.time_zone_info
+                # explicit_tz arrives as a plain string when it was stored
+                # in a previous serialization (e.g. after a human-readable
+                # round-trip via to_yaml_parts).  datetime() requires a
+                # tzinfo subclass, so coerce strings to ZoneInfo objects.
+                if isinstance(tz, str):
+                    tz = ZoneInfo(tz)
+                if tz is not None:
+                    # Alan's approach
+                    # It was converted as a local time, so unpack it and
+                    #   create a new datetime in the given TZ
+                    dt = datetime.fromtimestamp(t, tz=UTC)
+                    dt2 = datetime(
+                        dt.year,
+                        dt.month,
+                        dt.day,
+                        dt.hour,
+                        dt.minute,
+                        0,
+                        0,
+                        tzinfo=tz,
+                    )
+                    new_ts = int(dt2.timestamp())
+                    return new_ts, t - new_ts
+            return t, 0
+
         for leg in self.legs:
             # the nominal time is local time but so far got stored as UTC,
             # so we need to add the time zone offset to be actually local time
 
-            def adjust_time_zone(t, place):
-                if place is not None:
-                    tz = place.time_zone_info
-                    if tz is not None:
-                        # Alan's approach
-                        # It was converted as a local time, so unpack it and
-                        #   create a new datetime in the given TZ
-                        dt = datetime.fromtimestamp(t, tz=UTC)
-                        dt2 = datetime(
-                            dt.year,
-                            dt.month,
-                            dt.day,
-                            dt.hour,
-                            dt.minute,
-                            0,
-                            0,
-                            tzinfo=tz,
-                        )
-                        new_ts = int(dt2.timestamp())
-                        return new_ts, t - new_ts
-                return t, 0
-
             if not leg.time_adjusted:
                 place_o = self.places.get(leg.orig, None)
-                leg.dep_time, leg.dep_time_offset = adjust_time_zone(leg.dep_time, place_o)
-                leg.orig_timezone = str(place_o.time_zone_info) if place_o else None
+                leg.dep_time, leg.dep_time_offset = adjust_time_zone(leg.dep_time, place_o, leg.orig_timezone)
+                if not leg.orig_timezone:
+                    leg.orig_timezone = str(place_o.time_zone_info) if place_o else None
                 place_d = self.places.get(leg.dest, None)
-                leg.arr_time, leg.arr_time_offset = adjust_time_zone(leg.arr_time, place_d)
-                leg.dest_timezone = str(place_d.time_zone_info) if place_d else None
+                leg.arr_time, leg.arr_time_offset = adjust_time_zone(leg.arr_time, place_d, leg.dest_timezone)
+                if not leg.dest_timezone:
+                    leg.dest_timezone = str(place_d.time_zone_info) if place_d else None
                 if place_o is None:
                     warnings.warn(f"No defined place for {leg.orig}", stacklevel=2)
                 if place_d is None:
@@ -1247,6 +1334,18 @@ class Config(YamlConfig, extra="forbid"):
                 raise ValueError(f"Circuity rule '{rule.name}' refers to a dest airport that isn't specified in places")
 
             # Now we check state codes
+        return self
+
+    def preprocess(self) -> Self:
+        """Conduct cleaning and preprocessing on this Config.
+
+        This will run the following steps:
+
+        - connection builder
+        - compute delta-t for all markets as needed
+        - assign standard TODD curves to all demands if `simulation_controls.use_standard_todd_curves`
+        """
+        preprocess_config(self)
         return self
 
     def __repr__(self):

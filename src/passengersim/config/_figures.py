@@ -486,10 +486,13 @@ def fig_demand_vs_capacity(cfg: Config):
                 place_counters[leg.dest][1] += 1
     flow_shares = pd.Series({k: v[1] / (sum(v) + 0.0001) for k, v in place_counters.items()}).rename("path_flow_share")
 
+    _demands = cfg.dataframes.demands
+    _demands["base_demand"] *= cfg.simulation_controls.demand_multiplier
+
     ## Arriving
     df = cfg.dataframes.places[["name"]].set_index("name")
     df = (
-        df.join(cfg.dataframes.demands.groupby("dest").agg(demand_arriving=("base_demand", "sum")))
+        df.join(_demands.groupby("dest").agg(demand_arriving=("base_demand", "sum")))
         .join(cfg.dataframes.legs.groupby("dest").agg(seats_arriving=("capacity", "sum")))
         .join(flow_shares)
         .fillna(0)
@@ -534,7 +537,7 @@ def fig_demand_vs_capacity(cfg: Config):
     ## Departing
     df1 = cfg.dataframes.places[["name"]].set_index("name")
     df1 = (
-        df1.join(cfg.dataframes.demands.groupby("orig").agg(demand_departing=("base_demand", "sum")))
+        df1.join(_demands.groupby("orig").agg(demand_departing=("base_demand", "sum")))
         .join(cfg.dataframes.legs.groupby("orig").agg(seats_departing=("capacity", "sum")))
         .join(flow_shares)
         .fillna(0)

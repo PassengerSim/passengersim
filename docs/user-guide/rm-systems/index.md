@@ -204,3 +204,64 @@ carriers:
     the `em_algorithm` to `"em"` and the `em_maxiter` to `20`.
 2.  Carrier `AL2` has no options set, so it will use the default values for all
     options defined in the RM system.
+
+
+## RM System Variants
+
+The process of defining a new RM system is flexible, and allows for a wide variety of
+RM system designs.  However, in many cases, a new RM system may be very similar to an
+existing RM system, with only a few differences in the selected options.  It can also
+make working with experiments simpler if users can easily create a handful of named
+system variants of an existing RM system, using different options.  Using a named system
+variant both ensures the the desired package of options is set correctly, and also makes
+it easier to track which variants are being used in different experiments.
+
+To create a named RM system variant, users can use a special convenience decorator called
+[`make_rm_system_variant`][passengersim.rm.systems.make_rm_system_variant].  This
+allows you to define a new RM system class that inherits from an existing RM system,
+and overrides the desired options, without having to repeat the full definition of the RM
+system.  For example, the code snippet below defines a new RM system variant called `Qs_25`
+that inherits from the standard `Q` RM system, and overrides two options: it sets the
+`fare_adjustment_scale` to `0.25`, and it sets `sub_bp` to `True` to enable SubBP optimization.
+
+```python title="rm_system_variant.py"
+
+from passengersim.rm.systems import make_rm_system_variant
+from passengersim.rm.standard_systems import Q  #(1)!
+
+@make_rm_system_variant
+class Qs_25(Q):   #(2)!
+    """Hybrid Q Forecasting with SubBP"""
+    fare_adjustment_scale = 0.25
+    sub_bp = True
+
+```
+{ .annotate }
+1.  For typicaly use of "standard" RM systems, PassengerSim will automatically import
+    what it needs. But since we want to sub-class the `Q` system, we need to explicitly
+    import it.
+2.  The name of this RM system is the same as the name of this class. So, to have a
+    carrier use this RM system, you would specify `rm_system: Qs_25` in the carrier
+    configuration.
+
+The attributes that can be overridden in this way when creating a named variant for
+any existing RM system are the same attributes that can be set using the `rm_system_options`
+for that system.  For example, the two carriers shown below are both using essentially the
+same RM system. AL1 is using the named `Qs_25` variant with the custom options defined
+in the code snippet above, while AL2 is using the base `Q` system with options set
+explicitly.
+
+```yaml title="carriers.yaml"
+carriers:
+  AL1:
+    rm_system: Qs_25
+  AL2:
+    rm_system: Q
+    rm_system_options:
+      fare_adjustment_scale: 0.25
+      sub_bp: True
+```
+
+As far as the math goes, these two RM systems are the same, but using the named
+variant makes it easier to keep track of which options are being used.  Certain pre-packaged
+visualization tools may also be designed to highlight named variants.

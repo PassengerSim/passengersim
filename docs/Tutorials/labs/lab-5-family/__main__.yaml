@@ -9,5 +9,6 @@ include:
 - legs.yaml
 - demands.yaml
 - fares.yaml
+- markets.yaml
 - other_controls.yaml
 - general.yaml

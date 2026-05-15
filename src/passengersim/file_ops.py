@@ -2,7 +2,7 @@ import os
 import pathlib
 
 from passengersim.config import Config
-from passengersim.summaries import SimulationTables
+from passengersim.driver import get_default_summarizer
 
 
 def _has_file_extensions(path: str, ext: list[str]) -> bool:
@@ -26,7 +26,7 @@ def from_file(path: str | pathlib.Path | os.PathLike[str]) -> Config:
         Path to the file to load. The file type is determined by the extension.
     """
     if _has_file_extensions(path, [".pxsim"]):
-        return SimulationTables.from_file(path)
+        return get_default_summarizer().from_file(path)
     elif _has_file_extensions(path, [".yaml", ".yml", ".yml.gz", ".yaml.gz", ".yml.lz4", ".yaml.lz4"]):
         return Config.from_yaml(path)
     else:

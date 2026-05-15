@@ -60,6 +60,7 @@ class SimTabLegs(GenericSimulationTables):
         computed_fields={
             "avg_load_factor": "100.0 * gt_sold / gt_capacity",
             "avg_local": "100.0 * gt_sold_local / gt_sold",
+            # "avg_sold": "gt_sold / @n_total_samples",
         },
         doc="Leg-level summary data.",
     )

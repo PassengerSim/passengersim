@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_serializer, field_validator
 
 
 class Fare(BaseModel, extra="forbid"):
@@ -14,6 +14,16 @@ class Fare(BaseModel, extra="forbid"):
     price: float
     advance_purchase: int
     restrictions: list[str] = []
+    """Named restrictions that apply to this fare.
+
+    These are typically related to refundability, changeability, and other conditions
+    that may apply to the fare and which may be subject to random preference variation
+    across customers.
+
+    The names may not contain pipe or slash characters, as these are used as separators
+    when parsing from strings. The names should match those used in choice models.
+    """
+
     category: str | None = None
     cabin: str | None = "Y"
     min_stay: int = 0
@@ -34,6 +44,11 @@ class Fare(BaseModel, extra="forbid"):
         if isinstance(v, str):
             v = list(filter(None, re.split(r"[|/]", v)))
         return v
+
+    @field_serializer("restrictions", when_used="always")
+    def serialize_restrictions(self, value: list[str]) -> str:
+        """Serialize restrictions as a string."""
+        return "|".join(value)
 
     @property
     def market_identifier(self):

@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 
 from passengersim import core
+from passengersim.config.booking_curves import BookingCurve as BookingCurveConfig
 from passengersim.config.choice_model import ChoiceModel as ChoiceModelConfig
 from passengersim.config.demands import Demand as DemandConfig
 from passengersim.config.legs import Leg as LegConfig
@@ -12,11 +13,13 @@ from passengersim.utils.string_counting import StringTracker
 
 def make_core_choice_model(
     cm_cfg: ChoiceModelConfig,
-    prng: core.Generator,
+    prng: core.Generator | None = None,
     fare_restriction_name_to_num: StringTracker | None = None,
     todd_curves: dict[str, core.DecisionWindow] | None = None,
 ) -> core.ChoiceModel:
     """Convert a choice model configuration into a core choice model."""
+    if prng is None:
+        prng = core.Generator(42)
     if fare_restriction_name_to_num is None:
         fare_restriction_name_to_num = StringTracker(start_from=1)
     if todd_curves is None:
@@ -217,6 +220,9 @@ def make_core_demand(
     if market_multipliers is None:
         market_multipliers = dict()
 
+    if choice_models is None:
+        choice_models = dict()
+
     dmd = core.Demand(
         segment=dmd_config.segment,
         market=mkt,
@@ -239,6 +245,11 @@ def make_core_demand(
     else:
         raise ValueError(f"Choice model {model_name} not found for demand {dmd}")
 
+    if dmd_config.emult is not None:
+        dmd.emult = dmd_config.emult
+    else:
+        dmd.emult = cm.get_parameters().get("emult", 1.5)
+
     # Attach a booking curve to this demand
     if dmd_config.curve:
         booking_curve_name = str(dmd_config.curve).strip()
@@ -253,7 +264,8 @@ def make_core_demand(
     if dmd_config.group_sizes is not None:
         dmd.add_group_sizes(dmd_config.group_sizes)
 
-    dmd.prob_saturday_night = dmd_config.prob_saturday_night
+    if dmd_config.prob_saturday_night is not None:
+        dmd.prob_saturday_night = dmd_config.prob_saturday_night
     dmd.prob_num_days = dmd_config.prob_num_days
     if carrier_preference_probs is not None:
         dmd.prob_favored_carrier = carrier_preference_probs
@@ -272,3 +284,17 @@ def make_core_demand(
                     raise Exception(f"DWM tolerance data is missing segment '{dmd.segment}'")
 
     return dmd
+
+
+def make_core_booking_curve(
+    curve_config: BookingCurveConfig,
+    prng: core.Generator,
+) -> core.BookingCurve:
+    bc = core.BookingCurve(curve_config.name)
+    bc.random_generator = prng
+    # ensure that the curve is sorted in descending order by days prior
+    sorted_days_prior = reversed(sorted(curve_config.curve.keys()))
+    for days_prior in sorted_days_prior:
+        pct = curve_config.curve[days_prior]
+        bc.add_dcp(days_prior, pct)
+    return bc

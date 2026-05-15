@@ -10,7 +10,7 @@ def fig_leg_shifts(
     baseline: SimulationTables,
     treatment: SimulationTables,
     *,
-    coloring: Literal["avg_revenue", "change_revenue"] = "avg_revenue",
+    coloring: Literal["avg_revenue", "change_revenue", "change_revenue_pct"] = "avg_revenue",
     size_range: tuple[int, int] = (10, 100),
     facet_width: int = 400,
     facet_height: int = 400,
@@ -31,6 +31,7 @@ def fig_leg_shifts(
         suffixes=("_baseline", "_treatment"),
     )
     df["avg_revenue_change"] = df["avg_revenue_treatment"] - df["avg_revenue_baseline"]
+    df["avg_revenue_change_pct"] = df["avg_revenue_change"] / df["avg_revenue_baseline"]
 
     chart = alt.Chart(df.reset_index())
 
@@ -48,6 +49,16 @@ def fig_leg_shifts(
                 domainMid=0,  # Forces the center of the scheme to 0
             ),
         )
+    elif coloring == "change_revenue_pct":
+        color = alt.Color(
+            "avg_revenue_change_pct:Q",
+            title="Δ Avg Revenue %",
+            scale=alt.Scale(
+                scheme="redblue",  # Use a diverging scheme
+                domainMid=0,  # Forces the center of the scheme to 0
+            ),
+            legend=alt.Legend(format=".1%"),
+        )
     else:
         raise ValueError(f"Unknown coloring {coloring}")
 
@@ -62,6 +73,7 @@ def fig_leg_shifts(
         alt.Tooltip("avg_revenue_baseline", title="Avg Revenue (Baseline)", format="$.3s"),
         alt.Tooltip("avg_revenue_treatment", title="Avg Revenue (Treatment)", format="$.3s"),
         alt.Tooltip("avg_revenue_change", title="Δ Avg Revenue", format="$.3s"),
+        alt.Tooltip("avg_revenue_change_pct", title="Δ Avg Revenue %", format=".2%"),
         alt.Tooltip("capacity"),
     ]
 

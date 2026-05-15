@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -143,6 +144,14 @@ class Leg(BaseModel, extra="forbid"):
     20 J-cabin seats.
     """
 
+    @property
+    def total_capacity(self) -> int:
+        """The total capacity of this leg across all cabins."""
+        if isinstance(self.capacity, dict):
+            return sum(self.capacity.values())
+        else:
+            return self.capacity
+
     distance: float | None = None
 
     @field_validator("date", mode="before")
@@ -165,7 +174,7 @@ class Leg(BaseModel, extra="forbid"):
         if isinstance(v, str) and ":" in v:
             dep_time_str = v.split(":")
             hh, mm = int(dep_time_str[0]), int(dep_time_str[1])
-            v = create_timestamp(info.data["date"], 0, hh, mm)
+            v = create_timestamp(info.data.get("date", datetime(1492, 1, 1)), 0, hh, mm)
             if info.field_name == "arr_time":
                 # if v < info.data["dep_time"] and info.data["arr_day"] == 0:
                 #     v += 86400  # add a day (in seconds) as arr time is next day
@@ -183,6 +192,19 @@ class Leg(BaseModel, extra="forbid"):
     a "short-haul" or "long-haul" flight, allowing RM actions to adjust their
     behavior accordingly.
     """
+
+    @field_validator("tags", mode="before")
+    def validate_tags(cls, v):
+        if isinstance(v, str):
+            # attempt to parse a string representation of a dict, e.g. "{'key1': 'value1', 'key2': 'value2'}"
+            try:
+                v = ast.literal_eval(v)
+            except Exception as e:
+                raise ValueError(f"Invalid tags string: {v}") from e
+        if not isinstance(v, dict):
+            raise ValueError(f"Tags must be a dict or a string representation of a dict, got {type(v)}")
+        # ensure all keys and values are strings
+        return {str(k): str(v) for k, v in v.items()}
 
     def __str__(self) -> str:
         ident = f"{self.carrier}{self.fltno}"
@@ -259,7 +281,7 @@ class Leg(BaseModel, extra="forbid"):
                 out["arr_day"] = f"{days:+d}"
 
             if self.tags:
-                out["tags"] = self.tags.copy()
+                out["tags"] = str(self.tags)
 
             # do not serialize time_adjusted, dep_time_offset, or arr_time_offset, these are
             # created automatically during validation.

@@ -148,3 +148,63 @@ class WeightedWelford:
     @property
     def n(self) -> int:
         return self._w_sum
+
+
+class SingleWelford:
+    """
+    In this tool, any array passed in is flattened, and each element
+    is treated as another sample.
+    """
+
+    def __init__(self):
+        self._n = 0
+        self._mean = 0
+        self._mean2 = 0
+
+    def update(self, x: np.typing.ArrayLike) -> None:
+        if isinstance(x, tuple | list):
+            x = np.array(x)
+        x = np.asarray(x).ravel()
+        n2 = len(x)
+        if n2 == 0:
+            return
+        # Compute batch statistics for the incoming array.
+        mean2 = np.mean(x)
+        m2_2 = np.sum((x - mean2) ** 2)
+        # Merge existing statistics with batch statistics using the parallel
+        # Welford / Chan et al. combination formula:
+        #   M2 = M2_a + M2_b + delta^2 * n_a * n_b / (n_a + n_b)
+        n1 = self._n
+        n = n1 + n2
+        delta = mean2 - self._mean
+        self._mean = self._mean + delta * n2 / n
+        self._mean2 = self._mean2 + m2_2 + delta**2 * n1 * n2 / n
+        self._n = n
+
+    @property
+    def mean(self) -> np.typing.ArrayLike:
+        return self._mean
+
+    @property
+    def variance(self) -> np.typing.ArrayLike:
+        if self._n < 2:
+            return np.nan
+        return self._mean2 / self._n
+
+    @property
+    def std_dev(self) -> np.typing.ArrayLike:
+        return np.sqrt(self.variance)
+
+    @property
+    def sample_variance(self) -> np.typing.ArrayLike:
+        if self._n < 2:
+            return np.nan
+        return self._mean2 / (self._n - 1)
+
+    @property
+    def sample_std_dev(self) -> np.typing.ArrayLike:
+        return np.sqrt(self.sample_variance)
+
+    @property
+    def n(self) -> int:
+        return self._n

@@ -28,7 +28,7 @@ from ._types import PathLike
 from .config import Config
 from .driver import check_summarizer, get_default_summarizer
 from .mp_executor import JobExecutor
-from .summaries import SimulationTables
+from .summaries import GenericSimulationTables, SimulationTables
 
 if TYPE_CHECKING:
     from passengersim.contrast import Contrast
@@ -47,7 +47,7 @@ class Experiment:
         tag: str | None = None,
         multiprocess: bool = True,
         *,
-        external: SimulationTables | PathLike | None = None,
+        external: GenericSimulationTables | PathLike | None = None,
     ):
         """
         Parameters
@@ -68,7 +68,7 @@ class Experiment:
             multi-process mode is not compatible with all environments, and may cause issues
             in interactive environments such as Jupyter notebooks.  In those cases, set this to
             False to run in single-process mode.
-        external : SimulationTables or path-like, optional
+        external : GenericSimulationTables or path-like, optional
             If provided, this should be an existing SimulationTables result or a path to an
             existing output file containing the results for this experiment.  If this is
             provided, the experiment will skip running the simulation and instead load the
@@ -160,12 +160,12 @@ class Experiments(CallbackMixin):
         else:
             return pathlib.Path(self.output_dir) / tag / pathlib.Path(filename).name
 
-    def existing(self, external: SimulationTables | PathLike | None = None) -> Experiment:
+    def existing(self, external: GenericSimulationTables | PathLike | None = None) -> Experiment:
         """Create an experiment that uses existing results, rather than running a simulation.
 
         Parameters
         ----------
-        external : SimulationTables or path-like, optional
+        external : GenericSimulationTables or path-like, optional
             If provided, this should be an existing SimulationTables result or a path to an
             existing output file containing the results for this experiment.  If this is
             provided, the experiment will skip running the simulation and instead load the
@@ -189,7 +189,7 @@ class Experiments(CallbackMixin):
         tag: str | None = None,
         multiprocess: bool = True,
         *,
-        external: SimulationTables | PathLike | None = None,
+        external: GenericSimulationTables | PathLike | None = None,
     ) -> Experiment:
         if title == "__DEFERRED_INIT__":
             e = Experiment(title, tag, multiprocess, external=external)
@@ -213,19 +213,19 @@ class Experiments(CallbackMixin):
 
     @staticmethod
     def _check_loaded_summary(
-        summary: SimulationTables,
+        summary: GenericSimulationTables,
         config: Config,
         tag: str,
         check_versions: bool = True,
         check_content: bool = True,
         source_file: str | None = None,
-    ) -> tuple[str, SimulationTables | None]:
+    ) -> tuple[str, GenericSimulationTables | None]:
         """
         Check if the loaded summary matches the config and PassengerSim versions.
 
         Parameters
         ----------
-        summary : SimulationTables
+        summary : GenericSimulationTables
         config : Config
         tag : str
         check_versions : bool, optional
@@ -237,7 +237,7 @@ class Experiments(CallbackMixin):
         -------
         str
             A message about the loaded summary
-        SimulationTables
+        GenericSimulationTables
             The loaded summary if it matches the config, otherwise None
         """
         if source_file is None:
@@ -288,15 +288,15 @@ class Experiments(CallbackMixin):
             return msg, None
 
         if isinstance(check, ValidationError):
-            msg = f"Loaded {tag} from {source_file}, but the config is invalid:\n{check}"
+            msg = f"Loaded {tag} from {source_file}, but the config is invalid:\n{str(check)[:4000]}"
             return msg, None
 
         if check_content and check:
-            msg = f"Loaded {tag} from {source_file}, but the config has changed:\n{check}"
+            msg = f"Loaded {tag} from {source_file}, but the config has changed:\n{str(check)[:4000]}"
             return msg, None
 
         if check:
-            msg = f"Loaded {tag} from {source_file}, although the config has changed:\n{check}"
+            msg = f"Loaded {tag} from {source_file}, although the config has changed:\n{str(check)[:4000]}"
         else:
             msg = f"Loaded {tag} from {source_file}"
 
@@ -451,7 +451,10 @@ class Experiments(CallbackMixin):
                     # If an external file is provided, load it and skip the simulation.
                     # This is done without regard for the use_existing parameter, and
                     # the absence of the external file is always an error.
-                    summary = get_default_summarizer().from_file(e.external)
+                    if isinstance(e.external, GenericSimulationTables):
+                        summary = e.external
+                    else:
+                        summary = get_default_summarizer().from_file(e.external)
                     live_display.console.print(f"Loaded experiment {e.tag} from {e.external}")
                     results[e.tag] = summary
                     continue
@@ -665,7 +668,10 @@ class Experiments(CallbackMixin):
                 # If an external file is provided, load it and skip the simulation.
                 # This is done without regard for the use_existing parameter, and
                 # the absence of the external file is always an error.
-                summary = get_default_summarizer().from_file(e.external)
+                if isinstance(e.external, GenericSimulationTables):
+                    summary = e.external
+                else:
+                    summary = get_default_summarizer().from_file(e.external)
                 jobber.rich_progress.console.print(f"Loaded experiment {e.tag} from {e.external}")
                 results[e.tag] = summary
                 continue

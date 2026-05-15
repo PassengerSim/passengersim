@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import ast
 import warnings
 from typing import TYPE_CHECKING
 
 import numpy as np
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, field_serializer, field_validator, model_validator
 
 if TYPE_CHECKING:
     from .base import Config
@@ -71,7 +72,16 @@ class Demand(BaseModel, extra="forbid"):
     accepted as input for backward compatibility but is deprecated and will
     emit a :class:`DeprecationWarning`."""
 
+    emult: float | None = None
+    """An 'emult' value for this demand.
+
+    This value scales the decay rate of maximum willingness to pay above the
+    reference price.  If not provided, the `emult` attached to the choice model
+    will be used."""
+
     distance: float | None = 0.0
+    """O-D distance."""
+
     choice_model: str | None = None
     """The name of the choice model that is applied for this demand."""
 
@@ -93,7 +103,7 @@ class Demand(BaseModel, extra="forbid"):
     """Probability of each group size.
     i.e. [0.5, 0.3, 0.2] will give 50% one pax, 30% 2 pax, etc"""
 
-    prob_saturday_night: float = False
+    prob_saturday_night: float | None = None
     """Probability that the customer has a R/T itinerary with a Saturday night stay.
        Using this for choice modeling and CP experiments"""
 
@@ -115,6 +125,16 @@ class Demand(BaseModel, extra="forbid"):
     overrides: list[DemandOverride] = []
     """Used for some specialized tests.
        Each dictionary should have 'carrier', 'discount_pct' and 'pref_adj'"""
+
+    @field_validator("overrides", "prob_num_days", mode="before")
+    def _accept_strings(cls, v):
+        if isinstance(v, str):
+            v = ast.literal_eval(v)
+        return v
+
+    @field_serializer("overrides", "prob_num_days")
+    def _serialize_overrides(self, v):
+        return [str(o.model_dump() if isinstance(o, BaseModel) else str(o)) for o in v]
 
     @property
     def choice_model_(self):

@@ -632,7 +632,7 @@ def fig_max_wtp_distributions(
             warnings.warn(f"No demand for {cm_name}", stacklevel=2)
         dmd_cfg = demands[cm_name]
         dmd = make_core_demand(dmd_cfg, markets={}, choice_models=choice_models, booking_curves={})
-        z = cm.max_wtp(dmd, n_draws=n_draws, raw=True)
+        z = cm.max_wtp(dmd.reference_price, n_draws=n_draws, raw=True)
         raw_sorted = np.sort(z["raw"])
         x_values = np.linspace(lower_bound, upper_bound, 200)
         pct_greater[cm_name] = pd.Series(

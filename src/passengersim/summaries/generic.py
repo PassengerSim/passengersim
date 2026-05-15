@@ -91,6 +91,12 @@ class SimulationTableItem:
                     pass
             # now work with what we have
             df = instance._data[self.name]
+            # make n_total_samples available for computed fields, if it is present in the instance
+            # to use in, write `@n_total_samples` in the expression
+            local_dict = {}
+            n_total_samples = getattr(instance, "n_total_samples", None)
+            if n_total_samples is not None:
+                local_dict["n_total_samples"] = n_total_samples
             if isinstance(df, Exception):
                 raise df
             if df is not None:
@@ -99,7 +105,7 @@ class SimulationTableItem:
                     if field in df:
                         continue
                     try:
-                        df[field] = df.eval(func, engine=engine)
+                        df[field] = df.eval(func, engine=engine, local_dict=local_dict)
                     except Exception as e:
                         warnings.warn(
                             f"Error computing {field} for {self.name}: {e}",

@@ -10,6 +10,7 @@ simulation_controls:
   capture_choice_set_mkts: []
   capture_choice_set_obs: null
   capture_competitor_data: false
+  capture_demand_history: false
   connection_builder:
     circuity_function: default_circuity_function
     existing_paths: keep
@@ -61,5 +62,6 @@ simulation_controls:
   timeframe_demand_allocation: pods
   tot_z_factor: 2.0
   update_frequency: null
+  use_standard_todd_curves: true
   write_raw_files: false
 tags: {}

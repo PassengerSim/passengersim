@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Literal
 
@@ -281,6 +282,104 @@ def make_rm_system_variant(new_cls: type[RmSys]) -> type[RmSys]:
                 kwargs[k] = v
         super(base_cls, self).__init__(*args, **kwargs)
 
-    final_cls = type(new_cls.__name__, (base_cls,), {"__init__": _new_init})
+    final_cls = type(
+        new_cls.__name__,
+        (base_cls,),
+        {"__init__": _new_init, "_variant_defines": variant_defines, "_name": new_cls.__name__},
+    )
 
     return register_rm_system(final_cls)
+
+
+def describe_rm_systems(cfg: Config | None = None) -> dict:
+    """Describe the RM systems used in the configuration.
+
+    If no configuration is provided, a description of all available systems is returned.
+    """
+    rm_systems_setup = {}
+    if cfg is None:
+        for k in list_registered_rm_systems():
+            s = get_registered_rm_system(k)
+            if hasattr(s, "_variant_defines"):
+                rm_systems_setup[k] = {
+                    "base_class_name": s.__base__.get_name(),
+                    "variant_defines": s._variant_defines,
+                }
+            else:
+                v = {"module": s.__module__}
+                class_name = s.get_name()
+                if class_name != k:
+                    v["class_name"] = class_name
+                if s.__name__ != k:
+                    v["import_name"] = s.__name__
+                rm_systems_setup[k] = v
+    else:
+        for carrier in cfg.carriers.values():
+            k = carrier.rm_system
+            s = get_registered_rm_system(k)
+            while hasattr(s, "_variant_defines"):
+                rm_systems_setup[k] = {
+                    "base_class_name": s.__base__.get_name(),
+                    "variant_defines": s._variant_defines,
+                }
+                s = s.__base__
+                k = s.get_name()
+                if get_registered_rm_system(k) is not s:
+                    s = None
+            if s is not None:
+                v = {"module": s.__module__}
+                class_name = s.get_name()
+                if class_name != k:
+                    v["class_name"] = class_name
+                if s.__name__ != k:
+                    v["import_name"] = s.__name__
+                rm_systems_setup[k] = v
+
+    return rm_systems_setup
+
+
+def reload_rm_systems(description: dict) -> None:
+    """Reload RM systems used in the configuration, based on the provided description."""
+    step1 = {}
+    step2 = []
+    for k, v in description.items():
+        if "variant_defines" in v:
+            step2.append([k, v])
+        else:
+            step1[k] = v
+    for k, v in step1.items():
+        _module = importlib.import_module(v["module"])
+        _import_name = v.get("import_name", k)
+        _obj = getattr(_module, _import_name)
+        if get_registered_rm_system(k) is not _obj:
+            raise ValueError(f"tried and failed to load {_import_name!r} as {k!r} from {v['module']!r}")
+    n = 0
+    while len(step2):
+        (k, v) = step2.pop(0)
+        try:
+            base_cls = get_registered_rm_system(v["base_class_name"])
+        except (ValueError, KeyError):
+            step2.append([k, v])
+            n += 1
+        if n > 1000:
+            raise RecursionError("Recursion limit reached")
+        variant_defines = v["variant_defines"]
+
+        # if this system is already registered, check that it matches
+        try:
+            existing_system = get_registered_rm_system(k)
+        except KeyError:
+            existing_system = None
+        if existing_system is not None:
+            if existing_system.__base__.get_name() != v["base_class_name"]:
+                raise ValueError(f"existing system {k!r} has different base class than expected")
+            if getattr(existing_system, "_variant_defines", None) != variant_defines:
+                raise ValueError(f"existing system {k!r} has different settings than expected")
+            continue
+
+        # existing_system is None, so we need to create and register it
+        _new_cls = make_rm_system_variant(type(k, (base_cls,), variant_defines))
+
+        # we don't need to do anything else with _new_cls, it should now be registered
+        if get_registered_rm_system(k) is not _new_cls:
+            raise ValueError("unexpected error")

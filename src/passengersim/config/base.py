@@ -10,13 +10,15 @@ import time
 import typing
 import warnings
 from datetime import UTC, datetime
-from typing import Any, ClassVar
+from typing import Annotated, Any, ClassVar
 from urllib.request import urlopen
 from zoneinfo import ZoneInfo
 
 import addicty
+import pandas as pd
 import yaml
 from pydantic import (
+    AfterValidator,
     Field,
     SerializerFunctionWrapHandler,
     ValidationError,
@@ -26,7 +28,13 @@ from pydantic import (
 )
 
 from passengersim.pseudonym import random_label
-from passengersim.rm.systems import check_registered_rm_system, list_registered_rm_systems
+from passengersim.rm.systems import (
+    check_registered_rm_system,
+    describe_rm_systems,
+    list_registered_rm_systems,
+    reload_rm_systems,
+)
+from passengersim.utils.airport_lookup import lookup_airport
 from passengersim.utils.close_matching import did_you_mean
 from passengersim.utils.compression import (
     deserialize_from_file,
@@ -35,6 +43,7 @@ from passengersim.utils.compression import (
 )
 from passengersim.utils.file_freshness import check_modification_times, preprocess_filenames
 
+from ._csv import load_from_csv
 from ._preprocess import preprocess_config
 from .blf_curves import BlfCurve
 from .booking_curves import BookingCurve
@@ -73,6 +82,8 @@ logger = logging.getLogger("passengersim.config")
 _warn_skips = (os.path.dirname(__file__),)
 
 TConfig = typing.TypeVar("TConfig", bound="YamlConfig")
+
+_TABULAR_COMPATIBLE_KEYS = {"demands", "fares", "legs"}
 
 
 def web_opener(x):
@@ -160,6 +171,12 @@ class YamlConfig(PrettyModel):
                         else:
                             inclusions = [filename.parent.joinpath(i) for i in include]
                         raw_config.update(cls._load_unformatted_yaml(inclusions))
+
+                    # look for selected keys that are lists, but can be given as a CSV table
+                    for tab_key in _TABULAR_COMPATIBLE_KEYS:
+                        if tab_key in content and isinstance(content[tab_key], str | pathlib.Path):
+                            content[tab_key] = _path_to_str(content[tab_key])
+                            content[tab_key] = load_from_csv(filename.parent.joinpath(content[tab_key]))
                     raw_config.update(content)
             logger.info("loaded config from %s in %.2f secs", filename, time.time() - t)
         return raw_config
@@ -360,6 +377,7 @@ class YamlConfig(PrettyModel):
         warnings: bool = True,
         general_config: tuple[str] = ("simulation_controls", "tags"),
         human_readable: bool = True,
+        compress_large_files: bool = True,
     ) -> None:
         """Write to a set of YAML files, one for each top level key.
 
@@ -392,6 +410,9 @@ class YamlConfig(PrettyModel):
             Whether to write the YAML files in a human-readable format.  This will
             reformat inputs back to normal human-readable values (e.g. leg departure
             times as 'HH:MN' in local time, not an integer giving unix time.
+        compress_large_files : bool, default True
+            Whether to compress files larger than 1MB with lz4.  This can be helpful
+            to reduce file sizes when saving large networks.
         """
         if isinstance(directory, str):
             directory = pathlib.Path(directory)
@@ -408,20 +429,31 @@ class YamlConfig(PrettyModel):
                 context={"human_readable": True} if human_readable else {},
             )
         )
-        remainder = {}
+        remainder = {"rm_systems_setup": describe_rm_systems(self)}
         files_written = []
+        tables_written = {}
         for key, value in y.items():
             if key == "raw_license_certificate":
                 # do not write the license certificate to a file
                 continue
-            if isinstance(value, dict | list) and key not in general_config:
+            if key in _TABULAR_COMPATIBLE_KEYS:
+                filename = directory / f"{key}.csv"
+                pd.DataFrame(value).to_csv(filename, index=False)
+                if compress_large_files and filename.stat().st_size > 1024 * 1024:
+                    from passengersim.utils.compression import compress_file
+
+                    compressed_filename = compress_file(filename, rm_original=True)
+                    tables_written[key] = pathlib.Path(compressed_filename).name
+                else:
+                    tables_written[key] = filename.name
+            elif isinstance(value, dict | list) and key not in general_config:
                 filename = directory / f"{key}.yaml"
                 # when the value is empty, we don't write a file for it
                 if value:
                     with open(filename, "w", encoding="utf8") as f:
-                        yaml.dump({key: value}, f, Dumper=yaml.CSafeDumper)
+                        yaml.dump({key: value}, f, Dumper=yaml.CSafeDumper, sort_keys=False)
                     # if the file just written is bigger than 1MB, compress it with lz4
-                    if filename.stat().st_size > 1024 * 1024:
+                    if compress_large_files and filename.stat().st_size > 1024 * 1024:
                         from passengersim.utils.compression import compress_file
 
                         compress_file(filename, rm_original=True)
@@ -434,12 +466,12 @@ class YamlConfig(PrettyModel):
             # write the general config to a separate file
             filename = directory / "general.yaml"
             with open(filename, "w", encoding="utf8") as f:
-                yaml.dump(remainder, f, Dumper=yaml.CSafeDumper)
+                yaml.dump(remainder, f, Dumper=yaml.CSafeDumper, sort_keys=False)
             files_written.append("general.yaml")
         if files_written:
             filename = directory / "__main__.yaml"
             with open(filename, "w", encoding="utf8") as f:
-                yaml.dump({"include": files_written}, f, Dumper=yaml.CSafeDumper)
+                yaml.dump({"include": files_written, **tables_written}, f, Dumper=yaml.CSafeDumper, sort_keys=False)
 
 
 def find_differences(left, right):
@@ -476,6 +508,56 @@ def find_differences(left, right):
     if left == right:
         return {}
     return f"{left} != {right}"
+
+
+class filterable_list(list):
+    def set_filters(self, **kwargs):
+        """Filter items in this list based on matching attributes."""
+        queue = self.__class__()
+        for i in self:
+            for k, v in kwargs.items():
+                try:
+                    if getattr(i, k) != v:
+                        break
+                except AttributeError:
+                    if isinstance(i, dict):
+                        if i.get(k, None) != v:
+                            break
+                    else:
+                        raise
+            else:
+                queue.append(i)
+        return queue
+
+    def select(self, **kwargs):
+        """Select one item from the list matching attributes."""
+        for i in self:
+            for k, v in kwargs.items():
+                try:
+                    if getattr(i, k) != v:
+                        break
+                except AttributeError:
+                    if isinstance(i, dict):
+                        if i.get(k, None) != v:
+                            break
+                    else:
+                        raise
+            else:
+                return i
+        raise ValueError(f"no items matching {kwargs!r}")
+
+    def model_dump(self, *args, **kwargs):
+        """Call model_dump on all objects."""
+        return [i.model_dump(*args, **kwargs) for i in self]
+
+
+# Validator that wraps a standard list into your subclass
+def make_filterable(v: list) -> filterable_list:
+    return filterable_list(v)
+
+
+# Define the reusable annotated type
+FilterableList = Annotated[list, AfterValidator(make_filterable)]
 
 
 class Config(YamlConfig, extra="forbid"):
@@ -560,6 +642,15 @@ class Config(YamlConfig, extra="forbid"):
             )
         return DictAttr()
 
+    @model_validator(mode="before")
+    @classmethod
+    def _rm_systems_setup(cls, raw: Any) -> Any:
+        """Tool to set up RM systems based on instructions in the config."""
+        if isinstance(raw, dict) and "rm_systems_setup" in raw:
+            ss = raw.pop("rm_systems_setup")
+            reload_rm_systems(ss)
+        return raw
+
     blf_curves: DictOfNamed[BlfCurve] = {}
     """ Booked Load Factor curves"""
 
@@ -628,6 +719,39 @@ class Config(YamlConfig, extra="forbid"):
 
     places: DictOfNamed[Place] = {}
     """A list of places (airports, vertiports, other stations)."""
+
+    def get_place(self, name: str, *, error_if_missing: bool = True) -> Place | None:
+        """Get a place from the config, or look it up if not defined.
+
+        Parameters
+        ----------
+        name : str
+            The name of the place to retrieve.  If this place is not defined, it is assumed
+            the name is an IATA code, and it will be loaded from the standard set of places.
+        error_if_missing : bool, default True
+            Whether to raise an error if the place is not found in the config or as a standard
+            place.  If False, this method will return None instead of raising an error when
+            the place is not found.
+
+        Returns
+        -------
+        Place
+
+        Raises
+        ------
+        KeyError
+            If the name is not a defined place in this configuration, and cannot be found
+            as an IATA code in the standard set of places.
+        """
+        if name not in self.places:
+            try:
+                self.places[name] = lookup_airport(name)
+            except KeyError:
+                if error_if_missing:
+                    raise
+                else:
+                    return None
+        return self.places[name]
 
     circuity_rules: ListOfNamed[CircuityRule] = []
     """Specifies exceptions and the default rule"""
@@ -716,11 +840,11 @@ class Config(YamlConfig, extra="forbid"):
           1: 1.0
     """
 
-    legs: list[Leg] = []
-    demands: list[Demand] = []
-    fares: list[Fare] = []
-    paths: list[Path] = []
-    markets: list[Market] = []
+    legs: Annotated[list[Leg], AfterValidator(make_filterable)] = []
+    demands: Annotated[list[Demand], AfterValidator(make_filterable)] = []
+    fares: Annotated[list[Fare], AfterValidator(make_filterable)] = []
+    paths: Annotated[list[Path], AfterValidator(make_filterable)] = []
+    markets: Annotated[list[Market], AfterValidator(make_filterable)] = []
 
     other_controls: dict[str, Any] = {}
 
@@ -1190,20 +1314,20 @@ class Config(YamlConfig, extra="forbid"):
         """Attach distance in nautical miles to legs that are missing distance."""
         for leg in self.legs:
             if leg.distance is None:
-                place_o = self.places.get(leg.orig, None)
-                place_d = self.places.get(leg.dest, None)
+                place_o = self.get_place(leg.orig)
+                place_d = self.get_place(leg.dest)
                 if place_o is not None and place_d is not None:
-                    leg.distance = great_circle(place_o.lat, place_o.lon, place_d.lat, place_d.lon)
+                    leg.distance = round(great_circle(place_o.lat, place_o.lon, place_d.lat, place_d.lon), 3)
                 if place_o is None:
                     warnings.warn(f"No defined place for {leg.orig}", stacklevel=2)
                 if place_d is None:
                     warnings.warn(f"No defined place for {leg.dest}", stacklevel=2)
         for dmd in self.demands:
             if not dmd.distance:
-                place_o = self.places.get(dmd.orig, None)
-                place_d = self.places.get(dmd.dest, None)
+                place_o = self.get_place(dmd.orig)
+                place_d = self.get_place(dmd.dest)
                 if place_o is not None and place_d is not None:
-                    dmd.distance = great_circle(place_o.lat, place_o.lon, place_d.lat, place_d.lon)
+                    dmd.distance = round(great_circle(place_o.lat, place_o.lon, place_d.lat, place_d.lon), 3)
                 if place_o is None:
                     warnings.warn(f"No defined place for {dmd.orig}", stacklevel=2)
                 if place_d is None:
@@ -1260,11 +1384,11 @@ class Config(YamlConfig, extra="forbid"):
             # so we need to add the time zone offset to be actually local time
 
             if not leg.time_adjusted:
-                place_o = self.places.get(leg.orig, None)
+                place_o = self.get_place(leg.orig)
                 leg.dep_time, leg.dep_time_offset = adjust_time_zone(leg.dep_time, place_o, leg.orig_timezone)
                 if not leg.orig_timezone:
                     leg.orig_timezone = str(place_o.time_zone_info) if place_o else None
-                place_d = self.places.get(leg.dest, None)
+                place_d = self.get_place(leg.dest)
                 leg.arr_time, leg.arr_time_offset = adjust_time_zone(leg.arr_time, place_d, leg.dest_timezone)
                 if not leg.dest_timezone:
                     leg.dest_timezone = str(place_d.time_zone_info) if place_d else None

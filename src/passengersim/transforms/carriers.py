@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from passengersim.config.base import filterable_list
+
 if TYPE_CHECKING:
     from passengersim import Config
 
 
-def drop_carriers(cfg: Config, carriers: list[str]) -> Config:
+def drop_carriers(cfg: Config, carriers: list[str], *, inplace: bool = True) -> Config:
     """
     Drop carrier(s) from this config, including all fares, legs, and paths.
 
@@ -22,18 +24,20 @@ def drop_carriers(cfg: Config, carriers: list[str]) -> Config:
     Config
         The updated configuration object without the indicated carriers.
     """
+    if not inplace:
+        cfg = cfg.model_copy(deep=True)
     for c in carriers:
         # remove the carrier from the configuration
         if c in cfg.carriers:
             del cfg.carriers[c]
         # Remove fares for the dropped carrier
-        fares = []
+        fares = filterable_list()
         for f in cfg.fares:
             if f.carrier != c:
                 fares.append(f)
         cfg.fares = fares
         # Remove legs for the dropped carrier
-        legs = []
+        legs = filterable_list()
         removed_leg_ids = set()
         for leg in cfg.legs:
             if leg.carrier != c:
@@ -42,7 +46,7 @@ def drop_carriers(cfg: Config, carriers: list[str]) -> Config:
                 removed_leg_ids.add(leg.leg_id)
         cfg.legs = legs
         # Remove the carrier paths
-        paths = []
+        paths = filterable_list()
         for p in cfg.paths:
             if p.legs and p.legs[0] not in removed_leg_ids:
                 paths.append(p)

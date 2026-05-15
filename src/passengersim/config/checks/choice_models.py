@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -7,6 +8,7 @@ import altair as alt
 import numpy as np
 import pandas as pd
 from passengersim_core import Offer
+from passengersim_core._Zoo import _random_max_wtp
 
 from passengersim import Simulation
 from passengersim.config import Config
@@ -25,10 +27,25 @@ def _interpolate_series_with_new_index(s: pd.Series, new_index: np.ndarray) -> p
         pd.concat([s, pd.Series(index=new_index, dtype=float)])
         .sort_index()
         .interpolate(method="index")  # 'index' uses numerical distance
-        .reindex(new_index)  # only keep new points
     )
     # Remove duplicate entries if old and new indices overlapped
-    return interpolated_series[~interpolated_series.index.duplicated(keep="first")]
+    interpolated_series = interpolated_series[~interpolated_series.index.duplicated(keep="first")]
+    return interpolated_series.reindex(new_index)  # only keep new points
+
+
+def _get_wtp_from_quantile(quantile: float, reference_price: float, emult: float):
+    assert 0 <= quantile <= 1
+    return reference_price - ((np.log(quantile) * reference_price * (emult - 1.0)) / 0.6931471806)  # log(2)
+
+
+def _get_quantile_from_wtp(wtp_price: float, reference_price: float, emult: float):
+    return min(1.0, np.exp((-np.log(2) * (wtp_price - reference_price)) / (reference_price * (emult - 1.0))))
+
+
+def _get_frat5(wtp_price: float, reference_price: float, emult: float):
+    quantile = _get_quantile_from_wtp(wtp_price, reference_price, emult)
+    wtp2 = _get_wtp_from_quantile(quantile / 2, reference_price, emult)
+    return wtp2 / wtp_price
 
 
 def check_choice_models(
@@ -42,8 +59,9 @@ def check_choice_models(
     raw_df: bool = False,
     n_draws: int = 100_000,
 ):
-
+    # don't manipulate the config you were given, make a copy
     cfg = cfg.model_copy(deep=True)
+    cfg.simulation_controls.allow_unused_restrictions = True
 
     # check that there are todd curves defined
     if len(cfg.todd_curves) == 0:
@@ -108,7 +126,9 @@ def check_choice_models(
     use_fares = [f for f in cfg.fares if f.carrier == carrier and f.orig == orig and f.dest == dest]
     cfg.fares = use_fares
 
-    sim = Simulation(cfg)
+    with warnings.catch_warnings(record=False):
+        warnings.simplefilter("ignore")
+        sim = Simulation(cfg)
     sim.setup_scenario()
     pth = sim.paths.select(**{"orig": orig, "dest": dest})
     dmd = sim.demands.select(orig=orig, dest=dest, segment=segment)
@@ -129,13 +149,15 @@ def check_choice_models(
     df = pd.concat(choices, axis=1).rename_axis(columns="lowest_avail_class", index="chosen_class")
 
     cm = dmd.choice_model
-    wtp = cm.max_wtp(dmd, n_draws=n_draws, raw=True)
+    wtp = _random_max_wtp(dmd.reference_price, n_draws=n_draws, raw=True, emult=dmd.emult or cm.emult)
 
     lower_bound = 0
     upper_bound = far[0].price * 1.2
 
     wtp_raw_sorted = np.sort(wtp["raw"])
     x_values = np.linspace(lower_bound, upper_bound, 200)
+    exact_prices = np.asarray([f.price for f in far])
+    x_values = np.unique(np.concatenate([x_values, exact_prices]))
     wtp_pct_greater = pd.Series(
         100.0 * (1 - np.searchsorted(wtp_raw_sorted, x_values, side="left") / wtp_raw_sorted.size),
         index=x_values,
@@ -150,6 +172,9 @@ def check_choice_models(
 
     fare_prices["wtp_share"] = _interpolate_series_with_new_index(wtp_pct_greater, fare_prices["price"]).to_numpy()
     fare_prices["zero"] = 0
+    fare_prices["frat5"] = fare_prices["price"].apply(
+        lambda x: _get_frat5(x, dmd.reference_price, dmd.emult or cm.emult)
+    )
 
     if raw_df:
         return df, wtp_pct_greater, fare_prices
@@ -172,6 +197,7 @@ def check_choice_models(
                 alt.Tooltip("booking_class", title="Booking Class"),
                 alt.Tooltip("price", format="$.0f"),
                 alt.Tooltip("wtp_percent:Q", title="WTP Share", format=".2%"),
+                alt.Tooltip("frat5:Q", title="Frat5 Value", format=".2f"),
             ],
         )
     )
@@ -184,15 +210,11 @@ def check_choice_models(
         )
         .mark_line(
             color="black",
-            # line={'color': 'black'},
         )
         .encode(
             x=alt.X("price_point:Q", title="Price Point", axis=alt.Axis(format="$.0f")),
             y=alt.Y("pct_wtp:Q", title="Percentage Willing to Pay"),
         )
-        # ).configure_title(
-        #     anchor='middle',
-        #     fontSize=12
     )
 
     choice_figure = (

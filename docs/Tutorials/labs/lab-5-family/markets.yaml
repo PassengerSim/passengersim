@@ -1,0 +1,13 @@
+markets:
+- delta_t: null
+  demand_multiplier: 1.0
+  dest: ORD
+  orig: BOS
+- delta_t: null
+  demand_multiplier: 1.0
+  dest: LAX
+  orig: ORD
+- delta_t: null
+  demand_multiplier: 1.0
+  dest: LAX
+  orig: BOS

@@ -5,8 +5,23 @@ from io import StringIO
 from typing import Any
 
 
-def compress_file(input_file: str | os.PathLike[str], chunk_size: int = 65536, rm_original: bool = False):
-    """Compresses a file using LZ4."""
+def compress_file(input_file: str | os.PathLike[str], chunk_size: int = 65536, rm_original: bool = False) -> str:
+    """Compresses a file using LZ4.
+
+    Parameters
+    ----------
+    input_file : str | os.PathLike
+        The file path of the file to compress.
+    chunk_size : int, optional
+        Chunk size for compression, typically you can ignore this.
+    rm_original : bool, optional
+        Whether to remove the original file after compression. Default is False.
+
+    Returns
+    -------
+    str
+        The file path of the compressed file.
+    """
     import lz4.frame
 
     output_file = os.fspath(input_file) + ".lz4"
@@ -24,6 +39,7 @@ def compress_file(input_file: str | os.PathLike[str], chunk_size: int = 65536, r
         outfile.write(compressor.flush())
     if rm_original:
         os.remove(input_file)
+    return output_file
 
 
 def decompress_file(input_file: str | os.PathLike[str], chunk_size: int = 65536):

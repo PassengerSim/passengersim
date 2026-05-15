@@ -7,6 +7,8 @@ from zoneinfo import ZoneInfo
 from pydantic import BaseModel, field_validator
 from pydantic.functional_validators import AfterValidator, BeforeValidator
 
+from .named import Named
+
 if TYPE_CHECKING:
     from passengersim.core import Airport
 
@@ -71,11 +73,11 @@ def _reformat_mct(mct: Any) -> Any:
     return mct
 
 
-class Place(BaseModel, extra="forbid", validate_assignment=True):
+class Place(Named, extra="forbid", validate_assignment=True):
     name: str
     """Identifying code for this place.
 
-    For airports, typically the three letter code."""
+    For airports, typically the three letter IATA code."""
 
     label: str
     """A descriptive label for this place."""

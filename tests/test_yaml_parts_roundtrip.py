@@ -28,6 +28,7 @@ import pytest
 import yaml
 
 from passengersim.config import Config
+from passengersim.config._csv import load_from_csv
 
 # The FCFS RM system lives in the "specialty_systems" sub-package and must be
 # explicitly imported to be registered before Config.model_validate is called.
@@ -319,15 +320,20 @@ def test_yaml_parts_human_readable_leg_content(intl_config: Config, tmp_path: pa
     out_dir = tmp_path / "yaml_parts_content"
     intl_config.to_yaml_parts(out_dir, human_readable=True)
 
-    legs_yaml = out_dir / "legs.yaml"
-    assert legs_yaml.exists(), "legs.yaml was not written"
+    legs_csv = out_dir / "legs.csv"
+    assert legs_csv.exists(), "legs.yaml was not written"
 
-    with open(legs_yaml) as fh:
-        raw = yaml.safe_load(fh)
+    leg_list = load_from_csv(legs_csv)
 
-    leg_list = raw["legs"]
     assert isinstance(leg_list, list)
     by_fltno = {leg["fltno"]: leg for leg in leg_list}
+
+    print()
+    print("by_fltno.lkeys")
+    print(by_fltno.keys())
+    print("\n\n")
+    print("by_fltno")
+    print(by_fltno)
 
     # --- NRT→SEA (flight 1001, arr_day = -1) ---
     nrt_sea = by_fltno[1001]
@@ -401,8 +407,8 @@ def test_yaml_parts_include_file_structure(intl_config: Config, tmp_path: pathli
         part_path = out_dir / fname
         assert part_path.exists(), f"Included file {fname!r} was not found on disk"
 
-    # legs.yaml must be among the written parts
-    assert "legs.yaml" in included_files, "legs.yaml should be written as a separate part"
+    # legs.csv must be among the written parts
+    assert (out_dir / "legs.csv").exists(), "legs.csv should be written as a separate part"
 
     # places.yaml must also be present (needed for time-zone information)
     assert "places.yaml" in included_files, "places.yaml should be written as a separate part"

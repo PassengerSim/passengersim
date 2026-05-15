@@ -237,12 +237,14 @@ class Qs_25(Q):   #(2)!
 
 ```
 { .annotate }
-1.  For typicaly use of "standard" RM systems, PassengerSim will automatically import
+
+1.  For typical use of "standard" RM systems, PassengerSim will automatically import
     what it needs. But since we want to sub-class the `Q` system, we need to explicitly
     import it.
 2.  The name of this RM system is the same as the name of this class. So, to have a
     carrier use this RM system, you would specify `rm_system: Qs_25` in the carrier
     configuration.
+
 
 The attributes that can be overridden in this way when creating a named variant for
 any existing RM system are the same attributes that can be set using the `rm_system_options`

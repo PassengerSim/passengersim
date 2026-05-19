@@ -1548,3 +1548,10 @@ class Config(YamlConfig, extra="forbid"):
         result = super().__dir__()
         result.extend(extras)
         return result
+
+    def _rm_sys_summary(self):
+        """Print a quick summary of RM systems on each carrier."""
+        for c, cx in self.carriers.items():
+            print(f"{c}: {cx.rm_system}")
+            for opt, val in cx.rm_system_options.items():
+                print(f"  - {opt}: {val}")

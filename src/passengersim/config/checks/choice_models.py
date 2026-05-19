@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import warnings
+from collections import defaultdict
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -12,6 +13,7 @@ from passengersim_core._Zoo import _random_max_wtp
 
 from passengersim import Simulation
 from passengersim.config import Config
+from passengersim.config.choice_model import LogitChoiceModel, PodsChoiceModel
 from passengersim.config.legs import Leg
 from passengersim.config.places import get_mileage
 from passengersim.utils.airport_lookup import lookup_airport
@@ -48,16 +50,13 @@ def _get_frat5(wtp_price: float, reference_price: float, emult: float):
     return wtp2 / wtp_price
 
 
-def check_choice_models(
+def _create_sim_for_only_one_demand(
     cfg: Config,
     orig: str = "ISP",
     dest: str = "LSE",
     via: str | None = None,
     carrier: str | None = None,
     segment: str = "business",
-    *,
-    raw_df: bool = False,
-    n_draws: int = 100_000,
 ):
     # don't manipulate the config you were given, make a copy
     cfg = cfg.model_copy(deep=True)
@@ -130,6 +129,67 @@ def check_choice_models(
         warnings.simplefilter("ignore")
         sim = Simulation(cfg)
     sim.setup_scenario()
+
+    return sim
+
+
+def check_choice_models(
+    cfg: Config,
+    orig: str = "ISP",
+    dest: str = "LSE",
+    via: str | None = None,
+    carrier: str | None = None,
+    segment: str = "business",
+    *,
+    raw_data: bool = False,
+    n_draws: int = 100_000,
+) -> alt.HConcatChart | tuple:
+    """Analyze the choice model for a single demand.
+
+    This tool will compare the distribution of choices across fares and the
+    distribution of maximum willingness to pay used by the demand's choice
+    model.  This is intended as a diagnostic tool to help understand how the
+    choice model is working for a given demand, and how it relates to the
+    fares available in the market.
+
+    In the resulting dashboard, the first table shows the relative proportion
+    of customers choosing each booking class, conditional on various possibilities
+    for what is the lowest available booking class. This distribution will
+    show both overall purchase rates and buyup probabilities driven by fare
+    restrictions. The second table shows the customer's distribution of
+    maximum willingness to pay, and the prices of the various fares contrasted
+    against this distribution.
+
+    Parameters
+    ----------
+    cfg : Config
+    orig, dest, segment : str
+        The origin, destination, and segment of the demand to be analyzed.
+    via : str
+        Not implemented.
+    carrier : str
+        Name of the carrier to analyze.  Choices will be generated based on
+        this carrier's fares in the relevant market. If None, the first carrier
+        in the config will be used.
+    raw_data : bool, default False
+        If True, return the raw data used to create the figures instead of the
+        figures themselves.
+    n_draws : int, optional
+        The number of random draws to use for choice distributions.  The choice
+        model distribution table is created by simulating this number of customers
+        facing each pool of offers.
+
+    Returns
+    -------
+    alt.Chart | tuple
+        If `raw_data` is False, an Altair chart object containing the resulting
+        dashboard.  If `raw_data` is True, a tuple containing the raw data used
+        to create the figures: a DataFrame of choice model results, a Series of
+        willingness to pay distribution points, and a DataFrame of fare prices
+        and related information.
+    """
+    sim = _create_sim_for_only_one_demand(cfg, orig, dest, via, carrier, segment)
+
     pth = sim.paths.select(**{"orig": orig, "dest": dest})
     dmd = sim.demands.select(orig=orig, dest=dest, segment=segment)
     far = sim.fares(orig=orig, dest=dest, carrier=carrier)
@@ -176,7 +236,7 @@ def check_choice_models(
         lambda x: _get_frat5(x, dmd.reference_price, dmd.emult or cm.emult)
     )
 
-    if raw_df:
+    if raw_data:
         return df, wtp_pct_greater, fare_prices
 
     fare_rules = (
@@ -241,3 +301,26 @@ def check_choice_models(
         .configure_axis(grid=False)
         .properties(title=f"Choice Analysis for {orig}~{dest}@{segment}")
     )
+
+
+def check_choice_model_restrictions(cfg: Config) -> dict[str, dict[str, int]]:
+    """Check the restrictions found over all the choice models.
+
+    Parameters
+    ----------
+    cfg : Config
+        The config to check.
+
+    Returns
+    -------
+    dict[str, dict[str, int]]
+        A dictionary mapping restriction names to dictionaries, where the inner dictionaries
+        map choice model names to restriction values.
+    """
+    restrictions = defaultdict(dict)
+    for name, cm in cfg.choice_models.items():
+        assert isinstance(cm, PodsChoiceModel | LogitChoiceModel)
+        if cm.restrictions:
+            for r_name, r_value in cm.restrictions.items():
+                restrictions[r_name][name] = r_value
+    return dict(restrictions)

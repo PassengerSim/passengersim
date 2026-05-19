@@ -53,3 +53,12 @@ def check_fares_without_demands(cfg: Config, *, clean: bool = False, inplace: bo
                 f"found {len(fares_without_demand)} fares without demands, including {fares_without_demand[:3]}"
             )
     return cfg
+
+
+def check_fare_restrictions(cfg: Config) -> dict[str, int]:
+    """Identify all restrictions on fares and how frequently they occur."""
+    restrictions = defaultdict(int)
+    for fare in cfg.fares:
+        for r in fare.restrictions:
+            restrictions[r] += 1
+    return dict(restrictions)

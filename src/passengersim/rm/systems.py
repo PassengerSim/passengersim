@@ -270,6 +270,10 @@ def make_rm_system_variant(new_cls: type[RmSys]) -> type[RmSys]:
 
     base_cls = new_cls.__bases__[0]
 
+    # the base_cls must be an RmSys
+    if not issubclass(base_cls, RmSys):
+        raise ValueError(f"The base class of a new variant RmSys must be a subclass of RmSys, but {base_cls} is not.")
+
     variant_defines = {
         k: v
         for k, v in new_cls.__dict__.items()
@@ -340,19 +344,39 @@ def describe_rm_systems(cfg: Config | None = None) -> dict:
 
 def reload_rm_systems(description: dict) -> None:
     """Reload RM systems used in the configuration, based on the provided description."""
-    step1 = {}
+
+    # step 1 systems are RmSys classes that are "root" systems, defined with
+    # `availability_control` and `actions` attributes. These systems are tagged
+    # with their module so we can import them directly.  They also give a class
+    # name if that name differs from the registered name.
+    step1 = []
+
+    # step 2 systems are variants, which take an existing RM system and modify
+    # only the default setting for some (or none) of its options.  These systems
+    # are tagged with a `base_class_name` and `variant_defines` which gives the
+    # settings they modify
     step2 = []
+
+    # To begin, we parse the description into step1 and step2 systems.
     for k, v in description.items():
         if "variant_defines" in v:
             step2.append([k, v])
         else:
-            step1[k] = v
-    for k, v in step1.items():
+            step1.append([k, v])
+
+    # step 1 systems are then imported.  The modules where these systems live must
+    # have already been imported, or be findable on `sys.path`. These systems should
+    # register themselves on import.
+    for k, v in step1:
         _module = importlib.import_module(v["module"])
         _import_name = v.get("import_name", k)
         _obj = getattr(_module, _import_name)
         if get_registered_rm_system(k) is not _obj:
             raise ValueError(f"tried and failed to load {_import_name!r} as {k!r} from {v['module']!r}")
+
+    # Now we handle step 2 systems.  Since they may inherit from each other, we need
+    # to processes them as a re-entrant queue, in case a system wants to inherit from
+    # something we didn't handle yet.
     n = 0
     while len(step2):
         (k, v) = step2.pop(0)
@@ -362,7 +386,9 @@ def reload_rm_systems(description: dict) -> None:
             step2.append([k, v])
             n += 1
         if n > 1000:
-            raise RecursionError("Recursion limit reached")
+            raise RecursionError(
+                f"recursion limit reached, cannot reload {k!r} as a variant of {v['base_class_name']!r}"
+            )
         variant_defines = v["variant_defines"]
 
         # if this system is already registered, check that it matches
@@ -372,9 +398,31 @@ def reload_rm_systems(description: dict) -> None:
             existing_system = None
         if existing_system is not None:
             if existing_system.__base__.get_name() != v["base_class_name"]:
-                raise ValueError(f"existing system {k!r} has different base class than expected")
-            if getattr(existing_system, "_variant_defines", None) != variant_defines:
-                raise ValueError(f"existing system {k!r} has different settings than expected")
+                raise ValueError(
+                    f"existing system {k!r} has different base class ({existing_system.__base__.get_name()!r}) "
+                    f"than expected ({v['base_class_name']!r})"
+                )
+            existing_variant_defines = getattr(existing_system, "_variant_defines", {})
+            if existing_variant_defines != variant_defines:
+                _missing_keys_from_expected = variant_defines.keys() - existing_variant_defines.keys()
+                _missing_keys_from_existing = existing_variant_defines.keys() - variant_defines.keys()
+                _common_keys = set(variant_defines.keys()).intersection(set(existing_variant_defines.keys()))
+                _mismatch_values = {
+                    k: dict(expected=variant_defines[k], existing=existing_variant_defines[k])
+                    for k in _common_keys
+                    if variant_defines[k] != existing_variant_defines[k]
+                }
+                _errmsg = f"existing system {k!r} has different settings than expected\n"
+                if _missing_keys_from_existing:
+                    _errmsg += f"  - existing system missing {_missing_keys_from_existing}\n"
+                if _missing_keys_from_expected:
+                    _errmsg += f"  - expected system missing {_missing_keys_from_expected}\n"
+                for k, v in _mismatch_values.items():
+                    _errmsg += (
+                        f"  - setting {k!r} has value {v['existing']!r} in existing system "
+                        f"but expected {v['expected']!r}\n"
+                    )
+                raise ValueError(_errmsg)
             continue
 
         # existing_system is None, so we need to create and register it

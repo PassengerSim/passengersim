@@ -11,3 +11,4 @@ from .carriers import drop_carriers
 from .demands import common_reference_prices, demand_multiplier
 from .pricing import pricing_multiplier
 from .restrictions import clean_restrictions
+from .simplify import simplify_config

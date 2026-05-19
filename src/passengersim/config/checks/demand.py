@@ -36,17 +36,61 @@ DemandGenChecks = namedtuple(
 
 
 def _get_wtpQuantile_for_price(wtp_vector, price):
-    """The fraction of passengers with maximum WTP greater than or equal to the given price."""
+    """Return the fraction of passengers whose maximum WTP is at least *price*.
+
+    Parameters
+    ----------
+    wtp_vector : array-like
+        Sorted or unsorted array of individual maximum willingness-to-pay values.
+    price : float
+        The price threshold to evaluate against.
+
+    Returns
+    -------
+    float
+        Fraction in [0, 1] of passengers willing to pay at least *price*.
+    """
     return np.mean(wtp_vector >= price)
 
 
 def _get_price_for_wtpQuantile(wtp_vector, quantile):
-    """The price at which the given fraction of passengers have maximum WTP greater than or equal to that price."""
+    """Return the price at which exactly *quantile* fraction of passengers are willing to pay.
+
+    Parameters
+    ----------
+    wtp_vector : array-like
+        Array of individual maximum willingness-to-pay values.
+    quantile : float
+        Target fraction of passengers, in (0, 1].  For example, 0.5 returns the
+        median WTP.
+
+    Returns
+    -------
+    float
+        Price point such that the given fraction of passengers have WTP ≥ that price.
+    """
     return np.quantile(wtp_vector, 1 - quantile)
 
 
 def _get_frat5_at_price(wtp_vector, starting_price):
-    """Fare ratio at which half of passengers will disappear."""
+    """Return the fare ratio at which half of the passengers willing to pay *starting_price* will disappear.
+
+    This is the "Frat5" metric: the ratio of the price at which only half the
+    original willing passengers remain, divided by *starting_price*.
+
+    Parameters
+    ----------
+    wtp_vector : array-like
+        Array of individual maximum willingness-to-pay values.
+    starting_price : float
+        The reference price from which the Frat5 ratio is calculated.
+
+    Returns
+    -------
+    float
+        Frat5 ratio, or ``np.nan`` if no passengers are willing to pay
+        *starting_price* (making the ratio undefined).
+    """
     q = _get_wtpQuantile_for_price(wtp_vector, starting_price)
     if q == 0:
         # If no passengers are willing to pay the starting price,
@@ -67,10 +111,72 @@ def check_demand_generation(
     carrier: str | None = None,
     *,
     n_samples: int = 3653,
+    n_draws_per_tf: int = 100_000,
     wtp_resolution: int = 200,
     raw_data: bool = False,
 ):
-    """Check the random demand generation for a single market."""
+    """Check the random demand generation for a single market.
+
+    Runs *n_samples* Monte-Carlo demand draws for the given origin–destination
+    market, allocates the resulting passengers across booking timeframes, and
+    summarizes the willingness-to-pay (WTP) distribution for each timeframe.
+    The results are returned either as a structured :class:`DemandGenChecks`
+    named-tuple (``raw_data=True``) or as a multi-panel Altair dashboard.
+
+    The panels in the dashboard include:
+    - A set of willingness-to-pay survival curves showing the fraction of
+      passengers with WTP above each price point, for each booking timeframe.
+    - WTP statistics showing the mean, median, and interquartile range of
+      maximum WTP (this is the same data as the first panel in a different
+      visualization format).
+    - Segment-level WTP statistics showing the mean WTP relative to the
+      "reference price" for each passenger segment. The thin white lines show
+      the reference price inside each segment, while the overall bars show
+      the mean WTP.
+    - Mean demand arriving in each timeframe, by segment.
+    - Unconditional Frat5 curves, showing for each booking class the fare ratio
+      at which half of the customers who are willing to pay that fare will
+      no longer be willing to pay. This value varies by fare level and timeframe,
+      and is not directly reflective of a "Frat5" in application because it
+      does not consider any competitive effects.  It does however offer an idea
+      of an upper bound on the practical Frat5.
+
+    Parameters
+    ----------
+    cfg : Config
+        Simulation configuration.  The function operates on a deep copy so the
+        caller's object is never mutated.
+    orig : str
+        IATA origin airport code for the market to analyse.
+    dest : str
+        IATA destination airport code for the market to analyse.
+    carrier : str or None, optional
+        If provided, restrict the fare set to a single carrier.  Defaults to
+        ``None`` (all carriers in the market are included).
+    n_samples : int, optional
+        Number of demand-generation Monte-Carlo samples.  Defaults to 3653
+        (approximately ten years of daily draws).
+    n_draws_per_tf : int, optional
+        Number of individual passenger draws to generate in each booking
+        timeframe.  Defaults to 100,000.
+    wtp_resolution : int, optional
+        Number of price points used to build the WTP survival curves.
+        Defaults to 200.
+    raw_data : bool, optional
+        When ``True``, return the raw :class:`DemandGenChecks` named-tuple
+        instead of the visualisation dashboard.  Defaults to ``False``.
+
+    Returns
+    -------
+    alt.VConcatChart or DemandGenChecks
+        An Altair dashboard when ``raw_data=False`` (the default), or a
+        :class:`DemandGenChecks` named-tuple when ``raw_data=True``.
+
+    Raises
+    ------
+    ValueError
+        If no demand configurations are found for the requested market.
+    """
 
     # ensure the market given has some demand configs
     demands = [d for d in cfg.demands if d.orig == orig and d.dest == dest]
@@ -133,7 +239,7 @@ def check_demand_generation(
         welford.update(counter_array)
         sim.eng._purge_event_queue()
 
-    tf_boost_factor = (100_000 // (welford.mean * welford.n).astype(int).sum(0)) + 1
+    tf_boost_factor = (n_draws_per_tf // (welford.mean * welford.n).astype(int).sum(0)) + 1
     draw_table = (welford.mean * welford.n).astype(int) * tf_boost_factor
     wtp_vectors = {}
     wtp_pct_greater = np.empty([n_tf, wtp_resolution], dtype=np.float32)
@@ -194,9 +300,13 @@ def check_demand_generation(
     wtp_summary = wtp_summary.eval("frat5_25 = q12 / q25")
     wtp_summary = wtp_summary.eval("frat5_10 = q05 / q10")
 
-    segment_stats = pd.DataFrame(
-        {s: {"mean": welford_by_segments[s].mean, "std": welford_by_segments[s].std_dev} for s in segments}
-    ).T.rename_axis(index="segment")
+    segment_stats = (
+        pd.DataFrame(
+            {s: {"mean": welford_by_segments[s].mean, "std": welford_by_segments[s].std_dev} for s in segments}
+        )
+        .T.rename_axis(index="segment")
+        .sort_values(by="mean", ascending=False)
+    )
 
     frat_5_estimates = {}
     fare_levels = {f.booking_class: f.price for f in cfg.fares}
@@ -205,6 +315,9 @@ def check_demand_generation(
     frat_5_estimates = pd.DataFrame.from_dict(frat_5_estimates).rename_axis(
         columns=["booking_class", "price"], index="tf"
     )
+
+    # put segments in order of mean WTP, highest first
+    segments = segment_stats.index.tolist()
 
     output = DemandGenChecks(
         orig,
@@ -226,12 +339,34 @@ def check_demand_generation(
 
 
 def _viz_frat5(raw_data: DemandGenChecks, height: int, width: int) -> alt.LayerChart:
+    """Build the Unconditional Frat5 panel.
+
+    Renders one line per booking class showing how the Frat5 metric (the fare
+    ratio at which half the originally-willing passengers disappear) evolves
+    across booking timeframes.  An interactive hover rule displays exact values
+    for all booking classes at the selected timeframe.
+
+    Parameters
+    ----------
+    raw_data : DemandGenChecks
+        Aggregated demand-generation check data.
+    height : int
+        Panel height in pixels.
+    width : int
+        Panel width in pixels.
+
+    Returns
+    -------
+    alt.LayerChart
+        Layered Altair chart (lines + points + hover rule).
+    """
     df = (
         pd.DataFrame.from_dict(raw_data.frat_5_estimates)
         .rename_axis(columns=["booking_class", "price"], index="tf")
         .T.stack()
         .rename("frat5value")
         .reset_index()
+        .eval("tf = tf + 1")
     )
     df["label"] = df.booking_class + df["price"].map(lambda x: f" (${x:,.0f})")
 
@@ -246,7 +381,7 @@ def _viz_frat5(raw_data: DemandGenChecks, height: int, width: int) -> alt.LayerC
     )
 
     _frat5lines = _frat5chart.mark_line().encode(
-        x=alt.X("tf:O", title="Timeframe"),
+        x=alt.X("tf:O", title="Timeframe", axis=alt.Axis(labelAngle=0)),
         y=alt.Y("frat5value", title="Frat5 Value", scale=alt.Scale(zero=False)),
         color=alt.Color("label:N", title="Booking Class"),
     )
@@ -259,9 +394,9 @@ def _viz_frat5(raw_data: DemandGenChecks, height: int, width: int) -> alt.LayerC
         .transform_pivot("label", value="frat5value", groupby=["tf"])
         .mark_rule(color="gray")
         .encode(
-            x=alt.X("tf:O"),
+            x=alt.X("tf:O", axis=alt.Axis(labelAngle=0)),
             opacity=when_near.then(alt.value(0.3)).otherwise(alt.value(0)),
-            tooltip=[alt.Tooltip("tf:O", title="Timeframe")]
+            tooltip=[alt.Tooltip("tf", title="Timeframe")]
             + [alt.Tooltip(c, type="quantitative", format=".3f") for c in df.label.unique()],
         )
         .add_params(nearest)
@@ -271,7 +406,27 @@ def _viz_frat5(raw_data: DemandGenChecks, height: int, width: int) -> alt.LayerC
 
 
 def _viz_segment_stats(raw_data: DemandGenChecks, height: int, width: int) -> alt.LayerChart:
+    """Build the Segment Stats panel.
 
+    Renders a bar chart of mean WTP per passenger segment, overlaid with a
+    white error bar that spans from zero to the segment's reference price,
+    giving a visual comparison between simulated WTP and the configured
+    reference price.
+
+    Parameters
+    ----------
+    raw_data : DemandGenChecks
+        Aggregated demand-generation check data.
+    height : int
+        Panel height in pixels.
+    width : int
+        Panel width in pixels.
+
+    Returns
+    -------
+    alt.LayerChart
+        Layered Altair chart (bars + reference-price error bar).
+    """
     segment_stats = raw_data.segment_stats
     segments = raw_data.segments
     ref_prices = raw_data.reference_price
@@ -322,14 +477,35 @@ def _viz_wtp_survival_curves(
     raw_data: DemandGenChecks,
     width: int = 250,
     height: int = 250,
-) -> alt.VConcatChart:
+) -> alt.TopLevelMixin:
+    """Build the Willingness-to-Pay Survival Curves panel.
+
+    Each line represents one booking timeframe and shows the fraction of
+    passengers whose maximum WTP exceeds a given price point (the "survival"
+    curve of the WTP distribution).  An interactive hover rule displays exact
+    percentages for all timeframes at the selected price point.
+
+    Parameters
+    ----------
+    raw_data : DemandGenChecks
+        Aggregated demand-generation check data.
+    width : int, optional
+        Panel width in pixels.  Defaults to 250.
+    height : int, optional
+        Panel height in pixels.  Defaults to 250.
+
+    Returns
+    -------
+    alt.LayerChart
+        Layered Altair chart (survival curve lines + hover rule).
+    """
 
     wtp_pct_greater = raw_data.wtp_pct_greater
 
     wtp_pct_greater = wtp_pct_greater / 100
 
     _wtp_survival_curves = alt.Chart(
-        wtp_pct_greater.stack().rename("pct_wtp").reset_index(),
+        wtp_pct_greater.stack().rename("pct_wtp").reset_index().eval("tf = tf + 1"),
         width=width,
         height=height,
         title=alt.TitleParams("Willingness to Pay Survival Curves", anchor="middle", fontSize=14),
@@ -351,7 +527,10 @@ def _viz_wtp_survival_curves(
             x="price_point:Q",
             opacity=when_near.then(alt.value(0.3)).otherwise(alt.value(0)),
             tooltip=[alt.Tooltip("price_point", title="Price", format="$.2f")]
-            + [alt.Tooltip(str(c), title=f"TF {c}", type="quantitative", format=".2%") for c in wtp_pct_greater.index],
+            + [
+                alt.Tooltip(str(c), title=f"TF {c}", type="quantitative", format=".2%")
+                for c in wtp_pct_greater.index + 1
+            ],
         )
         .add_params(nearest)
     )
@@ -359,141 +538,154 @@ def _viz_wtp_survival_curves(
     return wtp_survival_curves
 
 
-def _viz_check_demand_generation(
-    raw_data: DemandGenChecks,
-    panel_widths: tuple[int, int, int, int, int] = (250, 250, 100, 350, 350),
-    panel_height: int = 250,
-) -> alt.VConcatChart:
+def _viz_wtp_statistics(raw_data: DemandGenChecks, height: int, width: int) -> alt.TopLevelMixin:
+    """Build the Willingness-to-Pay Statistics panel.
 
-    orig = raw_data.orig
-    dest = raw_data.dest
-    wtp_summary = raw_data.wtp_summary
-    welford = raw_data.welford
-    segments = raw_data.segments
+    Displays mean WTP as a line with points, the interquartile range (25th–75th
+    percentile) as an error bar, and the median/quartile values as shaped points,
+    all coloured by timeframe.
 
-    wtp_survival_curves = _viz_wtp_survival_curves(
-        raw_data,
-        width=panel_widths[0],
-        height=panel_height,
-    )
+    Parameters
+    ----------
+    raw_data : DemandGenChecks
+        Aggregated demand-generation check data.
+    height : int
+        Panel height in pixels.
+    width : int
+        Panel width in pixels.
 
+    Returns
+    -------
+    alt.LayerChart
+        Layered Altair chart combining the error bar, mean line, and shaped
+        marker points.
+    """
     color = alt.Color("tf:O", title="Time Frame", scale=alt.Scale(scheme="plasma", reverse=True), legend=None)
 
-    _wtp_statistics = alt.Chart(
-        wtp_summary.reset_index()
+    _base = alt.Chart(
+        raw_data.wtp_summary.reset_index()
         .eval("label_mean = 'Mean'")
         .eval("tf = tf + 1")
         .eval("label_median = 'Median'")
         .eval("label_q75 = '75th Pctile'")
         .eval("label_q25 = '25th Pctile'"),
         title=alt.TitleParams("Willingness to Pay Statistics", anchor="middle", fontSize=14),
-        width=panel_widths[1],
-        height=panel_height,
+        width=width,
+        height=height,
     )
     _shape_scale = alt.Scale(
         domain=["Mean", "Median", "75th Pctile", "25th Pctile"],
         range=["circle", "square", "triangle-up", "triangle-down"],  # Custom mapping
     )
-    wtp_statistics_tooltips = [
+    tooltips = [
         alt.Tooltip("tf:O", title="Timeframe"),
         alt.Tooltip("mean:Q", title="Mean WTP", format="$.2f"),
         alt.Tooltip("q25:Q", title="25th Pctile WTP", format="$.2f"),
         alt.Tooltip("q50:Q", title="Median WTP", format="$.2f"),
         alt.Tooltip("q75:Q", title="75th Pctile WTP", format="$.2f"),
     ]
-    wtp_statistics = (
-        _wtp_statistics.mark_errorbar(thickness=2, color="#ebebeb").encode(
-            x=alt.X("tf:O", title="Timeframe", axis=alt.Axis(labelAngle=0)),
+
+    x_enc = alt.X("tf:O", title="Timeframe", axis=alt.Axis(labelAngle=0))
+
+    return (
+        # IQR error bar (Q25–Q75)
+        _base.mark_errorbar(thickness=2, color="#ebebeb").encode(
+            x=x_enc,
             y=alt.Y("q25:Q", title="Willingness to Pay"),
-            y2=alt.Y2("q75:Q", title="Willingness to Pay"),
-            tooltip=wtp_statistics_tooltips,
+            y2=alt.Y2("q75:Q"),
+            tooltip=tooltips,
         )
-        + _wtp_statistics.mark_line().encode(
-            x=alt.X("tf:O", title="Timeframe", axis=alt.Axis(labelAngle=0)),
+        # Mean line
+        + _base.mark_line().encode(
+            x=x_enc,
             y=alt.Y("mean:Q", title="Willingness to Pay"),
         )
-        + _wtp_statistics.mark_point(filled=True, opacity=1.0).encode(
-            x=alt.X("tf:O", title="Timeframe", axis=alt.Axis(labelAngle=0)),
+        # Mean point
+        + _base.mark_point(filled=True, opacity=1.0).encode(
+            x=x_enc,
             y=alt.Y("mean:Q", title="Willingness to Pay"),
             size=alt.value(100),
             shape=alt.Shape("label_mean:N", legend=alt.Legend(title="WTP Stats"), scale=_shape_scale),
             color=color,
-            tooltip=wtp_statistics_tooltips,
+            tooltip=tooltips,
         )
-        + _wtp_statistics.mark_point(filled=True, opacity=1.0).encode(
-            x=alt.X("tf:O", title="Timeframe", axis=alt.Axis(labelAngle=0)),
+        # Median point
+        + _base.mark_point(filled=True, opacity=1.0).encode(
+            x=x_enc,
             y=alt.Y("q50:Q", title="Willingness to Pay"),
             size=alt.value(100),
             shape=alt.Shape("label_median:N", legend=alt.Legend(title="WTP Stats"), scale=_shape_scale),
             color=color,
-            tooltip=wtp_statistics_tooltips,
+            tooltip=tooltips,
         )
-        + _wtp_statistics.mark_point(filled=True, opacity=1.0).encode(
-            x=alt.X("tf:O", title="Timeframe", axis=alt.Axis(labelAngle=0)),
+        # 25th-percentile point
+        + _base.mark_point(filled=True, opacity=1.0).encode(
+            x=x_enc,
             y=alt.Y("q25:Q", title="Willingness to Pay"),
             size=alt.value(100),
             shape=alt.Shape("label_q25:N", legend=alt.Legend(title="WTP Stats"), scale=_shape_scale),
             color=color,
-            tooltip=wtp_statistics_tooltips,
+            tooltip=tooltips,
         )
-        + _wtp_statistics.mark_point(filled=True, opacity=1.0).encode(
-            x=alt.X("tf:O", title="Timeframe", axis=alt.Axis(labelAngle=0)),
+        # 75th-percentile point
+        + _base.mark_point(filled=True, opacity=1.0).encode(
+            x=x_enc,
             y=alt.Y("q75:Q", title="Willingness to Pay"),
             size=alt.value(100),
             shape=alt.Shape("label_q75:N", legend=alt.Legend(title="WTP Stats"), scale=_shape_scale),
             color=color,
-            tooltip=wtp_statistics_tooltips,
+            tooltip=tooltips,
         )
     )
 
-    # frat_5_est = (
-    #     alt.Chart(
-    #         wtp_summary[["frat5_99", "frat5_75", "frat5_50", "frat5_25", "frat5_10"]]
-    #         .rename_axis(columns="measure")
-    #         .stack()
-    #         .rename("frat5_value")
-    #         .reset_index(),
-    #         title=alt.TitleParams("Frat5 Estimates", anchor="middle", fontSize=14),
-    #         width=panel_widths[3],
-    #         height=panel_height,
-    #     )
-    #     .mark_line()
-    #     .encode(
-    #         x=alt.X("tf:O", title="Timeframe", axis=alt.Axis(labelAngle=0)),
-    #         y=alt.Y("frat5_value:Q", title="Frat5 Values"),
-    #         color=alt.Color("measure:N", title="Measure"),
-    #     )
-    # )
-    frat_5_est = _viz_frat5(raw_data, height=panel_height, width=panel_widths[3])
 
-    #### VOLUME
+def _viz_volume(raw_data: DemandGenChecks, height: int, width: int) -> alt.Chart:
+    """Build the Mean Segment Demand by Timeframe panel.
+
+    Renders a stacked bar chart showing the simulated mean demand for each
+    passenger segment across all booking timeframes.
+
+    Parameters
+    ----------
+    raw_data : DemandGenChecks
+        Aggregated demand-generation check data.
+    height : int
+        Panel height in pixels.
+    width : int
+        Panel width in pixels.
+
+    Returns
+    -------
+    alt.Chart
+        Altair bar chart with one stacked bar per timeframe, coloured by
+        segment.
+    """
+    segments = raw_data.segments
 
     volume_data = (
         pd.DataFrame(
-            welford.mean,
+            raw_data.welford.mean,
             index=pd.Index(segments, name="segment"),
-            columns=pd.Index(range(1, 17), name="tf"),
+            columns=pd.Index(range(1, raw_data.welford.mean.shape[1] + 1), name="tf"),
         )
         .stack()
         .rename("mean_demand")
         .reset_index()
     )
+    # Preserve the original segment order for consistent colour mapping
     volume_data["segment_order"] = volume_data["segment"].map({s: n for n, s in enumerate(segments)})
 
-    volume = (
+    return (
         alt.Chart(
             volume_data,
-            width=panel_widths[4],
-            height=panel_height,
+            width=width,
+            height=height,
             title=alt.TitleParams("Mean Segment Demand by Timeframe", anchor="middle", fontSize=14),
         )
         .mark_bar()
         .encode(
-            x=alt.X("tf:O", title="Time Frame"),
-            y=alt.Y(
-                "mean_demand:Q",
-                title="Mean Demand",
-            ),
+            x=alt.X("tf:O", title="Time Frame", axis=alt.Axis(labelAngle=0)),
+            y=alt.Y("mean_demand:Q", title="Mean Demand"),
             order=alt.Order("segment_order:N"),
             color=alt.Color("segment:N", title="Segment", sort=segments),
             tooltip=[
@@ -504,9 +696,48 @@ def _viz_check_demand_generation(
         )
     )
 
-    ####
 
+def _viz_check_demand_generation(
+    raw_data: DemandGenChecks,
+    panel_widths: tuple[int, int, int, int, int] = (250, 250, 100, 350, 350),
+    panel_height: int = 250,
+) -> alt.VConcatChart:
+    """Assemble the full five-panel demand-generation dashboard.
+
+    Combines all individual visualisation panels into a two-row Altair layout:
+
+    * **Row 1**: WTP survival curves | WTP statistics | Segment stats
+    * **Row 2**: Segment volume by timeframe | Unconditional Frat5
+
+    Each panel is built by its own ``_viz_*`` helper function so that panels
+    can also be rendered independently.
+
+    Parameters
+    ----------
+    raw_data : DemandGenChecks
+        Aggregated demand-generation check data returned by
+        :func:`check_demand_generation` with ``raw_data=True``.
+    panel_widths : tuple of five ints, optional
+        Pixel widths for each of the five panels in the order:
+        (survival curves, WTP statistics, segment stats, Frat5, volume).
+        Defaults to ``(250, 250, 100, 350, 350)``.
+    panel_height : int, optional
+        Shared pixel height applied to all panels.  Defaults to 250.
+
+    Returns
+    -------
+    alt.VConcatChart
+        A fully assembled Altair compound chart ready for display in a
+        Jupyter notebook.
+    """
+    orig = raw_data.orig
+    dest = raw_data.dest
+
+    wtp_survival_curves = _viz_wtp_survival_curves(raw_data, width=panel_widths[0], height=panel_height)
+    wtp_statistics = _viz_wtp_statistics(raw_data, height=panel_height, width=panel_widths[1])
     segment_stats_chart = _viz_segment_stats(raw_data, height=panel_height, width=panel_widths[2])
+    frat_5_est = _viz_frat5(raw_data, height=panel_height, width=panel_widths[3])
+    volume = _viz_volume(raw_data, height=panel_height, width=panel_widths[4])
 
     return (
         (
@@ -524,7 +755,26 @@ def _viz_check_demand_generation(
 
 
 def check_mean_wtp_by_demand(cfg: Config, *, n_draws: int = 10_000):
+    """Compute mean and standard-deviation of WTP for every demand config.
 
+    Instantiates a lightweight set of core objects (booking curves, choice
+    models, demands) from *cfg* and draws *n_draws* WTP samples for each
+    demand.  The results are indexed by origin, destination, and segment.
+
+    Parameters
+    ----------
+    cfg : Config
+        Simulation configuration containing the demand and choice-model
+        definitions to evaluate.
+    n_draws : int, optional
+        Number of random WTP draws per demand.  Defaults to 10 000.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame with a MultiIndex of ``(orig, dest, segment)`` and columns
+        ``mean_wtp`` and ``std_wtp``.
+    """
     fare_restriction_mapping = StringTracker(start_from=1, case_sensitive=False)
     prng = Generator(seed=42)
 
@@ -576,6 +826,30 @@ def get_market_reference_prices(
 def check_reference_price_scaling(
     cfg: Config,
 ) -> pd.DataFrame:
+    """Verify that reference prices scale consistently relative to minimum fare prices.
+
+    For each market in *cfg*, computes the ratio of the configured reference
+    price to the cheapest available fare price.  Raises an error if the ratio
+    is not the same across all markets, which would indicate an inconsistent
+    pricing setup.
+
+    Parameters
+    ----------
+    cfg : Config
+        Simulation configuration to validate.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame with one row per market and columns ``reference_price`` and
+        ``min_price``.
+
+    Raises
+    ------
+    ValueError
+        If the reference-price / min-fare ratio is not consistent across all
+        markets (checked with ``numpy.isclose``).
+    """
     df = pd.concat(
         [
             pd.Series(get_market_reference_prices(cfg), name="reference_price"),

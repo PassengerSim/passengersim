@@ -26,6 +26,7 @@ except ImportError:
 
 from passengersim.core import Generator
 from passengersim.driver._constructors import make_core_choice_model, make_core_demand
+from passengersim.utils.colors import common_carrier_colors
 from passengersim.utils.mapping import PROJECTION1_CONUS, PROJECTION1_WORLD, conus_only, world_only
 
 from .base import Config
@@ -41,6 +42,7 @@ __all__ = [
     "plotly_route_map",
     "fig_demand_vs_capacity",
     "fig_max_wtp_distributions",
+    "fig_hub_schedule",
 ]
 
 
@@ -383,7 +385,7 @@ def fig_speed_by_distance(cfg: Config, carrier: str | None = None) -> alt.Chart:
 def plotly_route_map(
     cfg: Config,
     carrier: str | None = None,
-    line_color: str = "red",
+    line_color: str | None = None,
     center_lon: float = -90,
     center_lat: float = 10,
     projection_type: str = "robinson",
@@ -393,6 +395,9 @@ def plotly_route_map(
     """Plot route map using plotly."""
 
     import plotly.graph_objects as go
+
+    if line_color is None:
+        line_color = common_carrier_colors(carrier)
 
     df_places = cfg.dataframes.places
     df_legs = cfg.dataframes.legs
@@ -661,3 +666,93 @@ def fig_max_wtp_distributions(
         .properties(title=f"Distribution of Maximum Willingness to Pay ({orig}~{dest})")
     )
     return chart
+
+
+def fig_hub_schedule(
+    cfg: Config,
+    hub: str,
+    *,
+    carrier: str | None = None,
+    raw_df: bool = False,
+    width: int = 600,
+    min_height: int = 200,
+    max_height: int = 600,
+) -> alt.TopLevelMixin:
+    """Visualize the schedule at a given hub.
+
+    This does not show the actually allowed connections, just the whole schedule
+    of arrivals and departures at the hub, which can be used to visually inspect
+    potential connection opportunities and the overall structure of the schedule
+    at that hub.
+    """
+    base_df = cfg.dataframes.legs
+    if carrier is not None:
+        base_df = base_df[base_df["carrier"] == carrier]
+    df1 = base_df.query(f"orig == '{hub}'")
+    df1 = df1[
+        ["orig", "dest", "dep_hour_local", "arr_hour_local", "duration_minutes", "leg_id", "fltno", "carrier"]
+    ].eval("duration_hours = duration_minutes / 60")
+    df1 = df1.eval("hub_hour = dep_hour_local").eval("far_hour = dep_hour_local + duration_hours")
+
+    df2 = base_df.query(f"dest == '{hub}'")
+    df2 = df2[
+        ["orig", "dest", "arr_hour_local", "dep_hour_local", "duration_minutes", "leg_id", "fltno", "carrier"]
+    ].eval("duration_hours = duration_minutes / 60")
+    df2 = df2.eval("hub_hour = arr_hour_local").eval("far_hour = arr_hour_local - duration_hours")
+
+    df = (
+        pd.concat([df1, df2], axis=0)
+        .sort_values(by=["orig", "dest", "hub_hour"])
+        .sort_values(by=["hub_hour"])
+        .reset_index(drop=True)
+        .reset_index(drop=False)
+        .rename(columns={"index": "rownum"})
+    )
+    df["hub_time"] = pd.to_datetime(df["hub_hour"], unit="h").dt.strftime("%H:%M")
+    df["dep_time"] = pd.to_datetime(df["dep_hour_local"], unit="h").dt.strftime("%H:%M")
+    df["arr_time"] = pd.to_datetime(df["arr_hour_local"], unit="h").dt.strftime("%H:%M")
+
+    height = len(df) * 5
+    if height < min_height:
+        height = min_height
+    if height > max_height:
+        height = max_height
+
+    if raw_df:
+        return df
+
+    title = f"Flight Schedule at {hub}"
+    if carrier is not None:
+        title = f"{carrier} {title}"
+
+    return alt.Chart(df.query(f"orig == '{hub}'")).mark_rule(point={"shape": "diamond"}).encode(
+        x=alt.X("hub_hour", title=f"Time at {hub} (local hour)"),
+        x2="far_hour",
+        y=alt.Y("rownum:N", axis=None),
+        color="carrier",
+        tooltip=[
+            "orig",
+            "dest",
+            alt.Tooltip("dep_time:N", title=f"Departure Time ({hub})"),
+            alt.Tooltip("arr_time:N", title="Arrival Time"),
+            "leg_id",
+            "fltno",
+            "carrier",
+        ],
+    ).properties(width=width, height=height) + alt.Chart(df.query(f"dest == '{hub}'")).mark_rule(
+        point={"shape": "diamond"}
+    ).encode(
+        x=alt.X("hub_hour", title=f"Time at {hub} (local hour)"),
+        x2="far_hour",
+        y=alt.Y("rownum:N", axis=None),
+        color="carrier",
+        tooltip=[
+            "orig",
+            "dest",
+            alt.Tooltip("dep_time:N", title="Departure Time"),
+            alt.Tooltip("hub_time:N", title=f"Arrival Time ({hub})"),
+            "leg_id",
+            "fltno",
+            "carrier",
+        ],
+    ).properties(width=width, height=height, title=title)

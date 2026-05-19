@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 
+import numpy as np
 import pandas as pd
 
 from passengersim.config.named import DictOfNamed, Named
@@ -53,6 +54,7 @@ class BookedLoadFactorAdjustment(RmActionCfg):
         cfg: Config | None = None,
         min_days_between_actions: int = 7,
         adjustment_multiplier: float = 1.1,
+        key_tag: str = "BLF_Curve",
     ):
         """
         Apply an adjustment to leg forecasted demand when the bookings are atypical.
@@ -95,13 +97,15 @@ class BookedLoadFactorAdjustment(RmActionCfg):
         self.hot_multiplier = adjustment_multiplier
         self.cold_multiplier = 1.0 / adjustment_multiplier
 
+        self.key_tag = key_tag
+
         # check that curves exist for all legs with a BLF curve tag
         missing_curves = set()
         for leg in cfg.legs:
             if leg.carrier != carrier:
                 # legs from other carriers are not checked
                 continue
-            if curve := leg.tags.get("BLF_Curve"):
+            if curve := leg.tags.get(self.key_tag):
                 if curve not in self.action_cfg:
                     missing_curves.add(curve)
         if missing_curves:
@@ -130,7 +134,7 @@ class BookedLoadFactorAdjustment(RmActionCfg):
         tot_legs, num_hot, num_cold = 0, 0, 0
         for leg in sim.eng.legs.set_filters(carrier=self.carrier):
             # for each leg, find the name of the appropriate BLF curve
-            leg_blf_curve = leg.tags.get("BLF_Curve")
+            leg_blf_curve = leg.tags.get(self.key_tag)
             # if there is no BLF curve tag, apply no adjustment
             if leg_blf_curve is None:
                 continue
@@ -167,13 +171,39 @@ def collect_blf_detail(sim: Simulation, days_prior: int) -> dict | None:
     return out
 
 
-def map_leg_blf_groups(cfg: Config) -> dict[int, str]:
+def map_leg_blf_groups(cfg: Config, tag_key: str = "BLF_Curve") -> dict[int, str]:
     """Get the mapping of leg ids to BLF groups, based on the leg tags."""
     leg_blf = {}
     for leg in cfg.legs:
-        if tag := leg.tags.get("BLF_Curve"):
+        if tag := leg.tags.get(tag_key):
             leg_blf[leg.leg_id] = tag
     return leg_blf
+
+
+def set_minimum_bandwidth(bounds: pd.DataFrame, bandwidth: float = 0.1) -> pd.DataFrame:
+    """Set a minimum bandwidth between lower and upper bounds to the specified value."""
+
+    if bandwidth <= 0 or bandwidth >= 1:
+        raise ValueError("Bandwidth must be between 0 and 1")
+
+    calc_bandwidth = bounds["upper_bound"] - bounds["lower_bound"]
+    augmentation = np.maximum(0, bandwidth - calc_bandwidth)
+    lb = bounds["lower_bound"] - augmentation / 2
+    ub = bounds["upper_bound"] + augmentation / 2
+
+    # shift both lower and upper bounds up if lower bound is negative after augmentation
+    shift_up = np.maximum(0, -lb)
+    lb += shift_up
+    ub += shift_up
+
+    # shift both lower and upper bounds down if upper bound is above 1 after augmentation
+    shift_down = np.maximum(0, ub - 1)
+    lb -= shift_down
+    ub -= shift_down
+
+    bounds["lower_bound"] = lb
+    bounds["upper_bound"] = ub
+    return bounds
 
 
 def process_blf_detail(
@@ -181,6 +211,8 @@ def process_blf_detail(
     leg_blf_groups: dict[int, str],
     lower_bound: float = 0.1,
     upper_bound: float = 0.9,
+    key_tag: str = "BLF_Curve",
+    minimum_bandwidth: float | None = None,
 ) -> pd.DataFrame:
     """Process data from the `collect_blf_detail` callback to compute BLF curves.
 
@@ -200,6 +232,18 @@ def process_blf_detail(
         The quantile from the observed data to use as the lower bound.
     upper_bound : float, default 0.9
         The quantile from the observed data to use as the upper bound.
+    key_tag : str, default "BLF_Curve"
+        The name of the column to use for the BLF group in the output dataframe.
+        This should match the tag key used in the leg tags to identify BLF groups.
+    minimum_bandwidth : float, optional
+        If provided, ensure that the distance between the lower and upper bound is
+        at least this value. This can be helpful to prevent the heuristic from
+        overreacting to small deviations in booked load factor when the bounds are
+        very tight (as is typical very early in the booking curve).  For example,
+        if this is set at 0.05, then you won't ever decide that demand is running
+        hot until you have sold at least 5% of capacity. You also won't ever decide
+        that demand is running cold until you reach the time when you can have sold
+        5% of capacity and still not be considered as running hot.
 
     Returns
     -------
@@ -209,8 +253,68 @@ def process_blf_detail(
     """
     df = pd.DataFrame(summary.callback_data.daily)
     df = df.melt(id_vars=["trial", "sample", "days_prior"], var_name="leg", value_name="blf")
-    df["BLF_Curve"] = df["leg"].str.strip("leg-").astype(int).apply(leg_blf_groups.get)
-    part = df.drop(columns=["sample", "trial", "leg"]).groupby(["BLF_Curve", "days_prior"])["blf"]
+    df[key_tag] = df["leg"].str.strip("leg-").astype(int).apply(leg_blf_groups.get)
+    part = df.drop(columns=["sample", "trial", "leg"]).groupby([key_tag, "days_prior"])["blf"]
     lb = part.quantile(lower_bound).rename("lower_bound")
     ub = part.quantile(upper_bound).rename("upper_bound")
-    return pd.concat({"lower_bound": lb, "upper_bound": ub}, axis=1).reset_index()
+    out = pd.concat({"lower_bound": lb, "upper_bound": ub}, axis=1).reset_index()
+    if minimum_bandwidth is not None:
+        out = set_minimum_bandwidth(out, minimum_bandwidth)
+    return out
+
+
+def attach_blf_bounds(cfg: Config, bounds: pd.DataFrame) -> Config:
+    """
+    Attach bounds from `process_blf_detail` for use by booked load factor adjustment.
+    """
+    if len(bounds.columns) != 4:
+        raise ValueError("bounds must have exactly 4 columns: key, days_prior, lower_bound, upper_bound")
+    key_col, days_col, lower_bound_col, upper_bound_col = bounds.columns
+    bound_cols = [lower_bound_col, upper_bound_col]
+    bounds_nested = {}
+    for curve, grp in bounds.groupby(key_col, sort=False):
+        by_day = grp.set_index(days_col)[bound_cols].to_dict()
+        bounds_nested[curve] = {}
+        for col_name, day_map in by_day.items():
+            bounds_nested[curve][col_name] = day_map
+    cfg.other_controls["booked_load_factor_curves"] = bounds_nested
+    return cfg
+
+
+def fig_blf_detail(df: pd.DataFrame | Config):
+    """Visualize the outputs from `process_blf_detail`."""
+    import altair as alt
+
+    from passengersim.config import Config
+
+    if isinstance(df, Config):
+        # convert from config nested dict format into dataframe
+        data = df.other_controls["booked_load_factor_curves"]
+        df = pd.concat({k: pd.DataFrame(v) for k, v in data.items()}, names=["haul", "days_prior"]).reset_index()
+
+    key_tag = df.columns[0]
+
+    chart = alt.Chart(df)
+
+    tooltips = [
+        f"{key_tag}:N",
+        alt.Tooltip("days_prior", title="Days Prior"),
+        alt.Tooltip("lower_bound", format=".2%"),
+        alt.Tooltip("upper_bound", format=".2%"),
+    ]
+
+    return (
+        chart.mark_area(opacity=0.5, line={"color": "black"})
+        .encode(
+            x=alt.X("days_prior", title="Days Prior to Departure", scale=alt.Scale(reverse=True)),
+            y=alt.Y("lower_bound", title="Booked Load Factor", axis=alt.Axis(format=".0%")),
+            y2="upper_bound",
+            tooltip=tooltips,
+        )
+        .properties(title="Booked Load Factor Curves by Haul Type")
+        + chart.mark_line(color="black").encode(
+            x=alt.X("days_prior", title="Days Prior to Departure", scale=alt.Scale(reverse=True)),
+            y=alt.Y("upper_bound", title="Booked Load Factor"),
+            tooltip=tooltips,
+        )
+    ).facet(facet=alt.Facet(f"{key_tag}:N", title="Bound Range"), columns=2)

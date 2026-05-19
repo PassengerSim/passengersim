@@ -19,6 +19,8 @@ from passengersim.config.legs import Leg
 from passengersim.config.places import get_mileage
 from passengersim.utils.airport_lookup import lookup_airport
 
+from .choice_models import _create_sim_for_only_one_demand
+
 try:
     from KDEpy import FFTKDE
 except ImportError as e:
@@ -349,7 +351,12 @@ def _check_edge_times(df: pd.DataFrame, side: Literal["start", "end"] = "start")
 
 
 def check_time_windows(
-    dmd: CoreDemand,
+    obj: CoreDemand | Config,
+    *,
+    orig: str | None = None,
+    dest: str | None = None,
+    carrier: str | None = None,
+    segment: str | None = None,
     n_draws: int = 100_000,
 ) -> alt.ConcatChart:
     """Generate a dashboard of checks for the decision windows of a demand.
@@ -369,6 +376,17 @@ def check_time_windows(
     -------
     alt.Chart
     """
+    if isinstance(obj, Config):
+        if orig is None:
+            orig = "ISP"
+        if dest is None:
+            dest = "LSE"
+        if segment is None:
+            segment = set(obj.choice_models.keys()).pop()
+        sim = _create_sim_for_only_one_demand(obj, orig=orig, dest=dest, carrier=carrier, segment=segment)
+        dmd = sim.demands.select(orig=orig, dest=dest, segment=segment)
+    else:
+        dmd = obj
     df = generate_time_windows(dmd, n=n_draws)
 
     start_end_times = _check_edge_times(df, side="start").properties(height=125, width=200) | _check_edge_times(

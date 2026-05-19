@@ -83,7 +83,9 @@ def prebuild_connections(cfg: Config, *, inplace: bool = True, **kwargs) -> Conf
         else:
             additional_kwds[key] = value
     sim = Simulation(sim_cfg)
-    _num_paths = sim.eng.build_connections(**additional_kwds)
+    _num_paths = sim.eng.build_connections(
+        **sim_cfg.simulation_controls.connection_builder.model_dump(), **additional_kwds
+    )
 
     path_defs = [
         Path.model_validate(

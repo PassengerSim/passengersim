@@ -10,7 +10,7 @@ def fig_leg_shifts(
     baseline: SimulationTables,
     treatment: SimulationTables,
     *,
-    coloring: Literal["avg_revenue", "change_revenue", "change_revenue_pct"] = "avg_revenue",
+    coloring: Literal["avg_revenue", "change_revenue", "change_revenue_pct", None] = "avg_revenue",
     size_range: tuple[int, int] = (10, 100),
     facet_width: int = 400,
     facet_height: int = 400,
@@ -20,6 +20,52 @@ def fig_leg_shifts(
     strokeOpacity: float = 1.0,
     strokeWidth: float = 1.0,
 ):
+    """Create a scatter/shift chart comparing leg-level metrics between two simulations.
+
+    For each leg, a "lollipop" is drawn, with the stick showing the change from the
+    baseline to the treatment position in load-factor vs. local-share space, and the
+    point marking the treatment result. The size of the point reflects the leg total
+    capacity (across all cabins). This makes it easy to see both the magnitude
+    and direction of change for every leg.
+
+    Parameters
+    ----------
+    baseline : SimulationTables
+        Simulation results to use as the reference (baseline) scenario.
+    treatment : SimulationTables
+        Simulation results to compare against the baseline (treatment) scenario.
+    coloring : {"avg_revenue", "change_revenue", "change_revenue_pct"}, optional
+        Determines how points and lines are colored:
+
+        - ``"avg_revenue"`` – color by absolute average revenue in the treatment.
+        - ``"change_revenue"`` – color by the absolute change in average revenue
+          (treatment minus baseline), using a diverging red-blue scale centered at 0.
+        - ``"change_revenue_pct"`` – color by the percentage change in average revenue,
+          using a diverging red-blue scale centered at 0.
+        - ``None`` – color by carrier (nominal color encoding).
+    size_range : tuple[int, int], optional
+        Minimum and maximum point sizes (in pixels²) used to encode leg capacity.
+    facet_width : int, optional
+        Width of each facet panel in pixels.
+    facet_height : int, optional
+        Height of each facet panel in pixels.
+    facet_columns : int, optional
+        Number of columns in the faceted layout (one facet per carrier).
+    opacity : float, optional
+        Overall opacity of the point marks.
+    fillOpacity : float, optional
+        Fill opacity of the point marks.
+    strokeOpacity : float, optional
+        Stroke opacity of both point and line marks.
+    strokeWidth : float, optional
+        Stroke width of the line (rule) marks.
+
+    Returns
+    -------
+    altair.FacetChart
+        An interactive Altair faceted chart (faceted by carrier) showing the shift
+        in load factor and local share for each leg between baseline and treatment.
+    """
     df_baseline = baseline.legs_
     df_treatment = treatment.legs
     df_baseline["avg_revenue"] = df_baseline["gt_revenue"] / baseline.n_total_samples
@@ -59,6 +105,8 @@ def fig_leg_shifts(
             ),
             legend=alt.Legend(format=".1%"),
         )
+    elif coloring is None:
+        color = alt.Color("carrier:N", title="Carrier")
     else:
         raise ValueError(f"Unknown coloring {coloring}")
 
@@ -108,7 +156,7 @@ def fig_service_shifts(
     baseline: SimulationTables,
     treatment: SimulationTables,
     *,
-    coloring: Literal["avg_revenue", "change_revenue"] = "avg_revenue",
+    coloring: Literal["avg_revenue", "change_revenue", None] = "avg_revenue",
     size_range: tuple[int, int] = (10, 100),
     facet_width: int = 400,
     facet_height: int = 400,
@@ -118,6 +166,49 @@ def fig_service_shifts(
     strokeOpacity: float = 1.0,
     strokeWidth: float = 1.0,
 ):
+    """Create a scatter/shift chart comparing service-level metrics between two simulations.
+
+    For each O&D service, a "lollipop" is drawn, with the stick showing the shift from
+    the baseline to the treatment position in load-factor vs. local-share space, and the
+    point marking the treatment result.  Services are the aggregation of all legs sharing
+    a common carrier, origin, and destination.
+
+    Parameters
+    ----------
+    baseline : SimulationTables
+        Simulation results to use as the reference (baseline) scenario.
+    treatment : SimulationTables
+        Simulation results to compare against the baseline (treatment) scenario.
+    coloring : {"avg_revenue", "change_revenue"}, optional
+        Determines how points and lines are colored:
+
+        - ``"avg_revenue"`` – color by absolute average revenue in the treatment.
+        - ``"change_revenue"`` – color by the absolute change in average revenue
+          (treatment minus baseline), using a diverging red-blue scale centered at 0.
+        - ``None`` – color by carrier (nominal color encoding).
+    size_range : tuple[int, int], optional
+        Minimum and maximum point sizes (in pixels²) used to encode service capacity.
+    facet_width : int, optional
+        Width of each facet panel in pixels.
+    facet_height : int, optional
+        Height of each facet panel in pixels.
+    facet_columns : int, optional
+        Number of columns in the faceted layout (one facet per carrier).
+    opacity : float, optional
+        Overall opacity of the point marks.
+    fillOpacity : float, optional
+        Fill opacity of the point marks.
+    strokeOpacity : float, optional
+        Stroke opacity of both point and line marks.
+    strokeWidth : float, optional
+        Stroke width of the line (rule) marks.
+
+    Returns
+    -------
+    altair.FacetChart
+        An interactive Altair faceted chart (faceted by carrier) showing the shift
+        in load factor and local share for each service between baseline and treatment.
+    """
     df_baseline = baseline.services
     df_treatment = treatment.services
     df = pd.merge(
@@ -144,6 +235,8 @@ def fig_service_shifts(
                 domainMid=0,  # Forces the center of the scheme to 0
             ),
         )
+    elif coloring is None:
+        color = alt.Color("carrier:N", title="Carrier")
     else:
         raise ValueError(f"Unknown coloring {coloring}")
 

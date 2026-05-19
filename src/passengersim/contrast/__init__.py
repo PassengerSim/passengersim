@@ -1431,7 +1431,7 @@ def fig_bid_price_history(
         bottom_line = bound_line.encode(y=alt.Y("bid_price_upper:Q", title="Bid Price"))
         fig = fig + bound + top_line + bottom_line
     if not isinstance(by_carrier, str):
-        fig = fig.properties(height=height or 125, width=width or 225).facet(facet="carrier:N", columns=2)
+        fig = fig.properties(height=height or 150, width=width or 300).facet(facet="carrier:N", columns=2)
         if title:
             fig = fig.properties(title=title)
     else:

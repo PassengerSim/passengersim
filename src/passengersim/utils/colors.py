@@ -63,3 +63,30 @@ def passengersim_theme():
             }
         }
     )
+
+
+def common_carrier_colors(carrier: str):
+    """Get a common color for a given carrier, to be used across multiple charts."""
+    commons = dict(
+        AA="#0078D2",  # American
+        AC="#F01428",  # Air Canada
+        AF="#FF0000",  # Air France
+        AS="#00b2d6",  # Alaska
+        BA="#0035AD",  # British Airways
+        DL="#9B1631",  # Delta
+        EK="#D71A21",  # Emirates
+        EY="#C4921B",  # Etihad
+        FR="#F4CA35",  # Ryanair
+        KL="#00A2DF",  # KLM
+        LH="#0A1D3D",  # Lufthansa
+        LX="#E60005",  # Swiss
+        QR="#660033",  # Qatar
+        TK="#C70A0C",  # Turkish
+        UA="#0033A0",  # United
+        U2="#FF5E00",  # Easyjet
+        WN="#FFBF27",  # Southwest
+        WS="#00AAA6",  # WestJet
+        Bison="#724e3a",
+        Eagle="#e3c622",
+    )
+    return commons.get(carrier, DarkPurple)

@@ -6,6 +6,7 @@ import io
 import logging
 import os
 import pathlib
+import re
 import time
 import typing
 import warnings
@@ -111,6 +112,8 @@ class OptionalPath(pathlib.Path):
 
 
 class YamlConfig(PrettyModel):
+    """A Pydantic BaseModel with methods for loading from and writing to YAML files."""
+
     @classmethod
     def _load_unformatted_yaml(
         cls: type[TConfig],
@@ -252,11 +255,14 @@ class YamlConfig(PrettyModel):
         Parameters
         ----------
         content : str or bytes
-            The YAML content to parse.
+            The YAML content to parse. Note this is *not* a filename -- if you
+            are ostensibly working with a file, this is the contents of the file
+            instead of its name. Alternatively, this can just be notional YAML
+            content as a string or bytes, without there being a "file" at all.
 
         Returns
         -------
-        Config
+        YamlConfig
         """
         if isinstance(content, bytes):
             content = content.decode("utf8")
@@ -378,6 +384,7 @@ class YamlConfig(PrettyModel):
         general_config: tuple[str] = ("simulation_controls", "tags"),
         human_readable: bool = True,
         compress_large_files: bool = True,
+        use_csv: bool = True,
     ) -> None:
         """Write to a set of YAML files, one for each top level key.
 
@@ -407,12 +414,15 @@ class YamlConfig(PrettyModel):
             The top-level keys to write to the general config file (general.yaml)
             instead of their own files.
         human_readable : bool, default True
-            Whether to write the YAML files in a human-readable format.  This will
+            Whether to write the output files in a human-readable format.  This will
             reformat inputs back to normal human-readable values (e.g. leg departure
             times as 'HH:MN' in local time, not an integer giving unix time.
         compress_large_files : bool, default True
             Whether to compress files larger than 1MB with lz4.  This can be helpful
             to reduce file sizes when saving large networks.
+        use_csv : bool, default True
+            Whether to write tabular-compatible data (e.g. demands, fares, legs) as
+            CSV files instead of YAML.
         """
         if isinstance(directory, str):
             directory = pathlib.Path(directory)
@@ -436,7 +446,7 @@ class YamlConfig(PrettyModel):
             if key == "raw_license_certificate":
                 # do not write the license certificate to a file
                 continue
-            if key in _TABULAR_COMPATIBLE_KEYS:
+            if key in _TABULAR_COMPATIBLE_KEYS and use_csv:
                 filename = directory / f"{key}.csv"
                 pd.DataFrame(value).to_csv(filename, index=False)
                 if compress_large_files and filename.stat().st_size > 1024 * 1024:
@@ -1073,8 +1083,12 @@ class Config(YamlConfig, extra="forbid"):
     def _choice_model_todd_curves_exist(self) -> Self:
         """Check that any TODD curves referenced in Demand objects have been defined."""
         for name, cm in self.choice_models.items():
-            if cm.todd_curve is not None and cm.todd_curve not in self.todd_curves:
-                raise ValueError(f"ChoiceModel {name} has unknown TOD Curve {cm.todd_curve}")
+            if (
+                cm.todd_curve is not None
+                and cm.todd_curve not in self.todd_curves
+                and not re.match("Standard_TODD_Curve_[0-9][0-9]", cm.todd_curve)
+            ):
+                raise ValueError(f"ChoiceModel {name} has unknown TODD Curve {cm.todd_curve}")
         return self
 
     @model_validator(mode="after")
@@ -1119,8 +1133,12 @@ class Config(YamlConfig, extra="forbid"):
     def _demand_todd_curves_exist(self) -> Self:
         """Check that any TODD curves referenced in Demand objects have been defined."""
         for dmd in self.demands:
-            if dmd.todd_curve is not None and dmd.todd_curve not in self.todd_curves:
-                raise ValueError(f"Demand {dmd.orig}-{dmd.dest}:{dmd.segment} has unknown TOD Curve {dmd.todd_curve}")
+            if (
+                dmd.todd_curve is not None
+                and dmd.todd_curve not in self.todd_curves
+                and not re.match("Standard_TODD_Curve_[0-9][0-9]", dmd.todd_curve)
+            ):
+                raise ValueError(f"Demand {dmd.orig}-{dmd.dest}:{dmd.segment} has unknown TODD Curve {dmd.todd_curve}")
         return self
 
     @model_validator(mode="after")

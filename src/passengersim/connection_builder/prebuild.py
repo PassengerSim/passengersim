@@ -72,6 +72,21 @@ def prebuild_connections(cfg: Config, *, inplace: bool = True, **kwargs) -> Conf
         met, potentially relaxing circuity rules at each iteration.  This setting also
         allows for the relaxation of maximum connect times, by adding this many minutes
         to all maximum connection times at each iteration.
+
+    Returns
+    -------
+    Config
+        The config with the newly generated paths appended to ``cfg.paths`` and
+        ``cfg.simulation_controls.connection_builder.existing_paths`` set to
+        ``"required"``.  When *inplace* is ``True`` this is the same object as
+        *cfg*; when *inplace* is ``False`` it is a deep copy.
+
+    Raises
+    ------
+    ValueError
+        If ``existing_paths="none"`` is requested but the config already
+        contains defined paths, or if ``existing_paths="required"`` is
+        requested but any market is missing paths.
     """
     if not inplace:
         cfg = cfg.model_copy(deep=True)

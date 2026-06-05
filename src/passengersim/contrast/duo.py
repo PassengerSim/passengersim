@@ -1,3 +1,11 @@
+"""Visualization tools for comparing exactly two simulations.
+
+Each function here takes two positional arguments that each provide a `SimulationTables` object,
+the "baseline" and "treatment" scenarios to compare. The functions then produce visualizations
+that show the shift performance metrics (e.g. load factor, local share) from the baseline
+to the treatment scenarios.
+"""
+
 from typing import Literal
 
 import altair as alt
@@ -19,6 +27,7 @@ def fig_leg_shifts(
     fillOpacity: float = 1.0,
     strokeOpacity: float = 1.0,
     strokeWidth: float = 1.0,
+    raw_df: bool = False,
 ):
     """Create a scatter/shift chart comparing leg-level metrics between two simulations.
 
@@ -78,6 +87,9 @@ def fig_leg_shifts(
     )
     df["avg_revenue_change"] = df["avg_revenue_treatment"] - df["avg_revenue_baseline"]
     df["avg_revenue_change_pct"] = df["avg_revenue_change"] / df["avg_revenue_baseline"]
+
+    if raw_df:
+        return df
 
     chart = alt.Chart(df.reset_index())
 

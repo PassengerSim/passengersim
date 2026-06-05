@@ -6,7 +6,16 @@ from passengersim.core import Airport, Leg
 ## circuity function registration ##
 
 CircuityFunc = Callable[[dict[str, Airport], tuple[Leg, ...], str | None, int], bool]
+"""Type alias for circuity functions.
+
+A circuity function accepts a dictionary of airport places, a tuple of legs
+representing the proposed path, an optional destination airport code, and an
+iteration counter.  It returns ``True`` if the path is allowable and ``False``
+if the path should be rejected.  It may raise ``StopIteration`` to signal that
+no further iterations will yield new acceptable paths.
+"""
 _REGISTERED_CIRCUITY_FUNCS: dict[str, CircuityFunc] = {}
+"""Registry mapping circuity function names to their implementations."""
 
 
 def register_circuity_function(func: CircuityFunc, name: str | None = None) -> CircuityFunc:
@@ -32,6 +41,11 @@ def register_circuity_function(func: CircuityFunc, name: str | None = None) -> C
         The same circuity function that was registered. This allows this function
         to be used as a decorator to register a circuity function but otherwise
         act transparently.
+
+    Raises
+    ------
+    ValueError
+        If a circuity function is already registered under *name*.
     """
     global _REGISTERED_CIRCUITY_FUNCS
     if name is None:
@@ -43,7 +57,23 @@ def register_circuity_function(func: CircuityFunc, name: str | None = None) -> C
 
 
 def get_registered_circuity_function(name: str) -> CircuityFunc:
-    """Retrieve a registered circuity function by name."""
+    """Retrieve a registered circuity function by name.
+
+    Parameters
+    ----------
+    name : str
+        The name under which the circuity function was registered.
+
+    Returns
+    -------
+    CircuityFunc
+        The circuity function registered under *name*.
+
+    Raises
+    ------
+    KeyError
+        If no circuity function has been registered under *name*.
+    """
     global _REGISTERED_CIRCUITY_FUNCS
     if name not in _REGISTERED_CIRCUITY_FUNCS:
         raise KeyError(f"Circuity function {name!r} is not registered.")
@@ -86,6 +116,8 @@ def default_circuity_function(
 
     Raises
     ------
+    ValueError
+        If *legs* is empty, or if *orig* or *dest* is not found in *places*.
     StopIteration
         If the iteration number is large enough that further iterations are
         no longer going to produce newly acceptable paths.
@@ -157,6 +189,38 @@ def unlimited_circuity(
     preferences about circuity and wants to allow all paths. Note that this
     will likely lead to a very large number of possible paths, which may
     increase computation time and memory usage.
+
+    Parameters
+    ----------
+    places : dict[str, Airport]
+        A dictionary mapping airport codes to Airport objects containing
+        their location information.  Not used by this implementation, but
+        required by the :data:`CircuityFunc` interface.
+    legs : tuple[Leg, ...]
+        A tuple of Leg objects representing the sequence of legs in the
+        proposed path.  Must contain at least one leg.
+    dest : str | None, optional
+        The code of the destination airport.  Not used by this
+        implementation, but required by the :data:`CircuityFunc` interface.
+        Defaults to None.
+    iteration : int, optional
+        The current iteration of the connection builder.  When greater than
+        zero, ``StopIteration`` is raised to signal that no new paths will
+        be discovered in subsequent iterations.  Defaults to 0.
+
+    Returns
+    -------
+    bool
+        Always returns ``True`` (all paths are accepted) on the first
+        iteration.
+
+    Raises
+    ------
+    ValueError
+        If *legs* is empty.
+    StopIteration
+        If *iteration* is greater than zero, signaling that further
+        iterations will not produce new paths.
     """
     if len(legs) < 1:
         raise ValueError("proposed path has no legs")

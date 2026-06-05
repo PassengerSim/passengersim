@@ -1,3 +1,10 @@
+"""Compare results across multiple PassengerSim simulations.
+
+The :class:`Contrast` class acts as a named collection of
+:class:`~passengersim.summaries.SimulationTables` objects and provides
+methods for side-by-side analysis and visualization of simulation outcomes.
+"""
+
 import pathlib
 import warnings
 from collections.abc import Callable

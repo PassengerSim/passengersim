@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import ast
+import re
 import warnings
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from pydantic import BaseModel, field_serializer, field_validator, model_validator
@@ -18,6 +19,13 @@ _REFERENCE_FARE_DEPRECATION_MSG = (
 
 
 class DemandOverride(BaseModel, extra="forbid"):
+    """Per-carrier override applied on top of a base :class:`Demand`.
+
+    Used for special situations that require a particular carrier to offer
+    a discounted price or an adjusted preference weight relative to the
+    base demand specification.
+    """
+
     carrier: str
     """Carrier code for the override."""
 
@@ -29,6 +37,14 @@ class DemandOverride(BaseModel, extra="forbid"):
 
 
 class Demand(BaseModel, extra="forbid"):
+    """Specification of passenger demand between an origin–destination pair.
+
+    A :class:`Demand` record captures all parameters that govern how many
+    customers arrive in a market, how their willingness-to-pay is modeled,
+    and which simulation primitives (booking curves, choice models, TODD
+    curves, etc.) are attached to those customers.
+    """
+
     orig: str
     """Origin location for this demand.
 
@@ -54,16 +70,35 @@ class Demand(BaseModel, extra="forbid"):
     they are not limited to these two categories."""
 
     @property
-    def identifier(self):
-        """Unique identifier for this demand."""
+    def identifier(self) -> str:
+        """Unique identifier for this demand.
+
+        The identifier encodes the origin, destination, and segment in a
+        single string of the form ``"ORIG~DEST@SEGMENT"``.
+
+        Returns
+        -------
+        str
+            Identifier string in the format ``"<orig>~<dest>@<segment>"``.
+        """
         return f"{self.orig}~{self.dest}@{self.segment}"
 
     @property
-    def market_identifier(self):
-        """Unique identifier for the market of this demand."""
+    def market_identifier(self) -> str:
+        """Unique identifier for the market of this demand.
+
+        The market identifier encodes only the origin and destination,
+        omitting the segment, in a string of the form ``"ORIG~DEST"``.
+
+        Returns
+        -------
+        str
+            Identifier string in the format ``"<orig>~<dest>"``.
+        """
         return f"{self.orig}~{self.dest}"
 
     base_demand: float
+    """Mean number of customers arriving in this market per sample."""
 
     reference_price: float
     """Reference price used for willingness-to-pay and choice model scaling.
@@ -127,38 +162,128 @@ class Demand(BaseModel, extra="forbid"):
        Each dictionary should have 'carrier', 'discount_pct' and 'pref_adj'"""
 
     @field_validator("overrides", "prob_num_days", mode="before")
-    def _accept_strings(cls, v):
+    @classmethod
+    def _accept_strings(cls, v: list | str) -> Any:
+        """Parse list-valued fields that arrive as a serialized string.
+
+        Pydantic validators run *before* type coercion when ``mode="before"``
+        is set.  This validator allows the ``overrides`` and ``prob_num_days``
+        fields to be specified as a Python literal string (e.g. from a CSV or
+        database column) in addition to the normal list form.
+
+        Parameters
+        ----------
+        v : list or str
+            The raw field value supplied by the caller.  If it is a
+            :class:`str`, it is parsed with :func:`ast.literal_eval`;
+            otherwise it is returned unchanged.
+
+        Returns
+        -------
+        list or any
+            The parsed value.  In normal usage this will be a list, but
+            :func:`ast.literal_eval` may return any Python literal type if
+            the input string represents a non-list literal.
+
+        Raises
+        ------
+        ValueError
+            If ``v`` is a string that cannot be parsed as a Python literal.
+        """
         if isinstance(v, str):
             v = ast.literal_eval(v)
         return v
 
     @field_serializer("overrides", "prob_num_days")
-    def _serialize_overrides(self, v):
+    def _serialize_overrides(self, v: list) -> list[str]:
+        """Serialize list-valued fields to a list of strings.
+
+        Pydantic calls this serializer when converting the model to a
+        dictionary or JSON.  Each element is converted to its string
+        representation so that the round-trip through
+        :meth:`_accept_strings` is lossless.
+
+        Parameters
+        ----------
+        v : list
+            The list of values to serialize.  Elements may be
+            :class:`~pydantic.BaseModel` instances (serialized via
+            :meth:`~pydantic.BaseModel.model_dump`) or plain scalars
+            (converted with :class:`str`).
+
+        Returns
+        -------
+        list of str
+            A list where every element has been converted to a string.
+        """
         return [str(o.model_dump() if isinstance(o, BaseModel) else str(o)) for o in v]
 
     @property
-    def choice_model_(self):
-        """Choice model, falling back to segment name if not set explicitly."""
+    def choice_model_(self) -> str:
+        """Effective choice model name, falling back to segment name if not set.
+
+        Returns the explicitly configured :attr:`choice_model` when present,
+        otherwise falls back to :attr:`segment` so that callers always receive
+        a non-``None`` model name.
+
+        Returns
+        -------
+        str
+            The name of the choice model to use for this demand.
+        """
         return self.choice_model or self.segment
 
     @field_validator("curve", mode="before")
-    def curve_integer_name(cls, v):
-        """Booking curves can have integer names, treat as string."""
+    @classmethod
+    def _curve_integer_name(cls, v: int | str | None) -> str | None:
+        """Coerce integer booking-curve names to strings.
+
+        Booking curves are identified by string keys, but configuration files
+        sometimes provide integer values (e.g. ``curve: 1``).  This validator
+        converts any integer value to its string equivalent so downstream code
+        can rely on a uniform type.
+
+        Parameters
+        ----------
+        v : int, str, or None
+            The raw value supplied for the ``curve`` field.
+
+        Returns
+        -------
+        str or None
+            The curve name as a string, or ``None`` if no curve was specified.
+        """
         if isinstance(v, int):
             v = str(v)
         return v
 
     @model_validator(mode="before")
     @classmethod
-    def _migrate_reference_fare(cls, data):
-        """Accept the legacy ``reference_fare`` key as an alias for
-        ``reference_price`` for backward compatibility.
+    def _migrate_reference_fare(cls, data: Any) -> Any:
+        """Accept the legacy ``reference_fare`` key as an alias for ``reference_price``.
+
+        Provides backward compatibility for configuration files and code that
+        still use the old ``reference_fare`` field name.
 
         If a caller supplies ``reference_fare`` (and not ``reference_price``),
         the value is moved to ``reference_price`` and a
-        :class:`DeprecationWarning` is emitted. If both are supplied,
+        :class:`DeprecationWarning` is emitted.  If both are supplied,
         ``reference_price`` wins and the legacy key is discarded with a
-        warning."""
+        warning.
+
+        Parameters
+        ----------
+        data : dict or any
+            The raw input data passed to the model constructor.  When it is a
+            :class:`dict`, the validator inspects and potentially mutates it;
+            non-dict values are returned unchanged.
+
+        Returns
+        -------
+        dict or any
+            The (possibly modified) input data with ``reference_fare`` removed
+            and its value promoted to ``reference_price`` when applicable.
+        """
         if isinstance(data, dict) and "reference_fare" in data:
             warnings.warn(
                 _REFERENCE_FARE_DEPRECATION_MSG,
@@ -170,12 +295,31 @@ class Demand(BaseModel, extra="forbid"):
                 data["reference_price"] = legacy
         return data
 
-    def __getattr__(self, item):
-        """Route access to the deprecated ``reference_fare`` attribute to
-        ``reference_price``, emitting a :class:`DeprecationWarning`.
+    def __getattr__(self, item: str) -> Any:
+        """Route access to the deprecated ``reference_fare`` attribute to ``reference_price``.
 
-        Note: ``__getattr__`` is only invoked when the attribute is not found
-        through the normal mechanism, so this does not shadow real fields."""
+        :meth:`__getattr__` is only invoked when the attribute is not found
+        through the normal lookup mechanism, so this does not shadow real
+        Pydantic fields.
+
+        Parameters
+        ----------
+        item : str
+            Name of the attribute being accessed.
+
+        Returns
+        -------
+        any
+            The value of ``reference_price`` when ``item`` is
+            ``"reference_fare"``; otherwise the result of the parent class's
+            ``__getattr__`` implementation.
+
+        Raises
+        ------
+        AttributeError
+            If ``item`` is not ``"reference_fare"`` and is not found by the
+            parent :class:`~pydantic.BaseModel` implementation.
+        """
         if item == "reference_fare":
             warnings.warn(
                 _REFERENCE_FARE_DEPRECATION_MSG,
@@ -184,11 +328,25 @@ class Demand(BaseModel, extra="forbid"):
             )
             return self.reference_price
         # Delegate to Pydantic's default __getattr__ behavior for anything else.
-        return super().__getattr__(item)
+        # BaseModel.__getattr__ exists at runtime but is absent from type stubs.
+        return super().__getattr__(item)  # type: ignore[attr-defined]
 
-    def __setattr__(self, key, value):
-        """Route assignment to the deprecated ``reference_fare`` attribute to
-        ``reference_price``, emitting a :class:`DeprecationWarning`."""
+    def __setattr__(self, key: str, value: Any) -> None:
+        """Route assignment to the deprecated ``reference_fare`` attribute to ``reference_price``.
+
+        Intercepts attribute assignment so that code using the old
+        ``reference_fare`` name continues to work while emitting a
+        :class:`DeprecationWarning`.
+
+        Parameters
+        ----------
+        key : str
+            Name of the attribute being set.  When equal to
+            ``"reference_fare"``, it is silently redirected to
+            ``"reference_price"`` after emitting a warning.
+        value : any
+            The value to assign.
+        """
         if key == "reference_fare":
             warnings.warn(
                 _REFERENCE_FARE_DEPRECATION_MSG,
@@ -200,7 +358,29 @@ class Demand(BaseModel, extra="forbid"):
 
 
 def assign_standard_todd_curves(cfg: Config) -> Config:
-    """For all demands with no TODD curve, assign the appropriate standard TODD curve."""
+    """Assign standard TODD curves to all demands that do not have one set.
+
+    For each :class:`Demand` in *cfg* whose :attr:`~Demand.todd_curve` is
+    ``None``, this function looks up the associated market's ``delta_t`` and
+    assigns the matching ``Standard_TODD_Curve_<delta_t>`` curve.  Any
+    standard curves that are not already present in *cfg* are loaded from the
+    bundled ``standard-todd.yaml`` demo network and added to
+    :attr:`~Config.todd_curves`.
+
+    If :attr:`~SimulationControls.use_standard_todd_curves` is ``False`` on
+    *cfg*, the function returns *cfg* unchanged.
+
+    Parameters
+    ----------
+    cfg : Config
+        The simulation configuration to update in-place.
+
+    Returns
+    -------
+    Config
+        The same *cfg* object, with TODD curves assigned where they were
+        missing.
+    """
 
     if not cfg.simulation_controls.use_standard_todd_curves:
         # if disabled, do nothing
@@ -217,6 +397,8 @@ def assign_standard_todd_curves(cfg: Config) -> Config:
             dmd.todd_curve = todd_curve
             if todd_curve not in cfg.todd_curves:
                 todd_curve_queue.add(todd_curve)
+        elif dmd.todd_curve not in cfg.todd_curves and re.match(r"Standard_TODD_Curve_[0-9][0-9]", dmd.todd_curve):
+            todd_curve_queue.add(dmd.todd_curve)
 
     # load all required standard configs
     if todd_curve_queue:
@@ -229,8 +411,39 @@ def assign_standard_todd_curves(cfg: Config) -> Config:
     return cfg
 
 
-def assign_standard_dwm_tolerances(cfg: Config, segment_mapping: dict[str, str] | None = None) -> Config:
-    """For all demands with no DWM tolerance, assign the appropriate standard DWM tolerance."""
+def _assign_standard_dwm_tolerances(
+    cfg: Config,
+    segment_mapping: dict[str, str] | None = None,
+) -> Config:
+    """Assign standard Decision Window Model tolerances to demands that lack one.
+
+    For each :class:`Demand` in *cfg* whose :attr:`~Demand.dwm_tolerance` is
+    falsy (zero or ``None``), a tolerance value is selected from a lookup
+    table indexed by segment type and O-D distance.  Segment names are first
+    translated through *segment_mapping*; any name not found in the table is
+    treated as ``"leisure"``.
+
+    If :attr:`~SimulationControls.use_standard_todd_curves` is ``False`` on
+    *cfg*, the function returns *cfg* unchanged (the same flag controls both
+    TODD curves and DWM tolerances).
+
+    Parameters
+    ----------
+    cfg : Config
+        The simulation configuration to update in-place.
+    segment_mapping : dict of {str: str}, optional
+        A mapping from segment names used in *cfg* to the canonical segment
+        names recognized by the lookup table (``"business"`` or
+        ``"leisure"``).  Segments absent from the mapping are used as-is,
+        and any segment not found in the table falls back to ``"leisure"``.
+        Defaults to an empty mapping (i.e. no translation).
+
+    Returns
+    -------
+    Config
+        The same *cfg* object, with DWM tolerances filled in where they were
+        missing.
+    """
 
     if not cfg.simulation_controls.use_standard_todd_curves:
         # if disabled, do nothing

@@ -7,10 +7,11 @@ from passengersim.snapshot.filtering import NetworkSnapshotFilter
 
 @register_rm_system
 class P(RmSys):
-    """A standard RM system of type "P".
+    """RM system using standard path-level forecasting and ProBP.
 
-    This RM system uses path-level bid price controls with Pro-BP
-    optimization, along with EM untruncation and standard leg forecasting.
+    This RM system uses path-level bid price controls with probabilistic bid
+    price (ProBP) optimization, along with EM untruncation and standard leg
+    forecasting.
 
     Parameters
     ----------

@@ -17,14 +17,15 @@ import numpy as np  # noqa: F401
 import pandas as pd  # noqa: F401
 from rich.traceback import Traceback as _RichTraceback
 
-from .callbacks import CallbackMixin
-from .config import Config
-from .core import SimulationEngine
-from .driver import BaseSimulation, Simulation, check_summarizer
-from .mp_executor import JobExecutor
-from .rm.systems import export_registered_rm_systems, restore_registered_rm_systems
-from .summaries import GenericSimulationTables, SimulationTables
-from .utils.tempdir import MaybeTemporaryDirectory
+from passengersim.callbacks import CallbackMixin
+from passengersim.config import Config
+from passengersim.core import SimulationEngine
+from passengersim.driver._base_sim import BaseSimulation
+from passengersim.driver._singleproc import Simulation, check_summarizer
+from passengersim.mp_executor import JobExecutor
+from passengersim.rm.systems import export_registered_rm_systems, restore_registered_rm_systems
+from passengersim.summaries import GenericSimulationTables, SimulationTables
+from passengersim.utils.tempdir import MaybeTemporaryDirectory
 
 if typing.TYPE_CHECKING:
     from rich.progress import Progress

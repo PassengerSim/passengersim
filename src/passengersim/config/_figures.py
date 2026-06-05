@@ -43,6 +43,7 @@ __all__ = [
     "fig_demand_vs_capacity",
     "fig_max_wtp_distributions",
     "fig_hub_schedule",
+    "fig_reference_price_by_distance",
 ]
 
 
@@ -675,7 +676,7 @@ def fig_hub_schedule(
     carrier: str | None = None,
     raw_df: bool = False,
     width: int = 600,
-    min_height: int = 200,
+    min_height: int = 100,
     max_height: int = 600,
 ) -> alt.TopLevelMixin:
     """Visualize the schedule at a given hub.
@@ -726,33 +727,46 @@ def fig_hub_schedule(
         title = f"{carrier} {title}"
 
     return alt.Chart(df.query(f"orig == '{hub}'")).mark_rule(point={"shape": "diamond"}).encode(
-        x=alt.X("hub_hour", title=f"Time at {hub} (local hour)"),
-        x2="far_hour",
+        x=alt.X("hub_hour:Q", title=f"Time at {hub} (local hour)"),
+        x2="far_hour:Q",
         y=alt.Y("rownum:N", axis=None),
-        color="carrier",
+        color="carrier:N",
         tooltip=[
-            "orig",
-            "dest",
+            "orig:N",
+            "dest:N",
             alt.Tooltip("dep_time:N", title=f"Departure Time ({hub})"),
             alt.Tooltip("arr_time:N", title="Arrival Time"),
-            "leg_id",
-            "fltno",
-            "carrier",
+            "leg_id:N",
+            "fltno:N",
+            "carrier:N",
         ],
     ).properties(width=width, height=height) + alt.Chart(df.query(f"dest == '{hub}'")).mark_rule(
         point={"shape": "diamond"}
     ).encode(
-        x=alt.X("hub_hour", title=f"Time at {hub} (local hour)"),
-        x2="far_hour",
+        x=alt.X("hub_hour:Q", title=f"Time at {hub} (local hour)"),
+        x2="far_hour:Q",
         y=alt.Y("rownum:N", axis=None),
-        color="carrier",
+        color="carrier:N",
         tooltip=[
-            "orig",
-            "dest",
+            "orig:N",
+            "dest:N",
             alt.Tooltip("dep_time:N", title="Departure Time"),
             alt.Tooltip("hub_time:N", title=f"Arrival Time ({hub})"),
-            "leg_id",
-            "fltno",
-            "carrier",
+            "leg_id:N",
+            "fltno:N",
+            "carrier:N",
         ],
     ).properties(width=width, height=height, title=title)
+
+
+def fig_reference_price_by_distance(cfg: Config) -> alt.Chart:
+    return (
+        alt.Chart(cfg.dataframes.demands)
+        .mark_point(filled=True)
+        .encode(
+            x=alt.X("distance:Q", axis=alt.Axis(format=",.0f"), title="Distance (miles)"),
+            y=alt.Y("reference_price:Q", axis=alt.Axis(format="$,.0f"), title="Reference Price"),
+            color="segment:N",
+            tooltip=["orig", "dest", "distance", "reference_price", "segment"],
+        )
+    )

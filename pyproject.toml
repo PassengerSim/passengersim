@@ -92,6 +92,10 @@ fix = true
 line-length = 120
 target-version = "py312"
 
+[tool.ruff.format]
+docstring-code-format = true
+docstring-code-line-length = 80
+
 [tool.ruff.lint]
 ignore = ["B905"]
 select = ["E", "F", "B", "UP", "TID", "I001"]

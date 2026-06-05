@@ -1,4 +1,9 @@
-from passengersim.rm.systems import get_registered_rm_system, register_rm_system
+"""Standard revenue management (RM) systems.
+
+RM systems in this subpackage are available for general use, and are automatically
+available for use with all PassengerSim models. You do not need to explicitly import
+the relevant submodule to register them.
+"""
 
 from ._E import E
 from ._L import L

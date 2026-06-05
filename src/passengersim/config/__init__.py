@@ -1,5 +1,10 @@
-# TITLE: Config
-# DOC-NAME: 00-configs
+"""Configuration classes for PassengerSim simulations.
+
+Defines the full set of input configuration objects — including carriers,
+legs, paths, fares, demand curves, choice models, simulation controls, and more —
+that together specify a complete simulation scenario.
+"""
+
 from __future__ import annotations
 
 from .base import Config, OptionalPath

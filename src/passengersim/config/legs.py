@@ -24,6 +24,8 @@ def create_timestamp(base_date, offset, hh, mm) -> int:
 
 
 class Leg(BaseModel, extra="forbid"):
+    """Configuration for a single leg in the simulated network."""
+
     leg_id: int | None = None
     """A unique identifier for this leg.
 

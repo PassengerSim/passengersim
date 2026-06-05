@@ -1,3 +1,10 @@
+"""Run structured sets of PassengerSim simulations as experiments.
+
+Supports defining parameter changes and scenario comparisons, running
+individual simulations sequentially or in parallel across multiple
+processes, and collecting results into a unified output.
+"""
+
 from __future__ import annotations
 
 import concurrent.futures

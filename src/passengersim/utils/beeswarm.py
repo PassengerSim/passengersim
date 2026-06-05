@@ -3,7 +3,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
-__all__ = ["beeswarm"]
+__all__ = ["beeswarm", "bubble_centers"]
 
 
 def create_hex_centers(
@@ -164,3 +164,206 @@ def beeswarm(
             matched_queue.append(matched_group)
         matched_df = pd.concat(matched_queue, ignore_index=True)
     return matched_df
+
+
+def _resolve_overlaps(
+    cx: np.ndarray,
+    cy: np.ndarray,
+    w: np.ndarray,
+    min_sep: np.ndarray,
+    iteration: int = 0,
+) -> tuple[np.ndarray, np.ndarray, float]:
+    """Push overlapping circles apart to satisfy ``min_sep`` constraints.
+
+    Displacement is split between each overlapping pair in inverse proportion
+    to the circles' weights (``radius²``), so heavier circles move less.
+
+    Parameters
+    ----------
+    cx, cy : np.ndarray
+        Current center x/y coordinates, shape ``(n,)``.
+    w : np.ndarray
+        Per-circle weights (``radius²``), shape ``(n,)``.
+    min_sep : np.ndarray
+        Required minimum center-to-center distance for every pair, shape
+        ``(n, n)``.
+    iteration : int
+        Current iteration index used as an RNG seed when circles are
+        coincident, ensuring reproducible but varied directions.
+
+    Returns
+    -------
+    cx, cy : np.ndarray
+        Updated center coordinates.
+    max_overlap : float
+        Maximum constraint violation *before* this step was applied.
+    """
+    # Pairwise displacement vectors: dxij[i, j] = cx[j] - cx[i]
+    dxij = cx[None, :] - cx[:, None]  # (n, n)
+    dyij = cy[None, :] - cy[:, None]
+    dist = np.sqrt(dxij**2 + dyij**2)
+
+    # Exclude self-pairs.
+    np.fill_diagonal(dist, np.inf)
+
+    # Amount by which each pair violates the minimum separation constraint.
+    overlap = np.maximum(0.0, min_sep - dist)  # (n, n), symmetric
+    max_overlap = float(np.max(overlap))
+
+    if max_overlap == 0.0:
+        return cx, cy, 0.0
+
+    # Unit vectors pointing from i toward j; safe floor avoids divide-by-zero.
+    safe_dist = np.maximum(dist, 1e-10)
+    ux = dxij / safe_dist
+    uy = dyij / safe_dist
+
+    # For truly coincident circles, assign reproducible random directions so
+    # the algorithm can break the degeneracy and make progress.
+    coincident_mask = dist <= 1e-10
+    if np.any(coincident_mask):
+        rng = np.random.default_rng(seed=iteration)
+        angles = rng.uniform(0, 2 * np.pi, size=coincident_mask.sum())
+        rows, cols = np.where(coincident_mask)
+        ux[rows, cols] = np.cos(angles)
+        uy[rows, cols] = np.sin(angles)
+
+    # Split the displacement inversely by weight: w[j] / (w[i] + w[j]).
+    # Heavier circles (larger radius) absorb less of the correction.
+    pair_w = w[:, None] + w[None, :]  # (n, n)
+    pair_w = np.where(pair_w > 0, pair_w, 1.0)
+
+    # Displace circle i away from j (opposite to ux) by overlap * w[j] / pair_w.
+    disp_scale = overlap * w[None, :] / pair_w  # (n, n)
+    cx = cx - np.sum(ux * disp_scale, axis=1)  # sum contributions over all j
+    cy = cy - np.sum(uy * disp_scale, axis=1)
+
+    return cx, cy, max_overlap
+
+
+def bubble_centers(
+    data: pd.DataFrame,
+    x: str,
+    y: str,
+    radius: str,
+    buffer: float,
+) -> pd.DataFrame:
+    """
+    Compute non-overlapping circle center positions that approximately minimize
+    total weighted displacement from preferred positions.
+
+    Each circle's displacement is weighted by the square of its radius, so
+    larger circles are penalized more for moving and will be displaced less.
+
+    The algorithm runs in two phases:
+
+    **Phase 1 – force-directed positioning.**
+    Overlapping circles are pushed apart (weighted so heavier circles move
+    less), then all circles drift a small step back toward their preferred
+    positions.  This phase terminates when the maximum overlap stabilizes,
+    which indicates the system has reached a steady state where the separation
+    and drift forces are balanced.  When circles must be separated from their
+    preferred positions, this balanced state may have a small residual overlap
+    (a limit cycle); Phase 2 corrects this.
+
+    **Phase 2 – strict overlap resolution.**
+    Pure overlap resolution is applied without any drift.  This guarantees
+    that the final positions satisfy all separation constraints exactly,
+    independent of how Phase 1 terminated.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Input DataFrame containing preferred positions and circle sizes.
+    x : str
+        Column name for the preferred x coordinate of each circle.
+    y : str
+        Column name for the preferred y coordinate of each circle.
+    radius : str
+        Column name for the radius of each circle.
+    buffer : float
+        Minimum gap distance to maintain between any two circles, in addition
+        to the sum of their radii.
+
+    Returns
+    -------
+    pd.DataFrame
+        A copy of ``data`` with two additional columns, ``_bubble_x`` and
+        ``_bubble_y``, giving the computed non-overlapping circle centers.
+
+    Warns
+    -----
+    UserWarning
+        If Phase 2 cannot satisfy all separation constraints within the
+        maximum number of iterations.  This may indicate an over-constrained
+        layout (e.g., too many large circles in a confined region).
+    """
+    n = len(data)
+
+    if n == 0:
+        result = data.copy()
+        result["_bubble_x"] = pd.Series(dtype=float)
+        result["_bubble_y"] = pd.Series(dtype=float)
+        return result
+
+    px = data[x].to_numpy(dtype=float)
+    py = data[y].to_numpy(dtype=float)
+    r = data[radius].to_numpy(dtype=float)
+
+    # Weight = radius²: larger circles resist displacement more.
+    w = r**2
+
+    # Minimum required center-to-center distance for every pair of circles.
+    min_sep = r[:, None] + r[None, :] + buffer  # shape (n, n)
+
+    # Start with circles at their preferred positions.
+    cx = px.copy()
+    cy = py.copy()
+
+    tol = 1e-6
+    # Fraction to drift toward the preferred position each phase-1 iteration.
+    # Must be small enough not to re-introduce large overlaps.
+    drift_rate = 0.02
+
+    # ── Phase 1: force-directed (separation + drift) ────────────────────────
+    # Run until the maximum overlap stabilizes.  With a non-zero drift rate
+    # the system can enter a limit cycle where drift and separation forces
+    # exactly balance; detecting this state is the phase-1 stopping criterion.
+    prev_max_overlap = np.inf
+    for it in range(1000):
+        cx, cy, max_overlap = _resolve_overlaps(cx, cy, w, min_sep, iteration=it)
+
+        # Drift each circle a small step toward its preferred position.
+        cx = cx + drift_rate * (px - cx)
+        cy = cy + drift_rate * (py - cy)
+
+        # Stop when the maximum overlap has stabilized (limit cycle detected
+        # or full convergence), meaning phase 1 has done all it can.
+        if abs(max_overlap - prev_max_overlap) < tol:
+            break
+        prev_max_overlap = max_overlap
+
+    # ── Phase 2: strict overlap resolution (no drift) ───────────────────────
+    # Eliminate any remaining overlaps without moving circles toward preferred
+    # positions.  This guarantees constraint satisfaction in the output.
+    converged = False
+    max_overlap = np.inf
+    for it in range(1000):
+        cx, cy, max_overlap = _resolve_overlaps(cx, cy, w, min_sep, iteration=it)
+        if max_overlap < tol:
+            converged = True
+            break
+
+    if not converged:
+        warnings.warn(
+            f"bubble_centers did not converge after the maximum number of "
+            f"iterations.  Maximum remaining overlap: {max_overlap:.4g}. "
+            "The result may not satisfy all separation constraints. "
+            "The layout may be over-constrained.",
+            stacklevel=2,
+        )
+
+    result = data.copy()
+    result["_bubble_x"] = cx
+    result["_bubble_y"] = cy
+    return result

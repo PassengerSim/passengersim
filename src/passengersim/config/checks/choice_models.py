@@ -90,28 +90,37 @@ def _create_sim_for_only_one_demand(
     if carrier is None:
         carrier = next(iter(cfg.carriers))
 
-    # set a legs departing at 9 am
-    new_legs = []
-    h = 9
-    dep_timestamp = datetime.fromisoformat(f"2023-01-07T{h:02d}:06:00").replace(tzinfo=ZoneInfo(place_o.time_zone))
-    dep_unixtime = dep_timestamp.timestamp()
-    arr_unixtime = dep_unixtime + duration
-    arr_timestamp = datetime.fromtimestamp(arr_unixtime, tz=ZoneInfo(place_d.time_zone))
-    arr_day = arr_timestamp.day - 7
+    # check if there are any paths on this carrier
+    use_paths = cfg.paths.set_filters(orig=orig, dest=dest)
+    if use_paths:
+        use_leg_ids = set()
+        for path in use_paths:
+            use_leg_ids.update(path.legs)
+        new_legs = [leg for leg in cfg.legs if leg.leg_id in use_leg_ids]
+    else:
+        # no paths serve this market, so make one up
+        # set a legs departing at 9 am
+        new_legs = []
+        h = 9
+        dep_timestamp = datetime.fromisoformat(f"2023-01-07T{h:02d}:06:00").replace(tzinfo=ZoneInfo(place_o.time_zone))
+        dep_unixtime = dep_timestamp.timestamp()
+        arr_unixtime = dep_unixtime + duration
+        arr_timestamp = datetime.fromtimestamp(arr_unixtime, tz=ZoneInfo(place_d.time_zone))
+        arr_day = arr_timestamp.day - 7
 
-    leg = Leg(
-        orig=orig,
-        dest=dest,
-        dep_time=f"{h:02d}:06",
-        arr_time=f"{arr_timestamp.hour:02d}:{arr_timestamp.minute:02d}",
-        arr_day=arr_day,
-        date="2023-01-07",
-        capacity=70,
-        leg_id=9000 + h,
-        fltno=9000 + h,
-        carrier=carrier,
-    )
-    new_legs.append(leg)
+        leg = Leg(
+            orig=orig,
+            dest=dest,
+            dep_time=f"{h:02d}:06",
+            arr_time=f"{arr_timestamp.hour:02d}:{arr_timestamp.minute:02d}",
+            arr_day=arr_day,
+            date="2023-01-07",
+            capacity=70,
+            leg_id=9000 + h,
+            fltno=9000 + h,
+            carrier=carrier,
+        )
+        new_legs.append(leg)
 
     cfg.legs = new_legs
     cfg.paths = []

@@ -145,8 +145,7 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     This factor controls the level of correlation in demand levels across the
     entire system.
 
-    See [k-factors][demand-generation-k-factors]
-    for more details.
+    See :ref:`demand-generation-k-factors` for more details.
     """
 
     mkt_k_factor: confloat(ge=0, le=5.0) = 0.20
@@ -156,8 +155,7 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     This factor controls the level of correlation in demand levels across origin-
     destination markets.
 
-    See [k-factors][demand-generation-k-factors]
-    for more details.
+    See :ref:`demand-generation-k-factors` for more details.
     """
 
     pax_type_k_factor: confloat(ge=0, le=5.0) = 0.0
@@ -169,8 +167,7 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     This factor add uncorrelated variance to every demand, unless there are
     multiple demands in the same market and with the same passenger segment.
 
-    See [k-factors][demand-generation-k-factors]
-    for more details.
+    See :ref:`demand-generation-k-factors` for more details.
     """
 
     segment_k_factor: confloat(ge=0, le=5.0) = 0.0
@@ -187,8 +184,7 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
 
     This factor add uncorrelated variance to every demand.
 
-    See [k-factors][demand-generation-k-factors]
-    for more details.
+    See :ref:`demand-generation-k-factors` for more details.
     """
 
     @model_validator(mode="after")
@@ -238,7 +234,7 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     This factor scales the variance in the amount of total demand for any given
     market segment.
 
-    See [k-factors][demand-generation-k-factors] for more details.
+    See :ref:`demand-generation-k-factors` for more details.
     """
 
     tf_z_factor: confloat(ge=0, le=100.0) = 2.0
@@ -248,7 +244,7 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     This factor scales the variance in the allocation of total demand to the
     various arrival timeframes.
 
-    See [k-factors][demand-generation-k-factors] for more details.
+    See :ref:`demand-generation-k-factors` for more details.
     """
 
     prorate_revenue: bool = True
@@ -503,5 +499,10 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     """
     Speed limits for short, medium, and long travel legs.
 
-    These are only used for data quality checks at Config load time.
+    These are only used for data quality checks at Config load time. The limits
+    should be set quite generously. If you set do speed limits, then legs that
+    violate the limits (i.e., they appear abnormally fast or slow) will be flagged
+    as validation errors when your data is loaded. Most of the time this will
+    be due to data transcription errors (e.g. failure to account for crossing the
+    international date line, incorrect assignment of airports to time zones, etc.)
     """

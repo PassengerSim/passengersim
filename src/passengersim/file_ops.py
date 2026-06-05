@@ -30,4 +30,7 @@ def from_file(path: str | pathlib.Path | os.PathLike[str]) -> Config:
     elif _has_file_extensions(path, [".yaml", ".yml", ".yml.gz", ".yaml.gz", ".yml.lz4", ".yaml.lz4"]):
         return Config.from_yaml(path)
     else:
+        pth = pathlib.Path(path)
+        if pth.is_dir() and (pth / "__main__.yaml").exists():
+            return Config.from_yaml(pth / "__main__.yaml")
         raise ValueError("Unknown file type")

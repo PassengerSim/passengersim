@@ -6,7 +6,7 @@ from passengersim.rm.untruncation import LegUntruncation
 
 @register_rm_system
 class E(RmSys):
-    """A standard RM system of type "E".
+    """RM system using standard forecasting and EMSR-B.
 
     This RM system uses leg-level seat allocation controls with EMSR-B
     optimization, along with EM untruncation and standard leg forecasting.

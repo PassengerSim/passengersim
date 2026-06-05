@@ -88,5 +88,9 @@ def common_carrier_colors(carrier: str):
         WS="#00AAA6",  # WestJet
         Bison="#724e3a",
         Eagle="#e3c622",
+        AL1=DarkPurple,
+        AL2=DarkGreen,
+        AL3=DarkOrange,
+        AL4=DarkBlue,
     )
     return commons.get(carrier, DarkPurple)

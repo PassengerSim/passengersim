@@ -1,5 +1,6 @@
 #
 # Several LP approaches to RM optimization
+# - Uses Google OR-Tools (open source optimizer)
 #
 # Alan W
 # (c) PassengerSim LLC, January 2026
@@ -126,7 +127,7 @@ class LpBase(ABC):
 class DLP(LpBase):
     """Deterministic LP, can be used to get displacement for UDP
     Can also set bid-prices as a demo of why deterministic LP isn't used
-    for this purpose in any real RM system :-)"""
+    for this purpose in any real RM system as the answer will suck :-)"""
 
     __slots__ = ("carrier", "solver", "objective", "lp_vars", "constraints", "cabin_code")
 
@@ -227,6 +228,7 @@ class LpPiecewiseSolver(LpBase):
         "epsilon",
         "num_pieces",
         "max_std_dev",
+        "set_bp",
         "debug",
     )
 
@@ -235,6 +237,7 @@ class LpPiecewiseSolver(LpBase):
         self.carrier = carrier
         self.num_pieces = 25
         self.max_std_dev = 2.5
+        self.set_bp = False
         self.debug = _debug
 
     def initialize(self, eng: SimulationEngine):
@@ -298,6 +301,7 @@ class LpPiecewiseSolver(LpBase):
             self.constraints[leg.flt_no] = ct
 
     def update(self, eng: SimulationEngine):
+        """I didn't have a simple way to just update the LP, so we recreate it from scratch"""
         self.initialize(eng)
 
     def solve(self, sim: SimulationEngine, debug=False):
@@ -312,7 +316,8 @@ class LpPiecewiseSolver(LpBase):
                 # enforce that here because the solver can sometimes return tiny
                 # negative values due to numerical imprecision.
                 leg.displacement = max(self.constraints[leg.flt_no].dual_value(), 0)
-                leg.bid_price = leg.displacement
+                if self.set_bp:
+                    leg.bid_price = leg.displacement
                 if debug:
                     print(f"Leg: {leg}, bp={leg.displacement}")
 
@@ -333,12 +338,14 @@ class StochasticSampleSolver(LpBase):
         "lp_vars",
         "constraints",
         "num_samples",
+        "set_bp",
         "debug",
     )
 
     def __init__(self, carrier: str, num_samples=5, debug=False):
         self.carrier = carrier
         self.num_samples = num_samples
+        self.set_bp = True
         self.debug = debug
 
     def initialize(self, sim: SimulationEngine):
@@ -433,7 +440,8 @@ class StochasticSampleSolver(LpBase):
             for leg in sim.legs.set_filters(carrier=self.carrier):
                 dual = self.constraints[leg.flt_no].dual_value()
                 leg.displacement = max(dual, 0)
-                leg.bid_price = leg.displacement
+                if self.set_bp:
+                    leg.bid_price = leg.displacement
                 print(f"Dual for {leg} = {round(dual, 2)}")
             for k, var in self.lp_vars.items():
                 if k[0] != "x":
@@ -444,6 +452,7 @@ class StochasticSampleSolver(LpBase):
 class LpPiecewise2(LpBase):
     """
     Piecewise Linear Program from Talluri & Van Ryzin (3.8).
+    Formulation and code by Rithvik
 
     For each product j and each unit of capacity d = 1, ..., M_j, define
     variable z_{j,d} in [0, 1] representing the d-th unit of capacity
@@ -483,6 +492,7 @@ class LpPiecewise2(LpBase):
         "lp_vars",
         "constraints",
         "epsilon",
+        "set_bp",
         "debug",
     )
 
@@ -494,6 +504,7 @@ class LpPiecewise2(LpBase):
     ):
         self.carrier = carrier
         self.epsilon = epsilon
+        self.set_bp = False
         self.debug = _debug
 
     # Build (or rebuild) the LP for the current simulation state
@@ -620,13 +631,15 @@ class LpPiecewise2(LpBase):
                 # Clamp to zero; tiny negatives can arise from numerical noise.
                 dual = max(self.constraints[leg.flt_no].dual_value(), 0.0)
                 leg.displacement = dual
-                leg.bid_price = dual
+                if self.set_bp:
+                    leg.bid_price = dual
                 if debug:
                     print(f"  Leg {leg.flt_no}: displacement={dual:.4f}")
 
 
 # ##########################################################################################
 class SSBLP(LpBase):
-    """Stochastic Sales-Based LP, following [Ratliff 2025]"""
+    """Stochastic Sales-Based LP, following [Ratliff 2025]
+    Currrently a placeholder, with planned implementation in June 2026"""
 
     pass

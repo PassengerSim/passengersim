@@ -1,7 +1,6 @@
 import logging
 import warnings
 from collections import namedtuple
-from math import floor
 
 import altair as alt
 import numpy as np
@@ -14,8 +13,6 @@ from passengersim.driver._constructors import make_core_booking_curve, make_core
 from passengersim.driver._demand_gen import generate_sample_demands
 from passengersim.tracers.welford import SingleWelford, Welford
 from passengersim.utils.string_counting import StringTracker
-
-from .choice_models import _interpolate_series_with_new_index
 
 DemandGenChecks = namedtuple(
     "DemandGenChecks",
@@ -31,6 +28,7 @@ DemandGenChecks = namedtuple(
         "segments",
         "segment_stats",
         "frat_5_estimates",
+        "frat_5_estimates_ap",
     ],
 )
 
@@ -278,20 +276,13 @@ def check_demand_generation(
 
     quantiles = {}
     for tf in range(n_tf):
-        _s = wtp_pct_greater.iloc[tf].rename("pct_wtp").reset_index().set_index("pct_wtp")
-        _s = _s[~_s.index.duplicated(keep="last")]
-        try:
-            quantiles[tf] = _interpolate_series_with_new_index(
-                _s["price_point"], pd.Index([5, 10, 12.5, 25, 37.5, 50, 75, 90, 99.9], name="pct_wtp")
-            )
-        except ValueError:
-            print("FAIL")
-            return _s
+        quantiles[tf] = pd.Series(
+            np.quantile(wtp_vectors[tf], [0.05, 0.10, 0.125, 0.25, 0.375, 0.50, 0.75, 0.90, 0.99]),
+            index=["q05", "q10", "q12", "q25", "q37", "q50", "q75", "q90", "q99"],
+        )
 
     quantiles_df = pd.concat(quantiles, axis=1, names=["tf"])
-    quantiles_df.index = [f"q{floor(i):02d}" for i in quantiles_df.index]
     quantiles_df.index.name = "quantile"
-    # quantiles_df.fillna(upper_bound, inplace=True)
 
     wtp_summary = pd.concat([wtp_summary, quantiles_df.T], axis=1)
     wtp_summary = wtp_summary.eval("frat5_99 = q50 / q99")
@@ -316,6 +307,17 @@ def check_demand_generation(
         columns=["booking_class", "price"], index="tf"
     )
 
+    np.searchsorted(cfg.dcps[::-1], 0, side="right")
+    unavailable_tfs = {
+        f.booking_class: int(np.searchsorted(cfg.dcps[::-1], f.advance_purchase, side="right")) for f in cfg.fares
+    }
+
+    # create a copy of frat_5_estimates where places closed by AP are removed
+    frat_5_estimates_ap = frat_5_estimates.copy()
+    for bc, nan_tfs in unavailable_tfs.items():
+        if nan_tfs:
+            frat_5_estimates_ap.loc[frat_5_estimates_ap.index[-nan_tfs:], bc] = np.nan
+
     # put segments in order of mean WTP, highest first
     segments = segment_stats.index.tolist()
 
@@ -331,6 +333,7 @@ def check_demand_generation(
         segments,
         segment_stats,
         frat_5_estimates,
+        frat_5_estimates_ap,
     )
 
     if raw_data:
@@ -360,14 +363,24 @@ def _viz_frat5(raw_data: DemandGenChecks, height: int, width: int) -> alt.LayerC
     alt.LayerChart
         Layered Altair chart (lines + points + hover rule).
     """
-    df = (
+    df_base = (
         pd.DataFrame.from_dict(raw_data.frat_5_estimates)
         .rename_axis(columns=["booking_class", "price"], index="tf")
         .T.stack()
         .rename("frat5value")
-        .reset_index()
-        .eval("tf = tf + 1")
     )
+    df_ap = (
+        pd.DataFrame.from_dict(raw_data.frat_5_estimates_ap)
+        .rename_axis(columns=["booking_class", "price"], index="tf")
+        .T.stack()
+        .rename("frat5value_ap")
+    )
+    df_base = pd.concat([df_base, df_ap], axis=1)
+    df = df_base.reset_index().eval("tf = tf + 1")
+    df["frat5_off"] = df["frat5value"]
+    _off = ~(df.groupby("booking_class")["frat5value_ap"].shift(-1).isnull())
+    df.loc[_off, "frat5_off"] = np.nan
+
     df["label"] = df.booking_class + df["price"].map(lambda x: f" (${x:,.0f})")
 
     nearest = alt.selection_point(nearest=True, on="pointerover", fields=["tf"], empty=False)
@@ -382,12 +395,21 @@ def _viz_frat5(raw_data: DemandGenChecks, height: int, width: int) -> alt.LayerC
 
     _frat5lines = _frat5chart.mark_line().encode(
         x=alt.X("tf:O", title="Timeframe", axis=alt.Axis(labelAngle=0)),
-        y=alt.Y("frat5value", title="Frat5 Value", scale=alt.Scale(zero=False)),
+        y=alt.Y("frat5value_ap", title="Frat5 Value", scale=alt.Scale(zero=False)),
+        color=alt.Color("label:N", title="Booking Class"),
+    )
+
+    _frat5offlines = _frat5chart.mark_line(strokeDash=[2, 4], strokeWidth=1).encode(
+        x=alt.X("tf:O", title="Timeframe", axis=alt.Axis(labelAngle=0)),
+        y=alt.Y("frat5_off", title="Frat5 Value", scale=alt.Scale(zero=False)),
         color=alt.Color("label:N", title="Booking Class"),
     )
 
     # Draw points on the line, and highlight based on selection
-    _frat5points = _frat5lines.mark_point().encode(opacity=when_near.then(alt.value(1)).otherwise(alt.value(0)))
+    _frat5points = _frat5lines.mark_point().encode(
+        opacity=when_near.then(alt.value(1)).otherwise(alt.value(0)),
+        y=alt.Y("frat5value", title="Frat5 Value", scale=alt.Scale(zero=False)),
+    )
 
     _frat5rules = (
         alt.Chart(df)
@@ -402,7 +424,7 @@ def _viz_frat5(raw_data: DemandGenChecks, height: int, width: int) -> alt.LayerC
         .add_params(nearest)
     )
 
-    return alt.layer(_frat5lines, _frat5points, _frat5rules)
+    return alt.layer(_frat5lines, _frat5offlines, _frat5points, _frat5rules)
 
 
 def _viz_segment_stats(raw_data: DemandGenChecks, height: int, width: int) -> alt.LayerChart:

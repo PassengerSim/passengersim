@@ -358,6 +358,7 @@ def check_time_windows(
     carrier: str | None = None,
     segment: str | None = None,
     n_draws: int = 100_000,
+    raw_df: bool = False,
 ) -> alt.ConcatChart:
     """Generate a dashboard of checks for the decision windows of a demand.
 
@@ -388,6 +389,8 @@ def check_time_windows(
     else:
         dmd = obj
     df = generate_time_windows(dmd, n=n_draws)
+    if raw_df:
+        return df
 
     start_end_times = _check_edge_times(df, side="start").properties(height=125, width=200) | _check_edge_times(
         df, side="end"

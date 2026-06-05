@@ -8,7 +8,11 @@ from .named import Named
 
 class Frat5Curve(Named, extra="forbid"):
     """
-    FRAT5 = Fare Ratio at which 50% of customers will buy up to the higher fare.
+    Fare Ratio at which 50% of customers will buy up to a higher fare.
+
+    This is expressed as a curve, because the ratio generally changes over
+    the booking horizon, because the mixture of customer types changes as the
+    departure date approaches.
     """
 
     enforce_monotonic: bool = True
@@ -32,26 +36,26 @@ class Frat5Curve(Named, extra="forbid"):
 
     Example
     -------
-    ```{yaml}
-    - name: curve_C
-      curve:
-        63: 1.4
-        56: 1.4
-        49: 1.5
-        42: 1.5
-        35: 1.6
-        31: 1.7
-        28: 1.8
-        24: 1.9
-        21: 2.3
-        17: 2.7
-        14: 3.2
-        10: 3.3
-        7: 3.4
-        5: 3.4
-        3: 3.5
-        1: 3.5
-    ```
+    .. code-block:: yaml
+
+        - name: curve_C
+          curve:
+            63: 1.4
+            56: 1.4
+            49: 1.5
+            42: 1.5
+            35: 1.6
+            31: 1.7
+            28: 1.8
+            24: 1.9
+            21: 2.3
+            17: 2.7
+            14: 3.2
+            10: 3.3
+            7: 3.4
+            5: 3.4
+            3: 3.5
+            1: 3.5
     """
 
     max_cap: float = 10.0

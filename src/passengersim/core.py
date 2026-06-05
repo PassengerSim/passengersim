@@ -1,3 +1,10 @@
+"""Low-level interface to the PassengerSim C++ simulation engine.
+
+Re-exports the key classes and objects from the compiled
+``passengersim_core`` extension module so they are accessible under
+the ``passengersim.core`` namespace.
+"""
+
 import warnings
 
 try:

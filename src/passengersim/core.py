@@ -23,10 +23,12 @@ except ImportError:
     Event = None
     Fare = None
     Forecast = None
+    ForecastAccessor = None
     ForecastData = None
     ForecastGroup = None
     Frat5 = None
     Generator = None
+    History = None
     Leg = None
     LicenseError = None
     Market = None
@@ -52,6 +54,7 @@ else:
         Event,
         Fare,
         Forecast,
+        ForecastAccessor,
         ForecastData,
         ForecastGroup,
         Frat5,
@@ -83,6 +86,7 @@ __all__ = [
     "Event",
     "Fare",
     "Forecast",
+    "ForecastAccessor",
     "ForecastData",
     "ForecastGroup",
     "Frat5",

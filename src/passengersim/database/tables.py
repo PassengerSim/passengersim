@@ -234,7 +234,7 @@ def create_table_leg_detail(cnx: Database, primary_key: bool = False) -> None:
         local_sold	    	INT,
         local_revenue       FLOAT,
         q_demand            FLOAT,
-        untruncated_demand  FLOAT,
+        detruncated_demand  FLOAT,
         forecast_mean       FLOAT,
         bid_price           FLOAT,
         displacement        FLOAT
@@ -267,7 +267,7 @@ def create_table_leg_bucket_detail(cnx: Database, primary_key: bool = False):
         auth    		INT,
         revenue    		FLOAT,
         sold			INT,
-        untruncated_demand     FLOAT,
+        detruncated_demand     FLOAT,
         forecast_mean   FLOAT,
         forecast_stdev  FLOAT,
         forecast_closed_in_tf FLOAT,

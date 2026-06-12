@@ -74,7 +74,7 @@ class StandardLegForecast(RmAction):
         recompute = dcp_index == 0
 
         for leg in sim.eng.legs.set_filters(carrier=self.carrier):
-            leg.compute_forecasts(dcp_index, self.algorithm, None, recompute=recompute)
+            leg.forecast.compute_forecasts(dcp_index, self.algorithm, None, recompute=recompute)
 
 
 class StandardPathForecast(RmAction):
@@ -144,7 +144,7 @@ class StandardPathForecast(RmAction):
         recompute = dcp_index == 0
 
         for pth in sim.eng.paths.set_filters(carrier=self.carrier):
-            pth.compute_forecasts(dcp_index, self.algorithm, None, recompute=recompute)
+            pth.forecast.compute_forecasts(dcp_index, self.algorithm, None, recompute=recompute)
 
 
 class PathForecastDailyDecay(RmAction):
@@ -172,22 +172,22 @@ class PathForecastDailyDecay(RmAction):
             return
 
         engine = sim.eng
-        dcp_index = self.get_dcp_index(days_prior, allow_between=True)
-        # When does this timeframe end?
-        current_ts = engine.last_event_time
-        departure_ts = engine.base_time
-        end_tf_ts = departure_ts
-        tf_remaining_days = -1
-        if (dcp_index + 1) <= engine.num_dcps:
-            tf_remaining_days = days_prior - engine.get_days_prior(dcp_index + 1)
-            end_tf_ts = current_ts + tf_remaining_days * 86400
-        tf_remaining_days_at_begin = days_prior - engine.get_days_prior(dcp_index)
-        begin_tf_ts = current_ts + tf_remaining_days_at_begin * 86400
-        if tf_remaining_days < 0:
-            raise RuntimeError("tf_remaining_days is negative")
+        # dcp_index = self.get_dcp_index(days_prior, allow_between=True)
+        # # When does this timeframe end?
+        # current_ts = engine.last_event_time
+        # departure_ts = engine.base_time
+        # end_tf_ts = departure_ts
+        # tf_remaining_days = -1
+        # if (dcp_index + 1) <= engine.num_dcps:
+        #     tf_remaining_days = days_prior - engine.get_days_prior(dcp_index + 1)
+        #     end_tf_ts = current_ts + tf_remaining_days * 86400
+        # tf_remaining_days_at_begin = days_prior - engine.get_days_prior(dcp_index)
+        # begin_tf_ts = current_ts + tf_remaining_days_at_begin * 86400
+        # if tf_remaining_days < 0:
+        #     raise RuntimeError("tf_remaining_days is negative")
 
         for p in engine.paths.set_filters(carrier=self.carrier):
             # snapshot_instruction = get_snapshot_instruction(engine, path=p, only_type="forecast_adj", debug=debug)
             # snapshot_instruction.mode = "a"
             snapshot_instruction = False  # TODO: implement snapshot instruction properly
-            p.adjust_forecasts(dcp_index, begin_tf_ts, current_ts, end_tf_ts, departure_ts, snapshot_instruction)
+            p.forecast.move_forecast_pointers(days_prior=days_prior, snapshot_instruction=snapshot_instruction)

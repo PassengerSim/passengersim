@@ -29,7 +29,7 @@ def stored_results(retrospect_dir) -> Contrast:
     cfg.simulation_controls.show_progress_bar = False
     cfg.outputs.base_dir = retrospect_dir / "outputs1"
     summary1 = Simulation(cfg).run()
-    summary1.to_file(retrospect.joinpath("untruncated.pxsim"))
+    summary1.to_file(retrospect.joinpath("detruncated.pxsim"))
 
     cfg = Config.from_yaml(demo_network("3MKT/05-emsrb"))
     cfg.carriers.AL1.rm_system = "E_NoDetruncation"
@@ -45,7 +45,7 @@ def stored_results(retrospect_dir) -> Contrast:
     summary2.to_file(retrospect.joinpath("simple.pxsim"))
 
     simple = from_file(retrospect.joinpath("simple.pxsim"))
-    untrunc = from_file(retrospect.joinpath("untruncated.pxsim"))
+    untrunc = from_file(retrospect.joinpath("detruncated.pxsim"))
 
     comps = Contrast(Simple=simple, Untruncated=untrunc)
     return comps

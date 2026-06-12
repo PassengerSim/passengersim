@@ -24,7 +24,7 @@ def conditional_q_forecast(
     max_cap: float = 10,
     partial_tf_weight_adjustment: bool = False,
 ) -> None:
-    path.untruncate_demand(dcp_index, "em", which_data="yieldable")
+    path.detruncate_demand(dcp_index, "em", which_data="yieldable")
     path.compute_simple_fare_adjustments(algorithm=None, frat5=f5)
     path.compute_conditional_q_forecast(
         frat5=f5,

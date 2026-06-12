@@ -40,7 +40,7 @@ class U(RmSys):
     This RM system consists of the following actions executed in order:
 
     1. **EM Untruncation of Path Demands**
-        This step applies the EM algorithm to untruncate observed path
+        This step applies the EM algorithm to detruncate observed path
         sales into inferred true demand levels.  It runs only once at the
         beginning of each sample day, and detruncates demand for all timeframes.
 

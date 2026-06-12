@@ -155,13 +155,13 @@ class ConditionalPathForecast(RmAction):
             snapshot_instruction = None
             # snapshot_instruction = get_snapshot_instruction(sim, path=thing, only_type="forecast", debug=debug)
             if dcp_index == 0:
-                thing.compute_simple_fare_adjustments(
+                thing.forecast.compute_simple_fare_adjustments(
                     algorithm=self.fare_adjustment,
                     frat5=f5,
                     scale_factor=self.fare_adjustment_scale,
                     snapshot_instruction=snapshot_instruction,
                 )
-                thing.compute_conditional_q_forecast(
+                thing.forecast.compute_conditional_q_forecast(
                     f5,
                     0,
                     regression_weight=self.regression_weight,
@@ -172,7 +172,9 @@ class ConditionalPathForecast(RmAction):
 
                 # The forecast has now been created in the q_forecast of the thing.
                 # Now we allocate the Q demand to the pathclasses/buckets.
-                thing.allocate_q_demand(f5, 0, snapshot_instruction, allocation_algorithm=self.q_allocation_algorithm)
+                thing.forecast.allocate_q_demand(
+                    f5, 0, snapshot_instruction, allocation_algorithm=self.q_allocation_algorithm
+                )
 
                 # compute the yieldable forecasts (if needed).  This must be done before computing the
                 # fare adjustments if "weighted_by_ratio" is True, as in that case the fare adjustment is weighted by
@@ -180,7 +182,7 @@ class ConditionalPathForecast(RmAction):
                 # not critical to compute the yieldable forecasts before the fare adjustments, but it does not
                 # adversely affect the results to do so.
                 # TODO: check if actually needed?  This may do a lot of compute to get to zero if not needed
-                thing.compute_forecasts(
+                thing.forecast.compute_forecasts(
                     dcp_index,
                     self.algorithm,
                     snapshot_instruction=snapshot_instruction,
@@ -193,7 +195,7 @@ class ConditionalPathForecast(RmAction):
                 # This does two things: zero out forecasted Q demand in classes that have a negative
                 # adjusted price, and weight the fare adjustment by the ratio of priceable and yieldable demand
                 if self.fare_adjustment is not None:
-                    thing.compute_fare_adjustments(
+                    thing.forecast.compute_fare_adjustments(
                         self.fare_adjustment,
                         f5,
                         snapshot_instruction=snapshot_instruction,
@@ -201,16 +203,15 @@ class ConditionalPathForecast(RmAction):
                         scale_factor=self.fare_adjustment_scale,
                     )
 
-                thing.combine_forecasts(
+                thing.forecast.combine_forecasts(
                     dcp_index,
                     rollup_algorithm=self.variance_rollup_algorithm,
                     snapshot_instruction=snapshot_instruction,
                 )
-                thing.update_forecasts(dcp_index, snapshot_instruction=snapshot_instruction)
+                thing.forecast.move_forecast_pointers(dcp_index, snapshot_instruction=snapshot_instruction)
             else:
                 # just update cached forecast values
-                thing.update_forecasts(dcp_index, snapshot_instruction=snapshot_instruction)
-            thing.last_fcst_ts = sim.eng.last_event_time  # This is used for forecast adjustment
+                thing.forecast.move_forecast_pointers(dcp_index, snapshot_instruction=snapshot_instruction)
 
 
 class ConditionalLegForecast(ConditionalPathForecast):
@@ -218,13 +219,9 @@ class ConditionalLegForecast(ConditionalPathForecast):
     Conditional leg-level demand forecasting tool.
     """
 
-    requires: set[str] = set(
-        "leg_demand",
-    )
+    requires: set[str] = set("leg_demand")
 
-    produces: set[str] = set(
-        "leg_forecast",
-    )
+    produces: set[str] = set("leg_forecast")
 
     def _apply_on_objects(self, sim: Simulation):
         return sim.eng.legs.set_filters(carrier=self.carrier)

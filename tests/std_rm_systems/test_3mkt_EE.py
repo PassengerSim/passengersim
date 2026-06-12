@@ -135,7 +135,7 @@ def test_db_leg_bucket_detail(config: pax.Config, summary: pax.SimulationTables)
         "auth",
         "revenue",
         "sold",
-        "untruncated_demand",
+        "detruncated_demand",
         "forecast_mean",
         "forecast_stdev",
         "forecast_closed_in_tf",

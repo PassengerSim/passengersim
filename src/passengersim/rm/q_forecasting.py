@@ -195,13 +195,13 @@ class QPathForecast(RmAction):
             if dcp_index == 0:
                 # simple fare adjustments are safe to request even if self.fare_adjustment is None
                 # in which case the code will just make sure there are no adjustments
-                thing.compute_simple_fare_adjustments(
+                thing.forecast.compute_simple_fare_adjustments(
                     algorithm=self.fare_adjustment,
                     frat5=f5,
                     scale_factor=self.fare_adjustment_scale,
                     snapshot_instruction=snapshot_instruction,
                 )
-                thing.compute_hybrid_forecasts(
+                thing.forecast.compute_hybrid_forecasts(
                     dcp_index=0,
                     algorithm=self.algorithm,
                     frat5=f5,
@@ -218,12 +218,12 @@ class QPathForecast(RmAction):
 
                 # The forecast has now been created in the q_forecast of the thing.
                 # Now we allocate the Q demand to the pathclasses/buckets.
-                thing.allocate_q_demand(
+                thing.forecast.allocate_q_demand(
                     f5, dcp_index, snapshot_instruction, allocation_algorithm=self.q_allocation_algorithm
                 )
 
                 if self.fare_adjustment is not None:
-                    thing.compute_fare_adjustments(
+                    thing.forecast.compute_fare_adjustments(
                         self.fare_adjustment,
                         f5,
                         snapshot_instruction=snapshot_instruction,
@@ -231,17 +231,15 @@ class QPathForecast(RmAction):
                         scale_factor=self.fare_adjustment_scale,
                     )
 
-                thing.combine_forecasts(
+                thing.forecast.combine_forecasts(
                     dcp_index,
                     rollup_algorithm=self.variance_rollup_algorithm,
                     snapshot_instruction=snapshot_instruction,
                 )
-                thing.update_forecasts(dcp_index, snapshot_instruction=snapshot_instruction)
+                thing.forecast.move_forecast_pointers(dcp_index, snapshot_instruction=snapshot_instruction)
             else:
                 # just update cached forecast values
-                thing.update_forecasts(dcp_index, snapshot_instruction=snapshot_instruction)
-
-            thing.last_fcst_ts = sim.eng.last_event_time  # This is used for forecast adjustment
+                thing.forecast.move_forecast_pointers(dcp_index, snapshot_instruction=snapshot_instruction)
 
 
 class QLegForecast(QPathForecast):

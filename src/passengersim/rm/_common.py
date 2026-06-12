@@ -126,6 +126,17 @@ class RmAction(ABC):
         """
         raise NotImplementedError
 
+    def init(self, sim: Simulation):  # noqa: B027
+        """Initialize the action for the given simulation.
+
+        This is a hook called once at the beginning of the simulation, after the
+        entire network and all core data structures have been set up but before any
+        simulation samples have been run. It can be used to perform any necessary
+        setup before the first call to `run`. By default, this does nothing, but
+        subclasses can override it if needed.
+        """
+        pass
+
     @classmethod
     def configure(cls, fixed: dict[str, Any] | None = None, **kwargs) -> RmActionFactory:
         """Create an RmActionFactory for this action with the given configuration.

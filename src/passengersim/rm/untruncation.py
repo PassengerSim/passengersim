@@ -13,7 +13,7 @@ class LegUntruncation(RmAction):
     """
     Leg-level demand untruncation action.
 
-    This action will untruncate demand on legs using the specified algorithm.
+    This action will detruncate demand on legs using the specified algorithm.
     It is called only once at the beginning of each sample.
     """
 
@@ -136,7 +136,7 @@ class LegUntruncation(RmAction):
                 #     sim, leg=leg, only_type="leg_untruncation", debug=_debug
                 # )
                 snapshot_instruction = None
-                leg.untruncate_demand(
+                leg.forecast.detruncate_demand(
                     dcp_index,
                     self.algorithm,
                     snapshot_instruction,
@@ -278,7 +278,7 @@ class PathUntruncation(RmAction):
                 #     sim, leg=leg, only_type="leg_untruncation", debug=_debug
                 # )
                 snapshot_instruction = None
-                pth.untruncate_demand(
+                pth.forecast.detruncate_demand(
                     dcp_index,
                     self.algorithm,
                     snapshot_instruction,

@@ -118,7 +118,7 @@ class BookedLoadFactorAdjustment(RmActionCfg):
         departure).
         """
         for leg in sim.eng.legs.set_filters(carrier=self.carrier):
-            leg.clear_forecast_means_adjustment()
+            leg.forecast.clear_forecast_means_adjustment()
 
     def run(self, sim: Simulation, days_prior: int):
         if not self.should_run(sim, days_prior):
@@ -142,10 +142,12 @@ class BookedLoadFactorAdjustment(RmActionCfg):
             if curve := self.action_cfg.get(leg_blf_curve):
                 leg_booked = leg.sold / leg.capacity
                 if leg_booked > curve.upper_bound[days_prior]:
-                    leg.adjust_forecast_means(self.hot_multiplier, current_time, self.min_days_between_actions)
+                    leg.forecast.adjust_forecast_means(self.hot_multiplier, current_time, self.min_days_between_actions)
                     num_hot += 1
                 if leg_booked < curve.lower_bound[days_prior]:
-                    leg.adjust_forecast_means(self.cold_multiplier, current_time, self.min_days_between_actions)
+                    leg.forecast.adjust_forecast_means(
+                        self.cold_multiplier, current_time, self.min_days_between_actions
+                    )
                     num_cold += 1
             tot_legs += 1
 

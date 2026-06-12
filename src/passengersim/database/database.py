@@ -471,7 +471,7 @@ def save_leg_bucket_multi(cnx: Database, sim: SimulationEngine, leg, dcp, commit
         if cnx_type not in leg_bucket_sql:
             sql = leg_bucket_sql[cnx_type] = f"""INSERT INTO leg_bucket_detail
                 (scenario, iteration, trial, sample, days_prior, leg_id,
-                bucket_number, name, auth, revenue, sold, untruncated_demand,
+                bucket_number, name, auth, revenue, sold, detruncated_demand,
                 forecast_mean) VALUES ({sql_placeholders(cnx, 13)})"""
         else:
             sql = leg_bucket_sql.get(cnx_type)
@@ -489,7 +489,7 @@ def save_leg_bucket_multi(cnx: Database, sim: SimulationEngine, leg, dcp, commit
                 bkt.alloc,
                 bkt.revenue,
                 bkt.sold,
-                bkt.untruncated_demand,
+                bkt.detruncated_demand,
                 bkt.fcst_mean,
             )
             data_list.append(data)

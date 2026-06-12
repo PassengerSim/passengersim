@@ -191,8 +191,12 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
         self._fare_restriction_mapping = StringTracker(start_from=1, case_sensitive=False)
         """Mapping of fare restriction names to restriction numbers."""
 
-        self._forecasts: dict[str, dict] = {}
-        """A collection of forecasts, by carrier."""
+        self._rm_data: dict[tuple[str, str], Any] = {}
+        """A collection of RM data, by carrier and data type.
+
+        This can contain forecasts, optimizers, and/or other data or cached objects that can
+        be shared across RM actions for a given carrier.  The key is a tuple of (carrier_name, data_type).
+        """
 
         self._initialize(config)
         if not config.db:
@@ -321,6 +325,11 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
         self._init_fares(config)
         logger.info("Connecting markets")
         self.eng.connect_markets()
+
+        # For each carrier, cycle through all `RmAction`s in its `RmSys` and call the `init` for each.
+        for carrier in self.eng.carriers:
+            for action in carrier.rm_sys.action_queue:
+                action.init(self)
 
     @property
     def db_writer(self):
@@ -1884,10 +1893,26 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
                 raw[k] = v
         choicemodel.set_parameters(raw)
 
-    def forecasts(self, carrier: str, kind: str) -> dict:
-        """Access forecasts from the simulation.
+    def rm_data(self, carrier: str, kind: str, set_value: Any = None) -> Any:
+        """Access RM data (forecasts, optimizers, etc.) from the simulation.
 
-        If the forecasts for the requested carrier and kind do not exist, an
+        If the requested data for the carrier and kind do not exist, an
         empty dictionary is returned.
+
+        Parameters
+        ----------
+        carrier, kind : str
+            The carrier name and data type.
+        set_value : Any, optional
+            If provided, this value will be set for the carrier and kind
+            instead of retrieving the existing value.
+
+        Returns
+        -------
+        Any
+            The existing value for this carrier and data type, or an empty dict.
         """
-        return self._forecasts.setdefault(carrier, {}).setdefault(kind, {})
+        if set_value is not None:
+            self._rm_data[(carrier, kind)] = set_value
+            return None
+        return self._rm_data.setdefault((carrier, kind), {})

@@ -163,7 +163,6 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
         self.todd_curves = {}
         self.debug = False
         self.update_frequency = None
-        self.random_generator = passengersim.core.Generator(42)
         self.sample_done_callback = lambda n, n_total: None
         self.choice_set_file = None
         self.choice_set_obs = 0
@@ -243,6 +242,18 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
             The core simulation engine instance.
         """
         return self.eng
+
+    @property
+    def random_generator(self) -> passengersim.core.Generator:
+        """
+        Access to the random generator for the simulation.
+
+        Returns
+        -------
+        passengersim.core.Generator
+            The random generator instance used for stochastic processes in the simulation.
+        """
+        return self.eng.random_generator
 
     @property
     def base_time(self) -> int:
@@ -354,7 +365,6 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
         logger.info("Initializing simulation engine parameters")
         self.eng = passengersim.core.SimulationEngine(name=config.scenario)
         self.eng.config = config
-        self.eng.random_generator = self.random_generator
         self.eng.snapshot_filters = config.snapshot_filters
         for pname, pvalue in config.simulation_controls:
             if pname == "demand_multiplier":
@@ -467,6 +477,7 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
                 todd_name,
                 k_factor=todd.k_factor,
                 dwm_tod=[todd.probabilities.get(j) for j in range(24)],
+                random_generator=self.random_generator,
             )
             self.todd_curves[todd_name] = dwm
 
@@ -748,8 +759,7 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
         logger.info("Initializing booking curves")
         self.curves = {}
         for curve_name, curve_config in config.booking_curves.items():
-            bc = passengersim.core.BookingCurve(curve_name)
-            bc.random_generator = self.random_generator
+            bc = passengersim.core.BookingCurve(curve_name, random_generator=self.random_generator)
             # ensure that the curve is sorted in descending order by days prior
             sorted_days_prior = reversed(sorted(curve_config.curve.keys()))
             for days_prior in sorted_days_prior:
@@ -1668,7 +1678,7 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
         """
         logger.debug("reseeding random_generator: %s", seed)
         try:
-            self.eng.random_generator.seed(seed)
+            self.eng.reseed(seed)
         except Exception as e:
             logger.error("Failed to reseed random_generator: %s", e)
             raise RuntimeError(f"Failed to reseed random_generator with seed {seed}") from e

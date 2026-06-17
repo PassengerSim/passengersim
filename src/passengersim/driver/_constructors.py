@@ -290,8 +290,7 @@ def make_core_booking_curve(
     curve_config: BookingCurveConfig,
     prng: core.Generator,
 ) -> core.BookingCurve:
-    bc = core.BookingCurve(curve_config.name)
-    bc.random_generator = prng
+    bc = core.BookingCurve(curve_config.name, random_generator=prng)
     # ensure that the curve is sorted in descending order by days prior
     sorted_days_prior = reversed(sorted(curve_config.curve.keys()))
     for days_prior in sorted_days_prior:

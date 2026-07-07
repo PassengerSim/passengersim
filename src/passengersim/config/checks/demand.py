@@ -1,6 +1,6 @@
 import logging
 import warnings
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 
 import altair as alt
 import numpy as np
@@ -884,3 +884,107 @@ def check_reference_price_scaling(
         raise ValueError(f"Ratio in in range {ratio.min()} to {ratio.max()}")
     logging.getLogger("passengersim.config.checks").info("Reference price scaling ratio is consistent: %f", ratio.min())
     return df
+
+
+def check_demands_without_fares(cfg: Config, *, clean: bool = False, inplace: bool = True) -> Config:
+    """Check for demands without fares from the config.
+
+    Parameters
+    ----------
+    cfg : Config
+    clean : bool, default False
+        If True, remove demands without fares from the config. If False, raise an error if demands
+        without fares are found.
+    inplace : bool, default True
+        If True and `clean` is also True, modify the input config in place. If False, return a
+        modified copy of the config.  This has no effect if `clean` is False, since no modifications
+        are made to the config in that case.
+
+    Returns
+    -------
+    Config
+         The input config, potentially modified to remove demands without fares if `clean` is True.
+
+    Raises
+    ------
+    ValueError
+        If demands without fares are found, and `clean` is False.
+    """
+
+    if not inplace:
+        cfg = cfg.model_copy(deep=True)
+
+    fares_by_market = defaultdict(list)
+    for fare in cfg.fares:
+        fares_by_market[f"{fare.orig}~{fare.dest}"].append(fare)
+
+    demands_with_fare = []
+    demands_without_fare = []
+    for dmd in cfg.demands:
+        if dmd.market_identifier in fares_by_market:
+            demands_with_fare.append(dmd.market_identifier)
+        else:
+            demands_without_fare.append(dmd.market_identifier)
+
+    if clean:
+        if len(demands_without_fare):
+            warnings.warn(f"Demands without fares: {len(demands_without_fare)}", stacklevel=2)
+        cfg.demands = [m for m in cfg.demands if m.market_identifier in demands_with_fare]
+    else:
+        if len(demands_without_fare):
+            raise ValueError(
+                f"found {len(demands_without_fare)} demands without fares, including {demands_without_fare[:3]}"
+            )
+    return cfg
+
+
+def check_demands_without_paths(cfg: Config, *, clean: bool = False, inplace: bool = True) -> Config:
+    """Check for demands without paths from the config.
+
+    Parameters
+    ----------
+    cfg : Config
+    clean : bool, default False
+        If True, remove demands without paths from the config. If False, raise an error if demands
+        without paths are found.
+    inplace : bool, default True
+        If True and `clean` is also True, modify the input config in place. If False, return a
+        modified copy of the config.  This has no effect if `clean` is False, since no modifications
+        are made to the config in that case.
+
+    Returns
+    -------
+    Config
+         The input config, potentially modified to remove demands without paths if `clean` is True.
+
+    Raises
+    ------
+    ValueError
+        If demands without paths are found, and `clean` is False.
+    """
+
+    if not inplace:
+        cfg = cfg.model_copy(deep=True)
+
+    paths_by_market = defaultdict(list)
+    for path in cfg.paths:
+        paths_by_market[f"{path.orig}~{path.dest}"].append(path)
+
+    demands_with_path = []
+    demands_without_path = []
+    for dmd in cfg.demands:
+        if dmd.market_identifier in paths_by_market:
+            demands_with_path.append(dmd.market_identifier)
+        else:
+            demands_without_path.append(dmd.market_identifier)
+
+    if clean:
+        if len(demands_without_path):
+            warnings.warn(f"Demands without paths: {len(demands_without_path)}", stacklevel=2)
+        cfg.demands = [m for m in cfg.demands if m.market_identifier in demands_with_path]
+    else:
+        if len(demands_without_path):
+            raise ValueError(
+                f"found {len(demands_without_path)} demands without paths, including {demands_without_path[:3]}"
+            )
+    return cfg

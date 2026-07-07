@@ -2,7 +2,11 @@ import pytest
 
 from passengersim import Simulation, demo_network
 from passengersim.config import Config
+from passengersim.rm import RmSys, register_rm_system
+from passengersim.rm.emsr import ExpectedMarginalSeatRevenue
 from passengersim.rm.specialty_systems.fcfs import FirstComeFirstServed  # noqa: F401
+from passengersim.rm.standard_forecasting import StandardLegForecast, StandardPathForecast
+from passengersim.rm.untruncation import LegDetruncation, PathDetruncation
 from passengersim.summaries import SimulationTables
 
 DEFAULT_TOLERANCE = dict(rtol=2e-02, atol=1e-06)
@@ -125,3 +129,50 @@ def test_rm_sys_variant():
     assert isinstance(sim.carriers_dict["AL1"].rm_sys.action_queue[2], QPathForecast)
     assert sim.carriers_dict["AL1"].rm_sys.action_queue[2].fare_adjustment == "ki"
     assert sim.carriers_dict["AL1"].rm_sys.action_queue[2].fare_adjustment_scale == 0.212
+
+
+def test_mismatched_steps():
+
+    @register_rm_system
+    class Bad1(RmSys):
+        availability_control = "bp"
+        actions = [
+            LegDetruncation,
+            StandardLegForecast,
+            ExpectedMarginalSeatRevenue,
+        ]
+
+    cfg = Config.from_yaml(demo_network("3MKT/DEMO"))
+
+    cfg.carriers.AL1.rm_system = "Bad1"
+    cfg = Config.model_validate(cfg)
+    with pytest.raises(ValueError, match="requires bid_prices for availability control 'bp'"):
+        _ = Simulation(cfg)
+
+    @register_rm_system
+    class Bad2(RmSys):
+        availability_control = "bp"
+        actions = [
+            LegDetruncation,
+            StandardPathForecast,
+            ExpectedMarginalSeatRevenue,
+        ]
+
+    cfg.carriers.AL1.rm_system = "Bad2"
+    cfg = Config.model_validate(cfg)
+    with pytest.raises(ValueError, match="Bad2 action ExpectedMarginalSeatRevenue requires 'leg_forecast'"):
+        _ = Simulation(cfg)
+
+    @register_rm_system
+    class Bad3(RmSys):
+        availability_control = "bp"
+        actions = [
+            PathDetruncation,
+            StandardPathForecast,
+            ExpectedMarginalSeatRevenue,
+        ]
+
+    cfg.carriers.AL1.rm_system = "Bad3"
+    cfg = Config.model_validate(cfg)
+    with pytest.raises(ValueError, match="action ExpectedMarginalSeatRevenue requires 'leg_forecast'"):
+        _ = Simulation(cfg)

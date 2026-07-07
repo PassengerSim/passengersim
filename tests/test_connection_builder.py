@@ -3,6 +3,7 @@ from pytest import raises
 
 from passengersim import Simulation, demo_network
 from passengersim.config import Config
+from passengersim.connection_builder.prebuild import prebuild_connections
 
 DEFAULT_TOLERANCE = dict(rtol=2e-02, atol=1e-06)
 
@@ -63,3 +64,14 @@ def test_extreme_mct(cfg):
     # no connections are possible with a 24 hour MCT, but
     # every leg is a non-stop path, so there are still 8 paths
     assert len(sim.paths) == 8
+
+
+def test_repeated_pathbuilding(cfg):
+    # No paths exist yet
+    assert len(cfg.paths) == 0
+    # Build the paths once
+    cfg = prebuild_connections(cfg, inplace=False)
+    assert len(cfg.paths) == 12
+    # Call for building them again, should not create additional paths
+    cfg = prebuild_connections(cfg, inplace=False)
+    assert len(cfg.paths) == 12

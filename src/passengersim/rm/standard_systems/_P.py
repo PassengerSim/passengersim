@@ -1,7 +1,7 @@
 from passengersim.rm.probp import ProbabilisticBidPrice
 from passengersim.rm.standard_forecasting import PathForecastDailyDecay, StandardPathForecast
 from passengersim.rm.systems import RmSys, RmSysOption, register_rm_system
-from passengersim.rm.untruncation import PathUntruncation
+from passengersim.rm.untruncation import PathDetruncation
 from passengersim.snapshot.filtering import NetworkSnapshotFilter
 
 
@@ -63,7 +63,7 @@ class P(RmSys):
     """This RM system uses bid price availability controls."""
 
     actions = [
-        PathUntruncation,
+        PathDetruncation,
         StandardPathForecast.configure(
             algorithm=RmSysOption("forecast_algorithm", default="additive_pickup"),
         ),

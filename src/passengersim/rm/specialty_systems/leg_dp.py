@@ -6,7 +6,7 @@ from passengersim.rm.leg_value import LegValue
 from passengersim.rm.q_forecasting import QLegForecast
 from passengersim.rm.standard_forecasting import StandardLegForecast
 from passengersim.rm.systems import RmSys, RmSysOption, register_rm_system
-from passengersim.rm.untruncation import LegUntruncation
+from passengersim.rm.untruncation import LegDetruncation
 
 
 @register_rm_system
@@ -17,7 +17,7 @@ class LegDP(RmSys):
     """This RM system uses bid price availability controls."""
 
     actions = [
-        LegUntruncation.configure(
+        LegDetruncation.configure(
             initialization_method=RmSysOption("em_initialization_method", default="default"),
         ),
         StandardLegForecast.configure(
@@ -39,7 +39,7 @@ class CLegDP(RmSys):
     """This RM system uses bid price availability controls."""
 
     actions = [
-        LegUntruncation.configure(
+        LegDetruncation.configure(
             initialization_method=RmSysOption("em_initialization_method", default="default"),
             fixed=dict(which_data="yieldable"),
         ),
@@ -81,11 +81,11 @@ class QLegDP(RmSys):
                 "fare_inversion_minimum_pct_separation", expected_type=float, default=0.05
             ),
         ),
-        LegUntruncation.configure(
+        LegDetruncation.configure(
             algorithm=RmSysOption("yieldable_detruncation", expected_type=Literal["em", "none"], default="em"),
             fixed=dict(which_data="yieldable"),
         ),
-        LegUntruncation.configure(
+        LegDetruncation.configure(
             algorithm=RmSysOption("priceable_detruncation", expected_type=Literal["em", "none"], default="em"),
             fixed=dict(which_data="priceable"),
         ),

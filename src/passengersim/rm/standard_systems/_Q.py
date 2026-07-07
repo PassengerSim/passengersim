@@ -7,7 +7,7 @@ from passengersim.rm.probp import ProbabilisticBidPrice
 from passengersim.rm.q_forecasting import QLegForecast, QPathForecast
 from passengersim.rm.standard_forecasting import PathForecastDailyDecay
 from passengersim.rm.systems import RmSys, RmSysOption, register_rm_system
-from passengersim.rm.untruncation import LegUntruncation, PathUntruncation
+from passengersim.rm.untruncation import LegDetruncation, PathDetruncation
 from passengersim.snapshot.filtering import LegSnapshotFilter
 
 
@@ -129,10 +129,10 @@ class Q(RmSys):
     availability_control = "bp"
 
     actions = [
-        PathUntruncation.configure(
+        PathDetruncation.configure(
             fixed=dict(which_data="yieldable"),
         ),
-        PathUntruncation.configure(
+        PathDetruncation.configure(
             algorithm=RmSysOption("priceable_detruncation", expected_type=Literal["em", "none"], default="em"),
             fixed=dict(which_data="priceable"),
         ),
@@ -270,10 +270,10 @@ class Qu(RmSys):
     availability_control = "bp"
 
     actions = [
-        PathUntruncation.configure(
+        PathDetruncation.configure(
             fixed=dict(which_data="yieldable"),
         ),
-        PathUntruncation.configure(
+        PathDetruncation.configure(
             algorithm=RmSysOption("priceable_detruncation", expected_type=Literal["em", "none"], default="em"),
             fixed=dict(which_data="priceable"),
         ),
@@ -401,10 +401,10 @@ class Qe(RmSys):
     availability_control = "leg"
 
     actions = [
-        LegUntruncation.configure(
+        LegDetruncation.configure(
             fixed=dict(which_data="yieldable"),
         ),
-        LegUntruncation.configure(
+        LegDetruncation.configure(
             algorithm=RmSysOption("priceable_detruncation", expected_type=Literal["em", "none"], default="em"),
             fixed=dict(which_data="priceable"),
         ),

@@ -14,7 +14,11 @@ class StandardLegForecast(RmAction):
     Standard leg-level demand forecasting tool.
     """
 
-    requires: set[str] = {"leg_demand"}
+    requires: set[str] = {}
+    # Note: older versions of PassengerSim were set up so that a leg forecast *required*
+    # running detruncation to produce "demand" from "sales", even if the detruncation
+    # algorithm was "none".  This is no longer the case, as the leg forecast can be run
+    # directly on sales data, so having "demand" is not required.
     produces: set[str] = {"leg_forecast"}
     frequency = "dcp"
 
@@ -82,7 +86,11 @@ class StandardPathForecast(RmAction):
     Standard path-level demand forecasting tool.
     """
 
-    requires: set[str] = {"path_demand"}
+    requires: set[str] = {}
+    # Note: older versions of PassengerSim were set up so that a leg forecast *required*
+    # running detruncation to produce "demand" from "sales", even if the detruncation
+    # algorithm was "none".  This is no longer the case, as the leg forecast can be run
+    # directly on sales data, so having "demand" is not required.
     produces: set[str] = {"path_forecast"}
     frequency = "dcp"
 

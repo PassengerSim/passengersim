@@ -4,7 +4,7 @@ from passengersim.rm.conditional_forecasting import ConditionalPathForecast
 from passengersim.rm.probp import ProbabilisticBidPrice
 from passengersim.rm.standard_forecasting import PathForecastDailyDecay
 from passengersim.rm.systems import RmSys, RmSysOption, register_rm_system
-from passengersim.rm.untruncation import PathUntruncation
+from passengersim.rm.untruncation import PathDetruncation
 
 
 @register_rm_system
@@ -119,7 +119,7 @@ class M(RmSys):
     availability_control = "bp"
 
     actions = [
-        PathUntruncation.configure(
+        PathDetruncation.configure(
             fixed=dict(which_data="yieldable"),
         ),
         ConditionalPathForecast.configure(

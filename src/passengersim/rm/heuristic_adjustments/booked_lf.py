@@ -41,6 +41,7 @@ class BookedLoadFactorCurves(Named, extra="forbid"):
 
 
 class BookedLoadFactorAdjustment(RmActionCfg):
+    requires: set[str] = {"leg_forecast"}
     frequency: Literal["dcp", "daily", "daily_pre_dep", "non_dcp", "begin_sample", "end_sample", "weekly"] = "daily"
 
     cfg_name: str = "booked_load_factor_curves"

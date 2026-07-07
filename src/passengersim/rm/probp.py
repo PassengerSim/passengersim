@@ -19,6 +19,7 @@ class ProbabilisticBidPrice(RmAction):
     """
 
     requires: set[str] = {"path_forecast"}
+    produces: set[str] = {"bid_prices"}
     frequency = "daily_pre_dep"
     snapshot_filter_type = NetworkSnapshotFilter
 

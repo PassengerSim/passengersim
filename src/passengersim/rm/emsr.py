@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Collection
 from typing import TYPE_CHECKING, Literal
 
 from passengersim_core import EMSR
 
-from passengersim.config.snapshot_filter import SnapshotFilter
-from passengersim.snapshot import get_snapshot_instruction
+from passengersim.snapshot.filtering import LegSnapshotFilter
 
 from ._common import RmAction
 
@@ -40,7 +38,9 @@ class ExpectedMarginalSeatRevenue(RmAction):
     """
 
     requires: set[str] = {"leg_forecast"}
+    produces: set[str] = {"bucket_allocations"}
     frequency = "dcp"
+    snapshot_filter_type = LegSnapshotFilter
 
     OPT = EMSR()  # singleton EMSR optimizer
 
@@ -51,13 +51,14 @@ class ExpectedMarginalSeatRevenue(RmAction):
         carrier: str = "",
         cabins: str | list[str] | None = None,
         minimum_sample: int = 10,
-        snapshots: Collection[SnapshotFilter | dict] = (),
+        snapshot_filters: LegSnapshotFilter | list[LegSnapshotFilter] | None = None,
         cfg: Config | None = None,
     ):
         super().__init__(
             carrier=carrier,
             minimum_sample=minimum_sample,
             cfg=cfg,
+            snapshot_filters=snapshot_filters,
         )
 
         self.variant = variant
@@ -71,31 +72,17 @@ class ExpectedMarginalSeatRevenue(RmAction):
 
         If not provided, this tool will optimize on the leg as a whole."""
 
-        self.snapshots = []
-        """Optional list of snapshots to grap when running this action."""
-
-        # populate snapshots
-        for i in snapshots:
-            if not isinstance(i, SnapshotFilter):
-                i = SnapshotFilter(**i)
-            self.snapshots.append(i)
-
     def run(self, sim: Simulation, days_prior: int):
         if not self.should_run(sim, days_prior):
             return
 
         for leg in sim.eng.legs.set_filters(carrier=self.carrier):
-            snap_instruct = False
-            if self.snapshots:
-                snap_instruct = get_snapshot_instruction(
-                    sim.eng,
-                    filters=self.snapshots,
-                )
+            snapshot_instruction = self.apply_snapshot_filters(sim, days_prior, leg)
             if self.variant == "a":
                 raise NotImplementedError("EMSR-A variant is not implemented.")
             elif self.variant == "b":
                 if self.cabins is None:
-                    leg.emsrb(debug=snap_instruct)
+                    leg.emsrb(debug=snapshot_instruction)
                 else:
                     for cabin in leg.cabins:
                         if cabin.name in self.cabins:

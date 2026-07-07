@@ -3,7 +3,7 @@ from typing import Literal
 from passengersim.rm.conditional_forecasting import ConditionalLegForecast
 from passengersim.rm.emsr import ExpectedMarginalSeatRevenue
 from passengersim.rm.systems import RmSys, RmSysOption, register_rm_system
-from passengersim.rm.untruncation import LegUntruncation
+from passengersim.rm.untruncation import LegDetruncation
 
 
 @register_rm_system
@@ -108,7 +108,7 @@ class L(RmSys):
     """This RM system uses leg-level class allocation availability controls."""
 
     actions = [
-        LegUntruncation.configure(
+        LegDetruncation.configure(
             fixed=dict(which_data="yieldable"),
         ),
         ConditionalLegForecast.configure(

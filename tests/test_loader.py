@@ -101,6 +101,7 @@ def test_carriers_have_classes():
       AL2:
         rm_system: E
         frat5: flat_curve
+        cabin_ordering: [F, C, Y]
         classes:
           - F
           - C
@@ -147,10 +148,11 @@ def test_carriers_std_frat5():
       AL2:
         rm_system: M
         frat5: flat_curve
+        cabin_ordering: [F, C, Y]
         classes:
-          - F
-          - C
-          - Y
+          - F0
+          - C1
+          - Y2
     classes: # global classes assigned to AL1 because it has none of its own
       - Y0
       - Y1
@@ -178,17 +180,18 @@ def test_format_tags():
     carriers:
       AL1:
         rm_system: E
+        cabin_ordering: ["{letter}", Y]
       AL2:
         rm_system: E
         classes:
-          - "F{year}"
-          - "{letter}zz"
-          - "{artist}"
+          - ["F{year}", "Y"]
+          - ["{letter}zz", "Y"]
+          - ["{artist}", Y]
     """
     content = yaml.safe_load(io.StringIO(demo))
     loaded = Config.model_validate(content)
     assert loaded.carriers["AL1"].classes == ["Z0", "Z1", "Z2"]
-    assert loaded.carriers["AL2"].classes == ["F1999", "Zzz", "Prince"]
+    assert loaded.carriers["AL2"].classes == [("F1999", "Y"), ("Zzz", "Y"), ("Prince", "Y")]
 
 
 def test_carriers_rm_name_typo():

@@ -14,7 +14,11 @@ class ConditionalPathForecast(RmAction):
     Conditional path-level demand forecasting tool.
     """
 
-    requires: set[str] = {"path_demand"}
+    requires: set[str] = {}
+    # Note: older versions of PassengerSim were set up so that a forecast *required*
+    # running detruncation to produce "demand" from "sales", even if the detruncation
+    # algorithm was "none".  This is no longer the case, as the forecast can be run
+    # directly on sales data, so having "demand" is not required.
     produces: set[str] = {"path_forecast"}
     frequency = "dcp"
 
@@ -219,9 +223,7 @@ class ConditionalLegForecast(ConditionalPathForecast):
     Conditional leg-level demand forecasting tool.
     """
 
-    requires: set[str] = set("leg_demand")
-
-    produces: set[str] = set("leg_forecast")
+    produces: set[str] = {"leg_forecast"}
 
     def _apply_on_objects(self, sim: Simulation):
         return sim.eng.legs.set_filters(carrier=self.carrier)

@@ -218,7 +218,11 @@ def check_choice_models(
     df = pd.concat(choices, axis=1).rename_axis(columns="lowest_avail_class", index="chosen_class")
 
     cm = dmd.choice_model
-    wtp = _random_max_wtp(dmd.reference_price, n_draws=n_draws, raw=True, emult=dmd.emult or cm.emult)
+    dmd_ref_price = dmd.reference_price
+    reference_price_multiplier = cm.get_parameters().get("reference_price_multiplier")
+    if reference_price_multiplier is not None:
+        dmd_ref_price = dmd_ref_price * reference_price_multiplier
+    wtp = _random_max_wtp(dmd_ref_price, n_draws=n_draws, raw=True, emult=dmd.emult or cm.emult)
 
     lower_bound = 0
     upper_bound = far[0].price * 1.2

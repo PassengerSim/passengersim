@@ -5,7 +5,7 @@ from passengersim.experiments import Experiments
 from passengersim.rm.emsr import ExpectedMarginalSeatRevenue
 from passengersim.rm.standard_forecasting import StandardLegForecast
 from passengersim.rm.systems import RmSys, RmSysOption, check_registered_rm_system, register_rm_system
-from passengersim.rm.untruncation import LegUntruncation
+from passengersim.rm.untruncation import LegDetruncation
 
 
 @fixture
@@ -76,7 +76,7 @@ def test_rm_system_broken_default(tiny_cfg):
         _name = "BAD_E_1"
         availability_control = "leg"
         actions = [
-            LegUntruncation,
+            LegDetruncation,
             StandardLegForecast,
             ExpectedMarginalSeatRevenue.configure(
                 variant=RmSysOption("emsr_variant", default="BAD_VARIANT"),

@@ -437,8 +437,23 @@ class MultiSimulation(BaseSimulation, CallbackMixin):
         max_processes: int | None = None,
         fail_fast: bool = True,
         rich_progress: Progress | None = None,
+        cache_dir: pathlib.Path | None = None,
     ):
         summarizer = check_summarizer(summarizer)
+
+        if cache_dir is not None:
+            from ._cache_run import cache_run
+
+            return cache_run(
+                self,
+                cache_dir=cache_dir,
+                summarizer=summarizer,
+                output_dir=output_dir,
+                max_processes=max_processes,
+                fail_fast=fail_fast,
+                rich_progress=rich_progress,
+            )
+
         jobber = JobExecutor(max_workers=max_processes)
 
         with jobber:

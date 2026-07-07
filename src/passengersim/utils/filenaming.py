@@ -158,7 +158,7 @@ def filenames_with_timestamp(
 
     while any([fi.exists() for fi in filenames.values()]) and timestamp != "no-timestamp":
         t0, t1 = timestamp.split("-")
-        t1 = str(int(t1) + 1)
+        t1 = f"{int(t1) + 1:06}"
         timestamp = f"{t0}-{t1}"
         filenames = {s: filename.with_suffix(f".{timestamp}" + s) for s in suffix}
 

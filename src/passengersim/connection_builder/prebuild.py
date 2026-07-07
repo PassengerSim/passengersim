@@ -115,8 +115,10 @@ def prebuild_connections(cfg: Config, *, inplace: bool = True, **kwargs) -> Conf
         for p in sim.eng.paths
     ]
 
-    cfg.paths.extend(path_defs)
+    # Replace cfg.paths with the full set from the engine (which already includes
+    # any pre-existing paths that were passed in), rather than extending. This
+    # prevents duplicate paths if prebuild_connections is called more than once.
+    cfg.paths = filterable_list(path_defs)
     cfg.simulation_controls.connection_builder.existing_paths = "required"
-    cfg.paths = filterable_list(cfg.paths)  # ensure paths are filterable
 
     return cfg

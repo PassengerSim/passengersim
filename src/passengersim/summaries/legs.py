@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
@@ -18,12 +18,26 @@ if TYPE_CHECKING:
     from collections.abc import Collection
 
     import altair as alt
+    from ipywidgets import VBox
 
     from passengersim import Simulation
 
 
 def extract_legs(sim: Simulation) -> pd.DataFrame | None:
-    """Extract leg-level summary data from a Simulation."""
+    """Extract leg-level summary data from a simulation.
+
+    Parameters
+    ----------
+    sim : Simulation
+        Simulation instance whose engine contains the leg objects to
+        summarize.
+
+    Returns
+    -------
+    pd.DataFrame or None
+        DataFrame indexed by ``leg_id`` with one row per leg. Returns
+        ``None`` when the simulation has no legs.
+    """
     leg_data = []
     for leg in sim.eng.legs:
         leg_data.append(
@@ -66,7 +80,7 @@ class SimTabLegs(GenericSimulationTables):
     )
 
     @property
-    def leg_defs(self):
+    def leg_defs(self) -> pd.DataFrame:
         """
         A DataFrame containing the definitions of the legs in the simulation.
 
@@ -82,7 +96,7 @@ class SimTabLegs(GenericSimulationTables):
         return self._data["leg_defs"]
 
     @property
-    def legs_(self):
+    def legs_(self) -> pd.DataFrame:
         """
         A DataFrame containing the leg summary data, merged with the leg definitions.
 
@@ -147,7 +161,7 @@ class SimTabLegs(GenericSimulationTables):
         leg_attr: str,
         cat_attr: str,
         by_carrier: bool | str = True,
-        breakpoints: Collection[int] = None,
+        breakpoints: Collection[int] | None = None,
         normalize: bool = False,
         *,
         raw_df: bool = False,
@@ -170,9 +184,10 @@ class SimTabLegs(GenericSimulationTables):
             If True, show the distribution by carrier.  If a string, show the
             distribution for that carrier. If False, show the distribution
             aggregated over all carriers.
-        breakpoints : Collection[int, ...], default (25, 30, 35, 40, ..., 90, 95, 100)
+        breakpoints : Collection of int or None, default None
             The breakpoints for the load factor ranges, which represent the lowest
-            load factor value in each bin. The first and last breakpoints are always
+            load factor value in each bin. If None, defaults to 5-point bins from
+            25 through 95. The first and last breakpoints are always
             bounded to 0 and 101, respectively; these bounds can be included explicitly
             or omitted to be included implicitly. Setting the top value to 101 ensures
             that the highest load factor value (100) is included in the last bin.
@@ -274,7 +289,7 @@ class SimTabLegs(GenericSimulationTables):
     def fig_leg_load_factor_distribution(
         self,
         by_carrier: bool | str = True,
-        breakpoints: Collection[int] = None,
+        breakpoints: Collection[int] | None = None,
         normalize: bool = False,
         *,
         raw_df: bool = False,
@@ -289,9 +304,10 @@ class SimTabLegs(GenericSimulationTables):
             If True, show the distribution by carrier.  If a string, show the
             distribution for that carrier. If False, show the distribution
             aggregated over all carriers.
-        breakpoints : Collection[int, ...], default (25, 30, 35, 40, ..., 90, 95, 100)
+        breakpoints : Collection of int or None, default None
             The breakpoints for the load factor ranges, which represent the lowest
-            load factor value in each bin. The first and last breakpoints are always
+            load factor value in each bin. If None, defaults to 5-point bins from
+            25 through 95. The first and last breakpoints are always
             bounded to 0 and 101, respectively; these bounds can be included explicitly
             or omitted to be included implicitly. Setting the top value to 101 ensures
             that the highest load factor value (100) is included in the last bin.
@@ -329,10 +345,10 @@ class SimTabLegs(GenericSimulationTables):
     def fig_leg_local_share_distribution(
         self,
         by_carrier: bool | str = True,
-        breakpoints: Collection[int] = None,
+        breakpoints: Collection[int] | None = None,
         normalize: bool = False,
         *,
-        raw_df=False,
+        raw_df: bool = False,
         also_df: bool = False,
     ) -> alt.Chart | pd.DataFrame | tuple[alt.Chart, pd.DataFrame]:
         """
@@ -347,9 +363,10 @@ class SimTabLegs(GenericSimulationTables):
             If True, show the distribution by carrier.  If a string, show the
             distribution for that carrier. If False, show the distribution
             aggregated over all carriers.
-        breakpoints : Collection[int, ...], default (0, 10, 20, ..., 90, 100)
+        breakpoints : Collection of int or None, default None
             The breakpoints for the load factor ranges, which represent the lowest
-            load factor value in each bin. The first and last breakpoints are always
+            load factor value in each bin. If None, defaults to 10-point bins from
+            0 through 90. The first and last breakpoints are always
             bounded to 0 and 101, respectively; these bounds can be included explicitly
             or omitted to be included implicitly. Setting the top value to 101 ensures
             that the highest load factor value (100) is included in the last bin.
@@ -392,6 +409,26 @@ class SimTabLegs(GenericSimulationTables):
         place: str | None = None,
         carrier: str | None = None,
     ) -> tuple[pd.DataFrame, alt.Color]:
+        """Filter leg data and derive an appropriate color encoding.
+
+        Parameters
+        ----------
+        orig : str or None, default None
+            Restrict rows to legs whose origin matches this place.
+        dest : str or None, default None
+            Restrict rows to legs whose destination matches this place.
+        place : str or None, default None
+            Restrict rows to legs touching this place as either origin or
+            destination.
+        carrier : str or None, default None
+            Restrict rows to legs operated by this carrier.
+
+        Returns
+        -------
+        tuple[pd.DataFrame, alt.Color]
+            Filtered leg data with a derived ``capacity`` column, along with the
+            Altair color encoding best suited to the remaining cardinality.
+        """
         import altair as alt
 
         df = self.legs.assign(capacity=self.legs.gt_capacity / self.n_total_samples)
@@ -425,7 +462,7 @@ class SimTabLegs(GenericSimulationTables):
         also_df: bool = False,
         facet_columns: int | None = 2,
         select_leg: bool = False,
-    ) -> alt.Chart | pd.DataFrame:
+    ) -> alt.Chart | VBox | pd.DataFrame | tuple[alt.Chart, pd.DataFrame] | tuple[VBox, pd.DataFrame]:
         """
         Figure showing the relationship between leg load factor and local share.
 
@@ -455,7 +492,12 @@ class SimTabLegs(GenericSimulationTables):
 
         Returns
         -------
-        alt.Chart or pd.DataFrame
+        alt.Chart or VBox or pd.DataFrame or tuple
+            Interactive Altair chart by default. If ``raw_df`` is True, returns
+            the filtered DataFrame instead. If ``also_df`` is True, also returns
+            the DataFrame alongside the chart or interactive widget. When
+            ``select_leg`` is True, the primary return value is an ``ipywidgets``
+            ``VBox`` containing the linked interactive views.
         """
         import altair as alt
 
@@ -505,11 +547,33 @@ class SimTabLegs(GenericSimulationTables):
             # table_widget = HTML(value=df.iloc[:0].to_html())
             subchart_widget = alt.JupyterChart(self.fig_select_leg_analysis([]))
 
-            def on_select_point(change):
+            def on_select_point(change: Any) -> None:
+                """Update the linked selection view for point selections.
+
+                Parameters
+                ----------
+                change : Any
+                    Traitlets change record emitted by the chart selection.
+
+                Returns
+                -------
+                None
+                """
                 sel = change.new.value
                 subchart_widget.chart = self.fig_select_leg_analysis(df.index[sel])
 
-            def on_select_brush(change):
+            def on_select_brush(change: Any) -> None:
+                """Update the linked selection view for brush selections.
+
+                Parameters
+                ----------
+                change : Any
+                    Traitlets change record emitted by the chart selection.
+
+                Returns
+                -------
+                None
+                """
                 try:
                     sel = change.new.value
                     if sel is None or "avg_local" not in sel:
@@ -560,14 +624,45 @@ class SimTabLegs(GenericSimulationTables):
         also_df: bool = False,
         facet_columns: int | None = 2,
         beeswarm: int | tuple[int, float] = 0,
-    ):
+    ) -> alt.Chart | pd.DataFrame | tuple[alt.Chart, pd.DataFrame]:
+        """Figure showing leg load factor against leg distance.
+
+        Parameters
+        ----------
+        orig : str or None, default None
+            Filter the data to only include legs with this origin.
+        dest : str or None, default None
+            Filter the data to only include legs with this destination.
+        place : str or None, default None
+            Filter the data to only include legs with this origin or destination.
+        carrier : str or None, default None
+            Filter the data to only include legs operated by this carrier.
+        raw_df : bool, default False
+            If True, return the filtered raw data instead of generating the
+            figure.
+        also_df : bool, default False
+            If True, return the chart together with the plotted DataFrame.
+        facet_columns : int or None, default 2
+            Unused placeholder retained for API compatibility with other figure
+            methods.
+        beeswarm : int or tuple[int, float], default 0
+            Optional beeswarm configuration. A nonzero integer enables beeswarm
+            layout with that hex-bin count and a default aspect ratio of 1.25.
+            A tuple supplies ``(n_hex, aspect_ratio)`` explicitly.
+
+        Returns
+        -------
+        alt.Chart or pd.DataFrame or tuple[alt.Chart, pd.DataFrame]
+            Interactive Altair chart by default, the raw DataFrame when
+            ``raw_df`` is True, or both when ``also_df`` is True.
+        """
         import altair as alt
 
         df, _color = self._leg_filtering(orig=orig, dest=dest, place=place, carrier=carrier)
         if raw_df:
             return df
 
-        df = self.legs.eval(f"capacity = gt_capacity/{self.n_total_samples}").reset_index()
+        df = df.assign(capacity=df.gt_capacity / self.n_total_samples).reset_index()
         tooltips = [
             "leg_id",
             "flt_no",

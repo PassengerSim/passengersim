@@ -1,6 +1,29 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from passengersim.rm.standard_forecasting import StandardLegForecast
-from passengersim.rm.systems import RmSys, register_rm_system
-from passengersim.rm.untruncation import LegUntruncation
+from passengersim.rm.systems import RmAction, RmSys, register_rm_system
+from passengersim.rm.untruncation import LegDetruncation
+
+if TYPE_CHECKING:
+    from passengersim.driver import Simulation
+
+
+class NoProtection(RmAction):
+    """A no-protection RM action.
+
+    This RM action does not do anything, and is used to indicate that the lack of
+    any values set as bucket protection levels is intentional. Otherwise, PassengerSim
+    will flag this as an error.
+    """
+
+    requires: set[str] = {}
+    produces: set[str] = {"bucket_allocations"}
+    frequency = "begin_sample"
+
+    def run(self, sim: Simulation, days_prior: int):
+        pass
 
 
 @register_rm_system
@@ -28,10 +51,11 @@ class FirstComeFirstServed(RmSys):
     """This RM system uses leg-level class allocation availability controls."""
 
     actions = [
-        LegUntruncation,
+        LegDetruncation,
         StandardLegForecast.configure(
             fixed=dict(
                 algorithm="additive_pickup",
             ),
         ),
+        NoProtection,
     ]

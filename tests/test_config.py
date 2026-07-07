@@ -3,7 +3,7 @@ import json
 import pytest
 
 from passengersim import demo_network
-from passengersim.config import Config, DatabaseConfig, manipulate
+from passengersim.config import Carrier, Config, DatabaseConfig, manipulate
 
 
 @pytest.fixture
@@ -181,3 +181,56 @@ def test_ap_restriction_stripping(config):
         assert fare.advance_purchase == 0
     for fare in config.fares:
         assert fare.advance_purchase == 0
+
+
+def test_cabin_codes():
+    # OK
+    _c = Carrier(name="AL1", cabin_ordering=["F", "Y"], rm_system="E", classes=["F0", "F1", "Y2", "Y3", "Y4"])
+
+
+def test_cabin_codes_not_unique():
+    with pytest.raises(ValueError, match="cabin codes must be unique"):
+        Carrier(name="AL1", cabin_ordering=["Y", "Y"], rm_system="E")
+
+
+def test_cabin_codes_too_short():
+    with pytest.raises(ValueError, match="should have at least 1 character"):
+        Carrier(name="AL1", cabin_ordering=["", "Y"], rm_system="E")
+
+
+def test_cabin_codes_too_long():
+    with pytest.raises(ValueError, match="should have at most 1 character"):
+        Carrier(name="AL1", cabin_ordering=["ZZZ", "Y"], rm_system="E")
+
+
+def test_cabin_codes_missing():
+    with pytest.raises(ValueError, match="must have at least one cabin code"):
+        Carrier(name="AL1", cabin_ordering=[], rm_system="E")
+
+
+def test_cabin_codes_not_string():
+    with pytest.raises(ValueError, match="should be a valid string"):
+        Carrier(name="AL1", cabin_ordering=[1, 2, 3], rm_system="E")
+
+
+def test_class_codes_not_unique():
+    with pytest.raises(ValueError, match="class codes must be unique"):
+        _c = Carrier(
+            name="AL1",
+            cabin_ordering=["F", "Y"],
+            rm_system="E",
+            classes=[("F0", "F"), ("F1", "F"), ("F0", "Y"), ("Y3", "Y"), ("Y4", "Y")],
+        )
+
+
+def test_class_codes_missing_cabin():
+    with pytest.raises(ValueError, match="cabin code F not found in cabin ordering"):
+        _c = Carrier(
+            name="AL1",
+            cabin_ordering=["Y"],
+            rm_system="E",
+            classes=[("F0", "F"), ("F1", "F"), ("Y2", "Y"), ("Y3", "Y"), ("Y4", "Y")],
+        )
+
+    with pytest.raises(ValueError, match="class codes must begin with a cabin code character"):
+        _c = Carrier(name="AL1", cabin_ordering=["Y"], rm_system="E", classes=["F0", "F1", "Y2", "Y3", "Y4"])

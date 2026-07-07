@@ -44,10 +44,18 @@ if TYPE_CHECKING:
 
 
 class OverwriteExperimentWarning(UserWarning):
-    """An experiment is being overwritten with another of the same name."""
+    """Warning raised when an experiment is overwritten by another with the same tag."""
 
 
 class Experiment:
+    """A single experiment definition and its associated config-transforming callable.
+
+    Instances are normally created via the :class:`Experiments` factory methods or
+    by decorating a function with an :class:`Experiment` instance.  The instance
+    stores the experiment metadata (title, tag, multiprocess flag), the
+    config-transforming function, and optionally pre-loaded or cached results.
+    """
+
     def __init__(
         self,
         title: str | None,
@@ -55,14 +63,14 @@ class Experiment:
         multiprocess: bool = True,
         *,
         external: GenericSimulationTables | PathLike | None = None,
-    ):
-        """
+    ) -> None:
+        """Initialize an experiment definition.
+
         Parameters
         ----------
-        title : str
-            A short human-friendly title for the experiment.  This title is used in
-            generating an HTML report of the experiment results.  If not provided,
-            the tag is used as the title in reporting.
+        title : str or None
+            Human-friendly title for the experiment. Used in HTML reports. If
+            None, the tag is used as the title.
         tag : str, optional
             A short machine-friendly tag for the experiment. Ideally this tag will not have
             spaces or other special character other than underscores. This tag is used as a key
@@ -96,7 +104,33 @@ class Experiment:
         else:
             self.cached = None
 
-    def __call__(self, func: Callable[[Config], Config] | Config):
+    def __call__(self, func: Callable[[Config], Config] | Config) -> Experiment | Config:
+        """Decorate a config-mutating function or execute the experiment.
+
+        When called for the first time with a callable, this method stores the
+        function and returns ``self`` so the instance can be used as a
+        decorator.  When called again with a :class:`Config`, it runs the
+        stored function against a deep copy of that config and returns the
+        modified config.
+
+        Parameters
+        ----------
+        func : callable or Config
+            The function to decorate, or a base :class:`Config` to run the
+            experiment against.
+
+        Returns
+        -------
+        Experiment or Config
+            ``self`` when decorating a function; the modified config when
+            invoking the experiment.
+
+        Raises
+        ------
+        TypeError
+            If the experiment has already been decorated and the argument is
+            not a :class:`Config`.
+        """
         if self.func is None:
             # decorate a function that takes a config and returns a modified config
             self.func = func
@@ -115,6 +149,15 @@ class Experiment:
 
 
 class Experiments(CallbackMixin):
+    """Manage and run a collection of PassengerSim experiments.
+
+    This class stores a base :class:`Config`, creates per-experiment
+    configurations, orchestrates sequential or parallel execution, and
+    collects the results into a :class:`~passengersim.contrast.Contrast`
+    dictionary.  It also manages output paths, report generation, and
+    optional result caching.
+    """
+
     _report_filename = None
 
     def __init__(
@@ -125,7 +168,33 @@ class Experiments(CallbackMixin):
         pickle: bool | str = False,
         html: bool | str = "passengersim_output",
         hide_from_git: bool = True,
-    ):
+    ) -> None:
+        """Initialize the experiment manager.
+
+        Parameters
+        ----------
+        config : Config
+            Base configuration used to create per-experiment deep copies.
+        output_dir : pathlib.Path or None or False, optional
+            Directory where all experiment outputs are written. If ``None``
+            (default), outputs are placed in tag-named subdirectories of the
+            current directory. If ``False``, output is disabled.
+        pickle : bool or str, default False
+            If truthy, ensure the base config is set up to write pickle output.
+            If ``True``, the default filename stem ``"passengersim_output"``
+            is used.
+        html : bool or str, default "passengersim_output"
+            If truthy, ensure the base config is set up to write HTML output.
+            If ``True``, the default filename stem ``"passengersim_output"``
+            is used.
+        hide_from_git : bool, default True
+            If True and ``output_dir`` is set, write a ``.gitignore`` file
+            that prevents git from tracking generated outputs.
+
+        Returns
+        -------
+        None
+        """
         self.experiments: list[Experiment] = []
         self.base_config = config
         self.output_dir = output_dir
@@ -152,12 +221,41 @@ class Experiments(CallbackMixin):
         # sims are only retained if requested
 
     @property
-    def sims(self):
+    def sims(self) -> dict[str, Simulation | MultiSimulation]:
+        """Retained simulation objects from the most recent run.
+
+        Returns
+        -------
+        dict[str, Simulation or MultiSimulation]
+            Mapping from experiment tag to the simulation instance that
+            produced the corresponding results.
+
+        Raises
+        ------
+        ValueError
+            If ``retain_sims=True`` was not passed to :meth:`run`.
+        """
         if self._sims is None:
             raise ValueError("sims not available; set retain_sims=True in run() to retain them")
         return self._sims
 
-    def _rename_file(self, tag: str, filename: pathlib.Path):
+    def _rename_file(self, tag: str, filename: pathlib.Path | str | None) -> pathlib.Path | None:
+        """Rewrite an output filename so it lives under an experiment-tag subdirectory.
+
+        Parameters
+        ----------
+        tag : str
+            Experiment tag used as the subdirectory name.
+        filename : pathlib.Path or str or None
+            Original output filename to relocate.
+
+        Returns
+        -------
+        pathlib.Path or None
+            The rewritten path rooted under ``tag``. Returns the original
+            value unchanged for non-path types and ``None`` when output is
+            disabled.
+        """
         if not isinstance(filename, str | pathlib.Path):
             return filename
         if self.output_dir is None:
@@ -198,6 +296,30 @@ class Experiments(CallbackMixin):
         *,
         external: GenericSimulationTables | PathLike | None = None,
     ) -> Experiment:
+        """Create a new experiment or register a decorated function as one.
+
+        Can be called directly to create a titled experiment, used as a plain
+        decorator (``@exps``), or used as a parameterised decorator
+        (``@exps("Title")``).  Duplicate tags cause the old experiment to be
+        replaced with a warning.
+
+        Parameters
+        ----------
+        title : str or callable, default "__DEFERRED_INIT__"
+            Human-friendly title for the experiment, or the function to
+            decorate when this method is used directly as a decorator.
+        tag : str, optional
+            Machine-friendly tag. Defaults to the decorated function name.
+        multiprocess : bool, default True
+            If True, allow multi-process execution for this experiment.
+        external : GenericSimulationTables or path-like, optional
+            Existing results to use instead of running the simulation.
+
+        Returns
+        -------
+        Experiment
+            The newly created (or updated) experiment object.
+        """
         if title == "__DEFERRED_INIT__":
             e = Experiment(title, tag, multiprocess, external=external)
         elif not isinstance(title, str):
@@ -227,25 +349,34 @@ class Experiments(CallbackMixin):
         check_content: bool = True,
         source_file: str | None = None,
     ) -> tuple[str, GenericSimulationTables | None]:
-        """
-        Check if the loaded summary matches the config and PassengerSim versions.
+        """Check whether a loaded summary matches the expected config and versions.
 
         Parameters
         ----------
         summary : GenericSimulationTables
+            Loaded summary object to validate.
         config : Config
+            Expected configuration to compare against the summary's stored
+            config.
         tag : str
-        check_versions : bool, optional
-            If True, check the PassengerSim versions in the loaded summary.
-        check_content : bool, optional
-            If True, check the content of the loaded summary.
+            Experiment tag used in diagnostic messages.
+        check_versions : bool, default True
+            If True, verify that the `passengersim` and `passengersim.core`
+            package versions recorded in the summary match the currently
+            installed versions.
+        check_content : bool, default True
+            If True, treat any config differences as a mismatch and return
+            ``None`` for the summary.
+        source_file : str, optional
+            Source path to include in diagnostic messages. If omitted, the
+            method attempts to infer it from the summary metadata or config.
 
         Returns
         -------
-        str
-            A message about the loaded summary
-        GenericSimulationTables
-            The loaded summary if it matches the config, otherwise None
+        tuple[str, GenericSimulationTables or None]
+            A two-element tuple: a human-readable status message and the
+            summary itself if it passes all checks, or ``None`` if it should
+            not be reused.
         """
         if source_file is None:
             try:
@@ -309,7 +440,22 @@ class Experiments(CallbackMixin):
 
         return msg, summary
 
-    def _write_report_after_run(self, write_report, results: Contrast):
+    def _write_report_after_run(self, write_report: PathLike | bool | None, results: Contrast) -> None:
+        """Write the HTML report after all experiments have finished.
+
+        Parameters
+        ----------
+        write_report : path-like or bool or None
+            Destination control flag as originally passed to :meth:`run`. A
+            path-like value is used directly; any other truthy value uses the
+            default filename ``"experiments-summary.html"``.
+        results : Contrast
+            The collected experiment results to include in the report.
+
+        Returns
+        -------
+        None
+        """
         if isinstance(write_report, PathLike):
             write_report = pathlib.Path(write_report)
         else:
@@ -333,52 +479,49 @@ class Experiments(CallbackMixin):
         retain_sims: bool = False,
         write_report: PathLike | bool | None = True,
         cache_results: bool = True,
-    ):
-        """
-        Run the experiments in sequence.
+    ) -> contrast.Contrast | GenericSimulationTables:
+        """Run the selected experiments sequentially in the calling process.
 
         Parameters
         ----------
-        use_existing : Literal[True, False, "ignore", "raise"] or dict
-            This can either be a single value for all experiments, or a dictionary
-            mapping tags to values.  For each value, the behavior is as follows:
-            If True, load from existing output pickle files if they exist,
-            otherwise run the simulation for each experiment.  If False, always
-            run the simulation for each experiment. If "ignore", load results
-            from output pickle or pxsim files if they exist, otherwise skip each
-            experiment.  If "raise", raise an error if the output pickle or pxsim
-            files do not exist for any experiment.
+        use_existing : Literal[True, False, "ignore", "raise"] or dict, default True
+            Single value applied to all experiments, or a mapping from
+            experiment tag to a per-experiment value.
+
+            - ``True`` – load from an existing output file if one is found,
+              otherwise run the simulation.
+            - ``False`` – always run the simulation.
+            - ``"ignore"`` – load from an existing output file if found,
+              otherwise skip the experiment entirely.
+            - ``"raise"`` – raise an error if the output file is missing.
         tag : str, optional
-            If provided, only run the experiment with the given tag.
+            If provided, run only the experiment with this tag and return its
+            result directly rather than a :class:`~passengersim.contrast.Contrast`.
         check_versions : bool, default True
-            If True, check the PassengerSim versions in the loaded summary (if
-            any), and re-run the simulation if they do not match the current
-            environment. If False, do not check the PassengerSim versions.
+            If True, re-run the simulation when a loaded summary was produced
+            by a different PassengerSim version.
         check_content : bool, default True
-            If True, check the content of the loaded summary (if any), and
-            re-run the simulation if the config has changed. If False, do not
-            check the content of the loaded summary.
+            If True, re-run the simulation when a loaded summary's config
+            differs from the current config.
         single_process : bool, default False
-            If True, force all the simulations to run in single process mode. If
-            False, run allow each experiment's simulation to run multi-process,
-            unless that individual experiment is set to run in single process mode.
+            If True, force all experiments to run in single-process mode,
+            overriding each experiment's ``multiprocess`` flag.
         retain_sims : bool, default False
-            If True, retain the simulation objects in the `sims` attribute after
-            running each simulation. This is primarily useful for debugging.
-        write_report : path-like or bool, default True
-            If provided, write a report of the experiments to the given file.
-            This will be relative to the output directory if that is set, and the
-            filename given here is a relative path. If True, the report filename
-            will be "experiments-summary.html". If False, do not write a report.
+            If True, keep simulation objects in :attr:`sims` after completion.
+            Primarily useful for debugging.
+        write_report : path-like or bool or None, default True
+            If truthy, write an HTML report when all experiments finish. Pass
+            a path-like value to specify the destination; ``True`` uses the
+            default filename ``"experiments-summary.html"``.
         cache_results : bool, default True
-            If True, cache the results of each experiment in the `cached` attribute
-            of the corresponding Experiment object.  This allows the results to be
-            reused in future runs of the experiments, without needing to reload from
-            disk.
+            If True, cache each experiment's result on the corresponding
+            :class:`Experiment` object so it can be reused without reloading.
 
         Returns
         -------
-        contrast.Contrast or SimulationTables
+        contrast.Contrast or GenericSimulationTables
+            A :class:`~passengersim.contrast.Contrast` mapping tags to results,
+            or a single result when ``tag`` selects exactly one experiment.
         """
 
         results = contrast.Contrast()
@@ -580,52 +723,50 @@ class Experiments(CallbackMixin):
         write_report: PathLike | bool | None = True,
         cache_results: bool = True,
         summarizer: type | None = None,
-    ):
-        """
-        Run the experiments.
+    ) -> contrast.Contrast | GenericSimulationTables:
+        """Run the selected experiments using the parallel job executor.
+
+        Experiments are dispatched asynchronously to a :class:`~passengersim.mp_executor.JobExecutor`
+        and their futures are awaited before the method returns.
 
         Parameters
         ----------
-        use_existing : Literal[True, False, "ignore", "raise"] or dict
-            This can either be a single value for all experiments, or a dictionary
-            mapping tags to values.  For each value, the behavior is as follows:
-            If True, load from existing output pickle files if they exist,
-            otherwise run the simulation for each experiment.  If False, always
-            run the simulation for each experiment. If "ignore", load results
-            from output pickle or pxsim files if they exist, otherwise skip each
-            experiment.  If "raise", raise an error if the output pickle or pxsim
-            files do not exist for any experiment.
+        use_existing : Literal[True, False, "ignore", "raise"] or dict, default True
+            Single value applied to all experiments, or a mapping from
+            experiment tag to a per-experiment value.
+
+            - ``True`` – load from an existing output file if one is found,
+              otherwise run the simulation.
+            - ``False`` – always run the simulation.
+            - ``"ignore"`` – load from an existing output file if found,
+              otherwise skip the experiment entirely.
+            - ``"raise"`` – raise an error if the output file is missing.
         tag : str, optional
-            If provided, only run the experiment with the given tag.
+            If provided, run only the experiment with this tag and return its
+            result directly rather than a :class:`~passengersim.contrast.Contrast`.
         check_versions : bool, default True
-            If True, check the PassengerSim versions in the loaded summary (if
-            any), and re-run the simulation if they do not match the current
-            environment. If False, do not check the PassengerSim versions.
+            If True, re-run the simulation when a loaded summary was produced
+            by a different PassengerSim version.
         check_content : bool, default True
-            If True, check the content of the loaded summary (if any), and
-            re-run the simulation if the config has changed. If False, do not
-            check the content of the loaded summary.
-        single_process : bool, default False
-            If True, force all the simulations to run in single process mode. If
-            False, run allow each experiment's simulation to run multi-process,
-            unless that individual experiment is set to run in single process mode.
+            If True, re-run the simulation when a loaded summary's config
+            differs from the current config.
         retain_sims : bool, default False
-            If True, retain the simulation objects in the `sims` attribute after
-            running each simulation. This is primarily useful for debugging.
-        write_report : path-like or bool, default True
-            If provided, write a report of the experiments to the given file.
-            This will be relative to the output directory if that is set, and the
-            filename given here is a relative path. If True, the report filename
-            will be "experiments-summary.html". If False, do not write a report.
+            If True, keep simulation objects in :attr:`sims` after completion.
+            Primarily useful for debugging.
+        write_report : path-like or bool or None, default True
+            If truthy, write an HTML report when all experiments finish.
         cache_results : bool, default True
-            If True, cache the results of each experiment in the `cached` attribute
-            of the corresponding Experiment object.  This allows the results to be
-            reused in future runs of the experiments, without needing to reload from
-            disk.
+            If True, cache each experiment's result on the corresponding
+            :class:`Experiment` object.
+        summarizer : type, optional
+            Concrete summarizer class to use when dispatching simulations
+            asynchronously. If None, the default summarizer is used.
 
         Returns
         -------
-        contrast.Contrast or SimulationTables
+        contrast.Contrast or GenericSimulationTables
+            A :class:`~passengersim.contrast.Contrast` mapping tags to results,
+            or a single result when ``tag`` selects exactly one experiment.
         """
         jobber = JobExecutor().start()
         results = contrast.Contrast()
@@ -797,52 +938,53 @@ class Experiments(CallbackMixin):
         retain_sims: bool = False,
         write_report: PathLike | bool | None = True,
         cache_results: bool = True,
-    ):
-        """
-        Run the experiments.
+    ) -> contrast.Contrast | GenericSimulationTables:
+        """Run the experiments, choosing sequential or parallel execution automatically.
+
+        When ``single_process=True`` the experiments are run in sequence via
+        :meth:`_run_experiments_in_sequence`; otherwise they are dispatched to
+        the parallel job executor via :meth:`_run_together`.
 
         Parameters
         ----------
-        use_existing : Literal[True, False, "ignore", "raise"] or dict
-            This can either be a single value for all experiments, or a dictionary
-            mapping tags to values.  For each value, the behavior is as follows:
-            If True, load from existing output pickle files if they exist,
-            otherwise run the simulation for each experiment.  If False, always
-            run the simulation for each experiment. If "ignore", load results
-            from output pickle or pxsim files if they exist, otherwise skip each
-            experiment.  If "raise", raise an error if the output pickle or pxsim
-            files do not exist for any experiment.
+        use_existing : Literal[True, False, "ignore", "raise"] or dict, default True
+            Single value applied to all experiments, or a mapping from
+            experiment tag to a per-experiment value.
+
+            - ``True`` – load from an existing output file if one is found,
+              otherwise run the simulation.
+            - ``False`` – always run the simulation.
+            - ``"ignore"`` – load from an existing output file if found,
+              otherwise skip the experiment entirely.
+            - ``"raise"`` – raise an error if the output file is missing.
         tag : str, optional
-            If provided, only run the experiment with the given tag.
+            If provided, run only the experiment with this tag and return its
+            result directly rather than a :class:`~passengersim.contrast.Contrast`.
         check_versions : bool, default True
-            If True, check the PassengerSim versions in the loaded summary (if
-            any), and re-run the simulation if they do not match the current
-            environment. If False, do not check the PassengerSim versions.
+            If True, re-run the simulation when a loaded summary was produced
+            by a different PassengerSim version.
         check_content : bool, default True
-            If True, check the content of the loaded summary (if any), and
-            re-run the simulation if the config has changed. If False, do not
-            check the content of the loaded summary.
+            If True, re-run the simulation when a loaded summary's config
+            differs from the current config.
         single_process : bool, default False
-            If True, force all the simulations to run in single process mode. If
-            False, run allow each experiment's simulation to run multi-process,
-            unless that individual experiment is set to run in single process mode.
+            If True, force all experiments to run in single-process mode and
+            execute them sequentially.
         retain_sims : bool, default False
-            If True, retain the simulation objects in the `sims` attribute after
-            running each simulation. This is primarily useful for debugging.
-        write_report : path-like or bool, default True
-            If provided, write a report of the experiments to the given file.
-            This will be relative to the output directory if that is set, and the
-            filename given here is a relative path. If True, the report filename
-            will be "experiments-summary.html". If False, do not write a report.
+            If True, keep simulation objects in :attr:`sims` after completion.
+            Primarily useful for debugging.
+        write_report : path-like or bool or None, default True
+            If truthy, write an HTML report when all experiments finish. Pass
+            a path-like value to specify the destination; ``True`` uses the
+            default filename ``"experiments-summary.html"``.
         cache_results : bool, default True
-            If True, cache the results of each experiment in the `cached` attribute
-            of the corresponding Experiment object.  This allows the results to be
-            reused in future runs of the experiments, without needing to reload from
-            disk.
+            If True, cache each experiment's result on the corresponding
+            :class:`Experiment` object so it can be reused without reloading.
 
         Returns
         -------
-        contrast.Contrast or SimulationTables
+        contrast.Contrast or GenericSimulationTables
+            A :class:`~passengersim.contrast.Contrast` mapping tags to results,
+            or a single result when ``tag`` selects exactly one experiment.
         """
         if single_process:
             return self._run_experiments_in_sequence(
@@ -868,27 +1010,42 @@ class Experiments(CallbackMixin):
 
     @property
     def report_filename(self) -> pathlib.Path:
-        """Filename of the written report.
+        """Path of the HTML report written after the most recent run.
 
-        Unless disabled, a report is written to a file after running the experiments.
-        The report filename is stored here for reference.
+        Unless reporting is disabled, a report is written to a file after
+        :meth:`run` completes. The resulting path is stored here.
+
+        Returns
+        -------
+        pathlib.Path
+            The path of the written report file.
 
         Raises
         ------
         ValueError
-            If no report has been written.
+            If no report has been written yet.
         """
         if self._report_filename is None:
             raise ValueError("no report has been written")
         return self._report_filename
 
-    def validate(self):
-        """Validate the experiments.
+    def validate(self) -> None:
+        """Validate all experiment tags and callables against the base config.
 
-        This checks that all the experiments can be initialized with the base config,
-        and that there are no duplicate tags.  This does not check that the modified
-        configs are valid, since some modifications might be mutually incompatible
-        but still be useful for comparison.
+        Checks that every experiment has a unique tag and that its
+        config-transforming callable runs without error when given a deep
+        copy of the base config.  Does not verify that modified configs are
+        mutually compatible.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        ValueError
+            If any experiment is missing a tag, has a duplicate tag, or its
+            callable raises an exception against the base config.
         """
         tags = set()
         for e in self.experiments:

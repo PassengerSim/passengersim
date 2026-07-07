@@ -6,7 +6,7 @@ if TYPE_CHECKING:
     from passengersim import Config
 
 
-def clean_restrictions(cfg: Config) -> Config:
+def clean_restrictions(cfg: Config, *, inplace: bool = False) -> Config:
     """
     Remove unused restrictions from choice models and fares.
 
@@ -26,6 +26,9 @@ def clean_restrictions(cfg: Config) -> Config:
     Config
         The cleaned configuration object with unused restrictions removed.
     """
+    if not inplace:
+        cfg = cfg.model_copy(deep=True)
+
     all_restrictions_in_fares = set()
     for f in cfg.fares:
         for r in f.restrictions:

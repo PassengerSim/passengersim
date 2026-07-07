@@ -256,6 +256,8 @@ def make_core_demand(
         if booking_curve_name in booking_curves:
             curve = booking_curves[booking_curve_name]
             dmd.add_curve(curve)
+    else:
+        raise ValueError(f"No `curve` defined for demand {dmd}")
 
     if todd_curves is not None:
         if dmd_config.todd_curve in todd_curves:

@@ -231,6 +231,7 @@ class UnbucketedDynamicProgram(RmAction):
     """UDP (Unbucketed Dynamic Programming) is a path-based RM optimization algorithm."""
 
     requires: set[str] = {"path_forecast"}
+    produces: set[str] = {"bid_prices"}
     frequency = "daily_pre_dep"
     snapshot_filter_type = LegSnapshotFilter
 

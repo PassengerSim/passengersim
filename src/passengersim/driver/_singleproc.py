@@ -656,6 +656,8 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
                 cp_scale=carrier_config.cp_scale,
                 cp_record=carrier_config.cp_record,
                 cp_elasticity=carrier_config.cp_elasticity,
+                cp_markets=carrier_config.cp_markets,
+                cabin_ordering=carrier_config.cabin_ordering,
             )
             carrier.metadata = {
                 "rm_system": {"name": carrier_config.rm_system, "options": carrier_config.rm_system_options},
@@ -706,6 +708,9 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
             if carrier_config.contextual_optimizer is not None:
                 co = ContextualOptimizer()
                 carrier.contextual_optimizer = co
+
+            if carrier_config.cp_algorithm == "OPT":
+                self.config.simulation_controls.capture_competitor_data = True
 
             self.eng.add_carrier(carrier)
 
@@ -819,6 +824,13 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
                 curve_name = str(dmd_config.curve).strip()
                 curve = self.curves[curve_name]
                 dmd.add_curve(curve)
+            else:
+                # If there is no booking curve name attached, we will check if any booking
+                # curves are defined. It is valid sometimes to have no booking curves if you
+                # are not planning to actually run a simulation.  We will assume that if
+                # curves are defined then they should be used.
+                if self.curves:
+                    raise ValueError(f"Booking curve not defined for demand {dmd}")
             if dmd_config.todd_curve in self.todd_curves:
                 dmd.dwm = self.todd_curves[dmd_config.todd_curve]
             if dmd_config.group_sizes is not None:
@@ -1714,6 +1726,7 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
         single_trial: int | None = None,
         summarizer: type[SimulationTablesT] | SimulationTablesT | None = None,
         rich_progress: Progress | None = None,
+        cache_dir: pathlib.Path | None = None,
     ) -> SimulationTablesT:
         """
         Run the simulation and compute reports.
@@ -1738,6 +1751,11 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
         SimulationTables
         """
         summarizer = check_summarizer(summarizer)
+
+        if cache_dir is not None:
+            from ._cache_run import cache_run
+
+            return cache_run(self, cache_dir=cache_dir, summarizer=summarizer, rich_progress=rich_progress)
 
         start_time = time.time()
         self.setup_scenario()

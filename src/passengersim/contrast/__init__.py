@@ -22,12 +22,42 @@ from passengersim.summaries.demand_to_come import SimTabDemandToCome
 
 
 class Contrast(dict):
+    """A named collection of SimulationTables for side-by-side comparison.
+
+    ``Contrast`` is a :class:`dict` subclass that maps string labels to
+    :class:`~passengersim.summaries.SimulationTables` instances. It provides
+    methods for aggregating, visualizing, and reporting results across multiple
+    PassengerSim simulation runs.
+
+    Module-level functions whose names begin with ``fig_`` are automatically
+    accessible as instance methods, with the first ``summaries`` argument
+    pre-filled with this object.
+    """
+
     def apply(
         self,
         func: Callable,
         axis: int | Literal["index", "columns", "rows"] = 0,
         warn_if_missing: bool = False,
     ) -> pd.DataFrame | pd.Series:
+        """Apply a callable to each non-None entry and concatenate the results.
+
+        Parameters
+        ----------
+        func : callable
+            A function that accepts a :class:`~passengersim.summaries.SimulationTables`
+            instance and returns a pandas Series or DataFrame.
+        axis : int or {'index', 'columns', 'rows'}, default 0
+            The axis along which to concatenate the results. Passed directly to
+            :func:`pandas.concat`.
+        warn_if_missing : bool, default False
+            If True, emit a warning for any key whose value is ``None``.
+
+        Returns
+        -------
+        pd.DataFrame or pd.Series
+            Concatenated results with a ``"source"`` level prepended to the index.
+        """
         data = {}
         for k, v in self.items():
             if v is not None:
@@ -41,6 +71,24 @@ class Contrast(dict):
             return pd.Series(data).rename_axis(index="source")
 
     def __getattr__(self, attr):
+        """Look up module-level ``fig_*`` functions and bind them to this Contrast.
+
+        Parameters
+        ----------
+        attr : str
+            Attribute name to look up.
+
+        Returns
+        -------
+        callable
+            A partial application of the matching module-level figure function
+            with this :class:`Contrast` as the first argument.
+
+        Raises
+        ------
+        AttributeError
+            If ``attr`` is not a module-level ``fig_*`` function.
+        """
         if attr.startswith("fig_"):
             g = globals()
             if attr in g:
@@ -49,16 +97,37 @@ class Contrast(dict):
         raise AttributeError(attr)
 
     def __dir__(self):
+        """Return a sorted list of attributes, including all module-level ``fig_*`` functions.
+
+        Returns
+        -------
+        list of str
+        """
         x = set(super().__dir__())
         x |= {g for g in globals() if g.startswith("fig_")}
         return sorted(x)
 
     def write_report(self, filename: PathLike, **kwargs) -> pathlib.Path:
+        """Write an HTML report summarizing this contrast to a file.
+
+        Parameters
+        ----------
+        filename : path-like
+            Destination path for the HTML report.
+        **kwargs
+            Additional keyword arguments forwarded to
+            :func:`~passengersim.reporting.contrast.to_html`.
+
+        Returns
+        -------
+        pathlib.Path
+            The path of the written report file.
+        """
         from passengersim.reporting.contrast import to_html
 
         return to_html(self, filename, **kwargs)
 
-    def subset(self, keys=None, *, regex: str = None) -> Self:
+    def subset(self, keys=None, *, regex: str | None = None) -> Self:
         """Subset the contrast to only include the specified keys.
 
         Parameters
@@ -94,7 +163,35 @@ class Contrast(dict):
 
 
 class MultiContrast(dict):
+    """A collection of :class:`Contrast` objects for multi-scenario comparison.
+
+    ``MultiContrast`` is a :class:`dict` subclass that maps string labels to
+    :class:`Contrast` instances. Module-level ``fig_*`` functions are
+    automatically accessible as methods; calling them generates one chart per
+    :class:`Contrast` and horizontally concatenates the results into a single
+    side-by-side Altair figure.
+    """
+
     def __getattr__(self, attr):
+        """Look up module-level ``fig_*`` functions and wrap them for multi-contrast display.
+
+        Parameters
+        ----------
+        attr : str
+            Attribute name to look up.
+
+        Returns
+        -------
+        callable
+            A wrapper that calls the figure function on each contained
+            :class:`Contrast`, then horizontally concatenates the results via
+            :meth:`_hconcat`.
+
+        Raises
+        ------
+        AttributeError
+            If ``attr`` is not a module-level ``fig_*`` function.
+        """
         if attr.startswith("fig_"):
             g = globals()
             if attr in g:
@@ -126,12 +223,43 @@ class MultiContrast(dict):
         raise AttributeError(attr)
 
     def __dir__(self):
+        """Return a sorted list of attributes, including all module-level ``fig_*`` functions.
+
+        Returns
+        -------
+        list of str
+        """
         x = set(super().__dir__())
         x |= {g for g in globals() if g.startswith("fig_")}
         return sorted(x)
 
     @staticmethod
     def _hconcat(charts: dict[str, alt.Chart]) -> tuple[alt.HConcatChart, str]:
+        """Horizontally concatenate a dict of Altair charts, prepending keys as sub-titles.
+
+        The global Altair config is stripped from each individual chart and
+        re-applied to the concatenated result. Each chart's title is prefixed
+        with its key so viewers can identify which :class:`Contrast` produced it.
+
+        Parameters
+        ----------
+        charts : dict of str to alt.Chart
+            Mapping from label (e.g., contrast name) to Altair chart. ``None``
+            values trigger a warning and are skipped.
+
+        Returns
+        -------
+        alt.HConcatChart
+            The horizontally concatenated result.
+        str
+            The base title extracted from the last processed chart (before the
+            key prefix was added).
+
+        Raises
+        ------
+        ValueError
+            If ``charts`` is empty or all chart values are ``None``.
+        """
         if not charts:
             raise ValueError("no charts to concatenate")
         queue = []
@@ -152,7 +280,42 @@ class MultiContrast(dict):
         return result, title
 
 
-def _assemble(summaries, base, **kwargs):
+def _assemble(summaries: dict, base: str, **kwargs) -> pd.DataFrame:
+    """Collect and concatenate a named summary table from multiple SimulationTables.
+
+    For each entry in ``summaries`` this function tries (in order):
+
+    1. Call ``fig_{base}(raw_df=True, **kwargs)`` on the summary object.
+    2. Access the ``raw_{base}`` attribute of the summary object.
+    3. Use the value directly if it is already a :class:`pandas.DataFrame` or
+       :class:`pandas.Series`.
+
+    All recovered results are concatenated along axis 0 with a ``"source"``
+    level prepended to the index, which is then reset into a column.
+
+    Parameters
+    ----------
+    summaries : dict of str to SimulationTables
+        Mapping from run label to summary tables.
+    base : str
+        Name suffix identifying the figure or raw-data attribute to retrieve
+        (e.g., ``"carrier_revenues"`` resolves to ``fig_carrier_revenues`` or
+        ``raw_carrier_revenues``).
+    **kwargs
+        Additional keyword arguments forwarded to the figure or raw-data
+        accessor.
+
+    Returns
+    -------
+    pd.DataFrame
+        Concatenated DataFrame with a ``"source"`` column.
+
+    Raises
+    ------
+    Exception
+        Re-raises the last exception encountered if no data is recovered from
+        any of the summaries.
+    """
     summaries_ = {}
     last_exception = RuntimeError("no summaries loaded")
     for k, v in summaries.items():
@@ -204,6 +367,8 @@ def fig_bookings_by_timeframe(
         Whether to differentiate booking class by colors (the default) or give the
         name of a particular booking class as a string to filter the results shown
         in the figure to only that one booking class.
+    by_segment : str, optional
+        If provided, filter the results to only show this passenger segment.
     raw_df : bool, default False
         Set to true to return the raw dataframe used to generate the figure, instead
         of the figure itself.
@@ -213,6 +378,16 @@ def fig_bookings_by_timeframe(
         tooltips, the source labels may make it easier to interpret.
     ratio : str or bool, default False
         Compute ratios against a reference point and display them in tooltips.
+        Pass a source label string to specify the reference, or ``True`` to use
+        the first source as the reference.
+    also_df : bool, default False
+        If True, return a tuple of ``(figure, dataframe)`` instead of just the figure.
+
+    Returns
+    -------
+    alt.Chart or pd.DataFrame or tuple[alt.Chart, pd.DataFrame]
+        The Altair chart, or the raw DataFrame if ``raw_df`` is True, or a
+        ``(chart, dataframe)`` tuple if ``also_df`` is True.
 
     Other Parameters
     ----------------
@@ -408,6 +583,16 @@ def fig_segmentation_by_timeframe(
         tooltips, the source labels may make it easier to interpret.
     ratio : str or bool, default False
         Compute ratios against a reference point and display them in tooltips.
+        Pass a source label string to specify the reference, or ``True`` to use
+        the first source as the reference.
+    also_df : bool, default False
+        If True, return a tuple of ``(figure, dataframe)`` instead of just the figure.
+
+    Returns
+    -------
+    alt.Chart or pd.DataFrame or tuple[alt.Chart, pd.DataFrame]
+        The Altair chart, or the raw DataFrame if ``raw_df`` is True, or a
+        ``(chart, dataframe)`` tuple if ``also_df`` is True.
 
     Other Parameters
     ----------------
@@ -580,6 +765,47 @@ def _fig_carrier_measure(
     ratio_label: bool = True,
     width: int = 500,
 ):
+    """Build a carrier-level bar chart comparing a single metric across sources.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Data containing at least ``source``, ``carrier``, ``rm_system``, and
+        the column named by ``load_measure``.
+    source_order : list of str
+        Ordered list of source labels used to control axis sort order.
+    load_measure : str
+        Name of the DataFrame column to plot on the value axis.
+    measure_name : str
+        Human-readable label for the metric, used as the axis title.
+    measure_format : str, default ".2f"
+        Vega-Lite format string for axis tick labels and text annotations
+        (e.g., ``"$.4s"`` for dollar amounts, ``".2f"`` for plain floats).
+    orient : {'h', 'v'}, default 'h'
+        Chart orientation. ``'h'`` places sources on the y-axis (horizontal
+        bars); ``'v'`` places sources on the x-axis (vertical bars).
+    title : str, optional
+        Chart title. If None, no title is set.
+    ratio : str or bool, default False
+        If truthy, add a ratio tooltip comparing each bar to a reference source.
+        Pass a source-label string to specify the reference explicitly;
+        otherwise the first entry in ``source_order`` is used. Ignored when
+        ``ratio_all`` is True.
+    ratio_all : bool, default False
+        If True, compute and show ratio tooltips vs. every source in
+        ``source_order``, and add interactive radio buttons to select the
+        reference for inline percentage-change labels.
+    ratio_label : bool, default True
+        If True and ``ratio_all`` is True, annotate bars with an inline
+        percentage-change label controlled by the radio-button selection.
+    width : int, default 500
+        Width of each bar panel in pixels.
+
+    Returns
+    -------
+    alt.Chart
+        An Altair faceted bar chart.
+    """
     against = source_order[0]
     if ratio_all:
         queue = []
@@ -707,21 +933,25 @@ def fig_carrier_revenues(
     Parameters
     ----------
     summaries : dict[str, SimulationTables]
+        One or more SimulationTables to compare.
     raw_df : bool, default False
         Return only the raw data used to generate the figure.
     orient : {'h', 'v'}, default 'h'
-    ratio : bool or str, default True
+        Chart orientation; ``'h'`` for horizontal bars, ``'v'`` for vertical.
+    ratio : str or bool, default "all"
         Add tooltip(s) giving the percentage change of each carrier's revenue
-        to the revenue of the same carrier in the other summaries.  Can be
-        the key giving a specific summary to compare against, or 'all' to
-        compare against all other summaries.
+        relative to a reference source. Pass a source-label string to specify
+        the reference, or ``'all'`` to compare against all other sources.
+    width : int, default 500
+        Width of each bar panel in pixels.
     also_df : bool, default False
-        Return the raw data used to generate the figure in addition to the
-        figure itself.
+        If True, return a tuple of ``(figure, dataframe)`` instead of just the figure.
 
     Returns
     -------
     alt.Chart or pd.DataFrame or tuple[alt.Chart, pd.DataFrame]
+        The Altair chart, or the raw DataFrame if ``raw_df`` is True, or a
+        ``(chart, dataframe)`` tuple if ``also_df`` is True.
     """
     df = _assemble(summaries, "carrier_revenues")
     source_order = list(summaries.keys())
@@ -762,17 +992,25 @@ def fig_carrier_yields(
     Parameters
     ----------
     summaries : dict[str, SimulationTables]
+        One or more SimulationTables to compare.
     raw_df : bool, default False
+        Return only the raw data used to generate the figure.
     orient : {'h', 'v'}, default 'h'
-    ratio : bool or str, default True
+        Chart orientation; ``'h'`` for horizontal bars, ``'v'`` for vertical.
+    ratio : str or bool, default "all"
         Add tooltip(s) giving the percentage change of each carrier's yield
-        to the yield of the same carrier in the other summaries.  Can be
-        the key giving a specific summary to compare against, or 'all' to
-        compare against all other summaries.
+        relative to a reference source. Pass a source-label string to specify
+        the reference, or ``'all'`` to compare against all other sources.
+    width : int, default 500
+        Width of each bar panel in pixels.
+    also_df : bool, default False
+        If True, return a tuple of ``(figure, dataframe)`` instead of just the figure.
 
     Returns
     -------
-    alt.Chart or pd.DataFrame
+    alt.Chart or pd.DataFrame or tuple[alt.Chart, pd.DataFrame]
+        The Altair chart, or the raw DataFrame if ``raw_df`` is True, or a
+        ``(chart, dataframe)`` tuple if ``also_df`` is True.
     """
 
     df = _assemble(summaries, "carrier_yields")
@@ -811,20 +1049,31 @@ def fig_carrier_rasm(
     """
     Generate a figure contrasting carrier RASM for one or more runs.
 
+    RASM (Revenue per Available Seat Mile) is computed by the underlying
+    summary tables and pulled via :func:`_assemble`.
+
     Parameters
     ----------
     summaries : dict[str, SimulationTables]
+        One or more SimulationTables to compare.
     raw_df : bool, default False
+        Return only the raw data used to generate the figure.
     orient : {'h', 'v'}, default 'h'
-    ratio : bool or str, default True
-        Add tooltip(s) giving the percentage change of each carrier's yield
-        to the yield of the same carrier in the other summaries.  Can be
-        the key giving a specific summary to compare against, or 'all' to
-        compare against all other summaries.
+        Chart orientation; ``'h'`` for horizontal bars, ``'v'`` for vertical.
+    ratio : str or bool, default "all"
+        Add tooltip(s) giving the percentage change of each carrier's RASM
+        relative to a reference source. Pass a source-label string to specify
+        the reference, or ``'all'`` to compare against all other sources.
+    width : int, default 500
+        Width of each bar panel in pixels.
+    also_df : bool, default False
+        If True, return a tuple of ``(figure, dataframe)`` instead of just the figure.
 
     Returns
     -------
-    alt.Chart or pd.DataFrame
+    alt.Chart or pd.DataFrame or tuple[alt.Chart, pd.DataFrame]
+        The Altair chart, or the raw DataFrame if ``raw_df`` is True, or a
+        ``(chart, dataframe)`` tuple if ``also_df`` is True.
     """
     df = _assemble(summaries, "carrier_rasm")
     source_order = list(summaries.keys())
@@ -866,17 +1115,28 @@ def fig_carrier_local_share(
     Parameters
     ----------
     summaries : dict[str, SimulationTables]
+        One or more SimulationTables to compare.
+    load_measure : {'bookings', 'leg_pax'}, default 'bookings'
+        Whether to measure local share as a percentage of bookings or of
+        leg passengers.
     raw_df : bool, default False
+        Return only the raw data used to generate the figure.
     orient : {'h', 'v'}, default 'h'
-    ratio : bool or str, default True
+        Chart orientation; ``'h'`` for horizontal bars, ``'v'`` for vertical.
+    ratio : str or bool, default "all"
         Add tooltip(s) giving the percentage change of each carrier's local share
-        to the local share of the same carrier in the other summaries.  Can be
-        the key giving a specific summary to compare against, or 'all' to
-        compare against all other summaries.
+        relative to a reference source. Pass a source-label string to specify
+        the reference, or ``'all'`` to compare against all other sources.
+    width : int, default 500
+        Width of each bar panel in pixels.
+    also_df : bool, default False
+        If True, return a tuple of ``(figure, dataframe)`` instead of just the figure.
 
     Returns
     -------
-    alt.Chart or pd.DataFrame
+    alt.Chart or pd.DataFrame or tuple[alt.Chart, pd.DataFrame]
+        The Altair chart, or the raw DataFrame if ``raw_df`` is True, or a
+        ``(chart, dataframe)`` tuple if ``also_df`` is True.
     """
     measure_name = "Local Percent of Bookings" if load_measure == "bookings" else "Local Percent of Leg Passengers"
     m = "local_pct_bookings" if load_measure == "bookings" else "local_pct_leg_pax"
@@ -919,17 +1179,25 @@ def fig_carrier_total_bookings(
     Parameters
     ----------
     summaries : dict[str, SimulationTables]
+        One or more SimulationTables to compare.
     raw_df : bool, default False
+        Return only the raw data used to generate the figure.
     orient : {'h', 'v'}, default 'h'
-    ratio : bool or str, default "all"
+        Chart orientation; ``'h'`` for horizontal bars, ``'v'`` for vertical.
+    ratio : str or bool, default "all"
         Add tooltip(s) giving the percentage change of each carrier's bookings
-        to the bookings of the same carrier in the other summaries.  Can be
-        the key giving a specific summary to compare against, or 'all' to
-        compare against all other summaries.
+        relative to a reference source. Pass a source-label string to specify
+        the reference, or ``'all'`` to compare against all other sources.
+    width : int, default 500
+        Width of each bar panel in pixels.
+    also_df : bool, default False
+        If True, return a tuple of ``(figure, dataframe)`` instead of just the figure.
 
     Returns
     -------
-    alt.Chart or pd.DataFrame
+    alt.Chart or pd.DataFrame or tuple[alt.Chart, pd.DataFrame]
+        The Altair chart, or the raw DataFrame if ``raw_df`` is True, or a
+        ``(chart, dataframe)`` tuple if ``also_df`` is True.
     """
 
     df = _assemble(summaries, "carrier_total_bookings")
@@ -981,21 +1249,31 @@ def fig_carrier_load_factors(
     Parameters
     ----------
     summaries : dict[str, SimulationTables]
+        One or more SimulationTables to compare.
     raw_df : bool, default False
+        Return only the raw data used to generate the figure.
     load_measure : {'sys_lf', 'avg_leg_lf'}, default 'sys_lf'
+        Which load factor metric to display: system load factor (``'sys_lf'``)
+        or average leg load factor (``'avg_leg_lf'``).
     orient : {'h', 'v'}, default 'h'
-    ratio : bool or str, default "all"
+        Chart orientation; ``'h'`` for horizontal bars, ``'v'`` for vertical.
+    ratio : str or bool, default "all"
         Add tooltip(s) giving the percentage change of each carrier's load factor
-        to the load factor of the same carrier in the other summaries.  Can be
-        the key giving a specific summary to compare against, or 'all' to
-        compare against all other summaries.
+        relative to a reference source. Pass a source-label string to specify
+        the reference, or ``'all'`` to compare against all other sources.
+    width : int, default 500
+        Width of each bar panel in pixels.
+    also_df : bool, default False
+        If True, return a tuple of ``(figure, dataframe)`` instead of just the figure.
     title : str, optional
-        Title of the figure. Set to `None` for no title, otherwise a default
-        title is used.
+        Title of the figure. Pass ``None`` for no title; if not provided, a
+        default title is derived from ``load_measure``.
 
     Returns
     -------
-    alt.Chart or pd.DataFrame
+    alt.Chart or pd.DataFrame or tuple[alt.Chart, pd.DataFrame]
+        The Altair chart, or the raw DataFrame if ``raw_df`` is True, or a
+        ``(chart, dataframe)`` tuple if ``also_df`` is True.
     """
     measure_name = {
         "sys_lf": "System Load Factor",
@@ -1029,7 +1307,39 @@ def fig_carrier_load_factors(
 
 
 @report_figure
-def fig_fare_class_mix(summaries, *, raw_df=False, also_df: bool = False, label_threshold: float = 0.06):
+def fig_fare_class_mix(
+    summaries: dict[str, SimulationTables],
+    *,
+    raw_df: bool = False,
+    also_df: bool = False,
+    label_threshold: float = 0.06,
+) -> alt.Chart | pd.DataFrame | tuple[alt.Chart, pd.DataFrame]:
+    """Generate a figure contrasting carrier fare class mix for one or more runs.
+
+    Displays stacked bar charts of average seats sold per booking class for
+    each carrier and source, making it easy to compare how fare class mix
+    shifts across simulation scenarios.
+
+    Parameters
+    ----------
+    summaries : dict[str, SimulationTables]
+        One or more SimulationTables to compare. The keys are used as source
+        labels in the chart.
+    raw_df : bool, default False
+        If True, return the raw DataFrame instead of the chart.
+    also_df : bool, default False
+        If True, return a tuple of ``(figure, dataframe)`` instead of just the figure.
+    label_threshold : float, default 0.06
+        Minimum fraction of the tallest bar that a segment must represent for
+        its inline text label to be shown. Smaller segments are unlabeled to
+        avoid clutter.
+
+    Returns
+    -------
+    alt.Chart or pd.DataFrame or tuple[alt.Chart, pd.DataFrame]
+        The Altair chart, or the raw DataFrame if ``raw_df`` is True, or a
+        ``(chart, dataframe)`` tuple if ``also_df`` is True.
+    """
     df = _assemble(summaries, "fare_class_mix")
     source_order = list(summaries.keys())
     if raw_df:
@@ -1086,8 +1396,43 @@ def fig_fare_class_mix(summaries, *, raw_df=False, also_df: bool = False, label_
 
 @report_figure
 def fig_od_fare_class_mix(
-    summaries, orig: str, dest: str, *, raw_df=False, also_df: bool = False, label_threshold: float = 0.06
-):
+    summaries: dict[str, SimulationTables],
+    orig: str,
+    dest: str,
+    *,
+    raw_df: bool = False,
+    also_df: bool = False,
+    label_threshold: float = 0.06,
+) -> alt.Chart | pd.DataFrame | tuple[alt.Chart, pd.DataFrame]:
+    """Generate a figure contrasting O-D fare class mix for one or more runs.
+
+    Like :func:`fig_fare_class_mix` but restricted to a single origin-destination
+    market. Displays stacked bar charts of average seats sold per booking class
+    for each carrier and source within the specified market.
+
+    Parameters
+    ----------
+    summaries : dict[str, SimulationTables]
+        One or more SimulationTables to compare. The keys are used as source
+        labels in the chart.
+    orig : str
+        Origin airport code for the market of interest.
+    dest : str
+        Destination airport code for the market of interest.
+    raw_df : bool, default False
+        If True, return the raw DataFrame instead of the chart.
+    also_df : bool, default False
+        If True, return a tuple of ``(figure, dataframe)`` instead of just the figure.
+    label_threshold : float, default 0.06
+        Minimum fraction of the tallest bar that a segment must represent for
+        its inline text label to be shown.
+
+    Returns
+    -------
+    alt.Chart or pd.DataFrame or tuple[alt.Chart, pd.DataFrame]
+        The Altair chart, or the raw DataFrame if ``raw_df`` is True, or a
+        ``(chart, dataframe)`` tuple if ``also_df`` is True.
+    """
     df = _assemble(summaries, "od_fare_class_mix", orig=orig, dest=dest)
     source_order = list(summaries.keys())
     if raw_df:
@@ -1143,13 +1488,42 @@ def fig_od_fare_class_mix(
 
 
 def _fig_forecasts(
-    df,
-    facet_on=None,
-    y="forecast_mean",
-    y_title="Avg Demand Forecast",
-    color="booking_class:N",
+    df: pd.DataFrame,
+    facet_on: str | None = None,
+    y: str = "forecast_mean",
+    y_title: str = "Avg Demand Forecast",
+    color: str = "booking_class:N",
     rrd_ntype: Literal["O", "Q"] = "O",
-):
+) -> alt.Chart:
+    """Build a multi-source forecast line chart, optionally faceted.
+
+    Adds a legend-click selection so that clicking a booking class in the
+    legend highlights its lines and dims all others.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Data containing at least ``days_prior``, ``source``, ``booking_class``,
+        and the column named by ``y``.
+    facet_on : str, optional
+        If provided, facet the chart on this column (e.g., ``"flt_no"`` or
+        ``"path_id"``), with up to 3 columns per row.
+    y : str, default "forecast_mean"
+        Name of the DataFrame column to plot on the y-axis.
+    y_title : str, default "Avg Demand Forecast"
+        Y-axis title label.
+    color : str, default "booking_class:N"
+        Vega-Lite field specification for the color encoding channel.
+    rrd_ntype : {'O', 'Q'}, default 'O'
+        Vega-Lite data type for the ``days_prior`` field. Use ``'O'`` for
+        ordinal (discrete timeframes) and ``'Q'`` for quantitative (daily data).
+
+    Returns
+    -------
+    alt.Chart
+        An Altair line chart (or faceted chart if ``facet_on`` is given) with
+        an interactive booking-class selection.
+    """
     import altair as alt
 
     selection = alt.selection_point(name="pick_booking_class", fields=["booking_class"], bind="legend")
@@ -1182,14 +1556,44 @@ def _fig_forecasts(
 
 @report_figure
 def fig_leg_forecasts(
-    summaries,
-    raw_df=False,
-    by_leg_id=None,
+    summaries: dict[str, SimulationTables],
+    raw_df: bool = False,
+    by_leg_id: int | None = None,
     by_class: bool | str = True,
     of: Literal["mu", "sigma"] | list[Literal["mu", "sigma"]] = "mu",
     agg_booking_classes: bool = False,
     also_df: bool = False,
-):
+) -> alt.Chart | pd.DataFrame | tuple[alt.Chart, pd.DataFrame]:
+    """Generate a figure contrasting leg demand forecasts for one or more runs.
+
+    Parameters
+    ----------
+    summaries : dict[str, SimulationTables]
+        One or more SimulationTables to compare.
+    raw_df : bool, default False
+        If True, return the raw DataFrame instead of the chart.
+    by_leg_id : int, optional
+        If provided, show forecasts only for this specific leg ID. If None,
+        the chart is faceted by flight number.
+    by_class : bool or str, default True
+        If True, differentiate booking classes by color. If a string, filter
+        to only that booking class and color by source instead.
+    of : {'mu', 'sigma'} or list thereof, default 'mu'
+        Which forecast statistic to display: ``'mu'`` for mean demand forecast,
+        ``'sigma'`` for standard deviation. Pass a list to display multiple
+        statistics side-by-side.
+    agg_booking_classes : bool, default False
+        If True, aggregate (sum) across all booking classes before plotting,
+        coloring by source rather than booking class.
+    also_df : bool, default False
+        If True, return a tuple of ``(figure, dataframe)`` instead of just the figure.
+
+    Returns
+    -------
+    alt.Chart or pd.DataFrame or tuple[alt.Chart, pd.DataFrame]
+        The Altair chart, or the raw DataFrame if ``raw_df`` is True, or a
+        ``(chart, dataframe)`` tuple if ``also_df`` is True.
+    """
     if isinstance(of, list):
         if raw_df:
             raise NotImplementedError
@@ -1253,15 +1657,52 @@ ForecastOfT = Literal["mu", "sigma", "closed", "adj_price"]
 
 @report_figure
 def fig_path_forecasts(
-    summaries,
-    raw_df=False,
-    by_path_id=None,
+    summaries: dict[str, SimulationTables],
+    raw_df: bool = False,
+    by_path_id: int | None = None,
     path_names: dict | None = None,
     agg_booking_classes: bool = False,
     by_class: bool | str = True,
     of: ForecastOfT | list[ForecastOfT] = "mu",
     also_df: bool = False,
-):
+) -> alt.Chart | pd.DataFrame | tuple[alt.Chart, pd.DataFrame]:
+    """Generate a figure contrasting path demand forecasts for one or more runs.
+
+    Parameters
+    ----------
+    summaries : dict[str, SimulationTables]
+        One or more SimulationTables to compare.
+    raw_df : bool, default False
+        If True, return the raw DataFrame instead of the chart.
+    by_path_id : int, optional
+        If provided, show forecasts only for this specific path ID. If None,
+        the chart is faceted by path ID.
+    path_names : dict, optional
+        Mapping from integer path IDs to display labels. If provided, path IDs
+        in the data are replaced with their corresponding labels before plotting.
+    agg_booking_classes : bool, default False
+        If True, aggregate (sum or mean, depending on ``of``) across all booking
+        classes before plotting, coloring by source rather than booking class.
+    by_class : bool or str, default True
+        If True, differentiate booking classes by color. If a string, filter
+        to only that booking class and color by source instead.
+    of : {'mu', 'sigma', 'closed', 'adj_price'} or list thereof, default 'mu'
+        Which forecast statistic to display. Pass a list to display multiple
+        statistics side-by-side.
+
+        - ``'mu'``: mean demand forecast
+        - ``'sigma'``: standard deviation of demand forecast
+        - ``'closed'``: mean fraction of timeframe the path was closed
+        - ``'adj_price'``: mean adjusted fare
+    also_df : bool, default False
+        If True, return a tuple of ``(figure, dataframe)`` instead of just the figure.
+
+    Returns
+    -------
+    alt.Chart or pd.DataFrame or tuple[alt.Chart, pd.DataFrame]
+        The Altair chart, or the raw DataFrame if ``raw_df`` is True, or a
+        ``(chart, dataframe)`` tuple if ``also_df`` is True.
+    """
     if isinstance(of, list):
         if raw_df:
             df = {
@@ -1373,7 +1814,7 @@ def fig_path_forecasts(
 
 @report_figure
 def fig_bid_price_history(
-    summaries,
+    summaries: dict[str, SimulationTables],
     *,
     by_carrier: bool | str = True,
     show_stdev: float | bool | None = None,
@@ -1383,7 +1824,54 @@ def fig_bid_price_history(
     also_df: bool = False,
     width: int | None = None,
     height: int | None = None,
-):
+) -> alt.Chart | pd.DataFrame | tuple[alt.Chart, pd.DataFrame]:
+    """Generate a figure contrasting bid price history for one or more runs.
+
+    Plots average bid prices vs. days prior to departure, with one line per
+    source. When multiple carriers are present and ``by_carrier`` is not a
+    string, the chart is faceted by carrier.
+
+    Parameters
+    ----------
+    summaries : dict[str, SimulationTables]
+        One or more SimulationTables to compare.
+    by_carrier : bool or str, default True
+        If True, facet the chart by carrier. If a string, filter to only that
+        carrier and return a single unfaceted chart.
+    show_stdev : float or bool, optional
+        If truthy, overlay a shaded band and dashed boundary lines showing the
+        bid-price distribution width. Requires ``by_carrier`` to be a specific
+        carrier string.
+    cap : {'some', 'zero', None}, default None
+        Which bid-price capping variant to display. ``None`` uses the raw bid
+        price; ``'some'`` uses a partial-cap variant; ``'zero'`` uses the
+        zero-capped variant.
+    raw_df : bool, default False
+        If True, return the raw DataFrame instead of the chart.
+    title : str, optional
+        Chart title. Defaults to ``"Bid Price History"``. Pass ``None`` for no
+        title.
+    also_df : bool, default False
+        If True, return a tuple of ``(figure, dataframe)`` instead of just the figure.
+    width : int, optional
+        Width of each facet panel in pixels. Uses Altair's default if None.
+    height : int, optional
+        Height of each facet panel in pixels. Uses Altair's default if None.
+
+    Returns
+    -------
+    alt.Chart or pd.DataFrame or tuple[alt.Chart, pd.DataFrame]
+        The Altair chart, or the raw DataFrame if ``raw_df`` is True, or a
+        ``(chart, dataframe)`` tuple if ``also_df`` is True.
+
+    Raises
+    ------
+    NotImplementedError
+        If ``show_stdev`` is truthy and ``by_carrier`` is not a specific carrier
+        string.
+    ValueError
+        If ``cap`` is not one of ``'some'``, ``'zero'``, or ``None``.
+    """
     if cap is None:
         bp_mean = "bid_price_mean"
     elif cap == "some":
@@ -1452,7 +1940,7 @@ def fig_bid_price_history(
 
 @report_figure
 def fig_displacement_history(
-    summaries,
+    summaries: dict[str, SimulationTables],
     *,
     by_carrier: bool | str = True,
     show_stdev: float | bool | None = None,
@@ -1461,7 +1949,48 @@ def fig_displacement_history(
     also_df: bool = False,
     width: int = 225,
     height: int = 125,
-):
+) -> alt.Chart | pd.DataFrame | tuple[alt.Chart, pd.DataFrame]:
+    """Generate a figure contrasting displacement cost history for one or more runs.
+
+    Plots average displacement costs vs. days prior to departure, with one line
+    per source. When multiple carriers are present and ``by_carrier`` is not a
+    string, the chart is faceted by carrier.
+
+    Parameters
+    ----------
+    summaries : dict[str, SimulationTables]
+        One or more SimulationTables to compare.
+    by_carrier : bool or str, default True
+        If True, facet the chart by carrier. If a string, filter to only that
+        carrier and return a single unfaceted chart.
+    show_stdev : float or bool, optional
+        If truthy, overlay a shaded band and dashed boundary lines showing the
+        displacement cost distribution width. Requires ``by_carrier`` to be a
+        specific carrier string.
+    raw_df : bool, default False
+        If True, return the raw DataFrame instead of the chart.
+    title : str, optional
+        Chart title. Defaults to ``"Displacement Cost History"``. Pass ``None``
+        for no title.
+    also_df : bool, default False
+        If True, return a tuple of ``(figure, dataframe)`` instead of just the figure.
+    width : int, default 225
+        Width of each facet panel in pixels.
+    height : int, default 125
+        Height of each facet panel in pixels.
+
+    Returns
+    -------
+    alt.Chart or pd.DataFrame or tuple[alt.Chart, pd.DataFrame]
+        The Altair chart, or the raw DataFrame if ``raw_df`` is True, or a
+        ``(chart, dataframe)`` tuple if ``also_df`` is True.
+
+    Raises
+    ------
+    NotImplementedError
+        If ``show_stdev`` is truthy and ``by_carrier`` is not a specific carrier
+        string.
+    """
     if not isinstance(by_carrier, str) and show_stdev:
         raise NotImplementedError(
             "contrast.fig_displacement_history with show_stdev requires looking at a single carrier (set `by_carrier`)"
@@ -1523,11 +2052,53 @@ def fig_demand_to_come(
     summaries: Contrast,
     func: Literal["mean", "std"] | list[Literal["mean", "std"]] = "mean",
     *,
-    raw_df=False,
+    raw_df: bool = False,
     title: str | None = "Demand to Come",
     also_df: bool = False,
-):
+) -> alt.Chart | pd.DataFrame | tuple[alt.Chart, pd.DataFrame]:
+    """Generate a figure contrasting demand-to-come curves for one or more runs.
+
+    Demand to come is the expected remaining demand (i.e., future bookings)
+    at each days-prior-to-departure snapshot, broken out by passenger segment.
+    This figure plots those curves across multiple simulation runs for
+    easy comparison.
+
+    Parameters
+    ----------
+    summaries : Contrast
+        A :class:`Contrast` containing the simulation results to compare.
+    func : {'mean', 'std'} or list thereof, default 'mean'
+        Which statistic to display: ``'mean'`` for mean demand to come or
+        ``'std'`` for standard deviation. Pass a list to display both
+        side-by-side.
+    raw_df : bool, default False
+        If True, return the raw DataFrame instead of the chart.
+    title : str, optional
+        Chart title. Defaults to ``"Demand to Come"``. Pass ``None`` for no
+        title.
+    also_df : bool, default False
+        If True, return a tuple of ``(figure, dataframe)`` instead of just the figure.
+
+    Returns
+    -------
+    alt.Chart or pd.DataFrame or tuple[alt.Chart, pd.DataFrame]
+        The Altair chart, or the raw DataFrame if ``raw_df`` is True, or a
+        ``(chart, dataframe)`` tuple if ``also_df`` is True.
+
+    Raises
+    ------
+    ValueError
+        If ``func`` is not ``'mean'``, ``'std'``, or a list containing those
+        values.
+    """
+
     def dtc_seg(s):
+        """Aggregate demand-to-come over orig/dest dimensions if present.
+
+        If the input index contains ``orig`` or ``dest`` levels they are summed
+        away so that only the ``segment`` and ``days_prior`` dimensions remain.
+        Returns an empty DataFrame if ``s`` is None.
+        """
         if s is None:
             return pd.DataFrame(columns=["segment"])
         sum_on = []
@@ -1540,6 +2111,13 @@ def fig_demand_to_come(
         return s
 
     def get_values(s, which="mean"):
+        """Extract mean or std demand-to-come values from a summary object.
+
+        Handles both :class:`~passengersim.summaries.SimulationTables` and
+        :class:`~passengersim.summaries.demand_to_come.SimTabDemandToCome`
+        inputs, falling back to computing statistics from the raw
+        demand-to-come table when a pre-computed summary is not available.
+        """
         if isinstance(s, SimulationTables):
             result = getattr(s, "demand_to_come_summary", None)
             if result is None:
@@ -1619,14 +2197,16 @@ def fig_cp_segmentation(
 
     Parameters
     ----------
-    summaries : dict[str, SimulationTables]
-        A dictionary of summary tables for different runs.
+    summaries : Contrast
+        A :class:`Contrast` containing the simulation results to compare. Each
+        entry must expose a ``cp_segmentation`` attribute.
     raw_df : bool, default False
         If True, return the raw data used to generate the figure.
-    title : str, default "Continuous Price Segmentation"
-        The title of the figure.
+    title : str, optional
+        The title of the figure. Defaults to ``"Continuous Price Segmentation"``.
+        Pass ``None`` for no title.
     also_df : bool, default False
-        If True, return the raw data used to generate the figure in addition to the figure itself.
+        If True, return a tuple of ``(figure, dataframe)`` instead of just the figure.
     height : int, default 600
         The height of each facet panel of the figure, in pixels.
     width : int, default 300
@@ -1634,8 +2214,9 @@ def fig_cp_segmentation(
 
     Returns
     -------
-    alt.Chart or tuple[alt.Chart, pd.DataFrame] or pd.DataFrame
-        The generated Altair chart or the raw data used to generate the figure.
+    alt.Chart or pd.DataFrame or tuple[alt.Chart, pd.DataFrame]
+        The Altair chart, or the raw DataFrame if ``raw_df`` is True, or a
+        ``(chart, dataframe)`` tuple if ``also_df`` is True.
     """
     import altair as alt
 

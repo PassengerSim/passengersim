@@ -40,7 +40,7 @@ def check_markets_without_fares(cfg: Config, *, clean: bool = False, inplace: bo
     clean : bool, default False
         If True, remove markets without fares from the config. If False, raise an error if markets
         without fares are found.
-     inplace : bool, default True
+    inplace : bool, default True
         If True and `clean` is also True, modify the input config in place. If False, return a
         modified copy of the config.  This has no effect if `clean` is False, since no modifications
         are made to the config in that case.

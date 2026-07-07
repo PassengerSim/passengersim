@@ -1,7 +1,7 @@
 from passengersim.rm.emsr import ExpectedMarginalSeatRevenue
 from passengersim.rm.standard_forecasting import StandardLegForecast
 from passengersim.rm.systems import RmSys, RmSysOption, register_rm_system
-from passengersim.rm.untruncation import LegUntruncation
+from passengersim.rm.untruncation import LegDetruncation
 
 
 @register_rm_system
@@ -54,7 +54,7 @@ class E(RmSys):
     """This RM system uses leg-level class allocation availability controls."""
 
     actions = [
-        LegUntruncation,
+        LegDetruncation,
         StandardLegForecast.configure(
             algorithm=RmSysOption("forecast_algorithm", default="additive_pickup"),
             alpha=RmSysOption("exp_smoothing_alpha", expected_type=float, default=0.15),

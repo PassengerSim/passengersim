@@ -1,7 +1,7 @@
 from passengersim.rm.dynamic_prog import UnbucketedDynamicProgram
 from passengersim.rm.standard_forecasting import StandardPathForecast
 from passengersim.rm.systems import RmSys, RmSysOption, register_rm_system
-from passengersim.rm.untruncation import PathUntruncation
+from passengersim.rm.untruncation import PathDetruncation
 
 
 @register_rm_system
@@ -65,7 +65,7 @@ class U(RmSys):
     """This RM system uses bid price availability controls."""
 
     actions = [
-        PathUntruncation.configure(
+        PathDetruncation.configure(
             initialization_method=RmSysOption("em_initialization_method", default="default"),
         ),
         StandardPathForecast.configure(

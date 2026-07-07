@@ -72,6 +72,18 @@ class RmSys:
     of actions to be executed in order when this RM system runs.
     """
 
+    availability_control_requires = {
+        "leg": ["bucket_allocations"],
+        "cabin": ["bucket_allocations"],
+        "bp": ["bid_prices"],
+        "bp_loose": ["bid_prices"],
+        "classless": [],
+    }
+    """Requirements to use each kind of `availability_control`.
+
+    Each possible value of availability control may require one or more data
+    products to be produced by the RM system's actions."""
+
     def _check_action_parameters(self, factory_queue: Sequence[RmActionFactory], provided_parameters: dict) -> None:
         """Check that all provided parameters match at least one action factory."""
         for k in provided_parameters:
@@ -116,6 +128,11 @@ class RmSys:
         self.action_queue: list[RmAction] = [f.make_action(carrier=carrier, cfg=cfg, **kwargs) for f in factory_queue]
         """List of RM actions to be executed in order."""
 
+        # Finally, validate the actions.  This must be done after the actions are initialized
+        # by `make_action`, because the requirements and produced products are determined by
+        # the action instances.
+        self.validate_step_requirements()
+
     def run(self, sim: Simulation, days_prior: int) -> None:
         """Run all actions in the RM system's action queue.
 
@@ -149,6 +166,51 @@ class RmSys:
             f"<RmSys {self.get_name()!r}: {len(self.action_queue)} actions, "
             f"availability_control={self.availability_control}>"
         )
+
+    def validate_step_requirements(self) -> None:
+        """Check the requirements for each step are provided before that step.
+
+        Raises
+        ------
+        ValueError
+            If the required RM products are not produced in time for any step.
+        """
+        produced_rm_objects = set()
+        for action in self.action_queue:
+            action_produced = action.produces
+            if isinstance(action_produced, str):
+                # catch if the `action.produces` is a string instead of a set[str]
+                action_produced = {action_produced}
+            produced_rm_objects.update(action_produced)
+            missing_requirements = [r for r in action.requires if r not in produced_rm_objects]
+            if missing_requirements:
+                suffix = f"\n We only have {produced_rm_objects}"
+                if len(missing_requirements) > 1:
+                    raise ValueError(
+                        f"{self.__class__.__name__} action {action.__class__.__name__} requires {missing_requirements} "
+                        f"but they have not been produced by any previous actions." + suffix
+                    )
+                else:
+                    raise ValueError(
+                        f"{self.__class__.__name__} action {action.__class__.__name__} requires "
+                        f"{missing_requirements[0]!r} but it has not been produced by any previous actions." + suffix
+                    )
+        # Finally check the requirements for the availability control are met
+        if self.availability_control is None:
+            raise ValueError(f"availability_control is not defined on {self.__class__.__name__}.")
+        if self.availability_control not in self.availability_control_requires:
+            raise ValueError(
+                f"Unknown availability control {self.availability_control!r} on {self.__class__.__name__}."
+            )
+        need = self.availability_control_requires[self.availability_control]
+        if isinstance(need, str):
+            need = [need]
+        for n in need:
+            if n not in produced_rm_objects:
+                raise ValueError(
+                    f"{self.__class__.__name__} requires {n} for availability control {self.availability_control!r}, "
+                    f"but it has not been produced by any actions."
+                )
 
 
 ### RM SYSTEM REGISTRATION ###

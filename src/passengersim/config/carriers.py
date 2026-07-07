@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import warnings
-from typing import Any, Literal, Self
+from typing import Annotated, Any, Literal, Self
 
 from pydantic import (
+    StringConstraints,
     field_validator,
     model_validator,
 )
@@ -13,6 +14,8 @@ from passengersim.rm.systems import RmSys
 from .named import Named
 from .optional_literal import Optional
 from .pretty import PrettyModel
+
+CabinCode = Annotated[str, StringConstraints(min_length=1, max_length=1)]
 
 
 class CustomerModel(Named, extra="forbid"):
@@ -135,6 +138,10 @@ class Carrier(Named, extra="forbid"):
              the Frat5 value for *leisure* by 0.5
          - Other algorithms to come in the future :-) """
 
+    cp_markets: Optional[Literal["all", "local", "connect"]] = "all"
+    """Limit the Continuous Pricing to local markets, or conecting markets
+       Not currently implemented for every CP algorithm"""
+
     customer_models: list[CustomerModel] | None = []
     """Customer behavior models for Offer generation and optimization"""
 
@@ -172,42 +179,61 @@ class Carrier(Named, extra="forbid"):
     ancillaries: dict[str, float] | None = {}
     """Specifies ancillaries offered by the carrier, codes are ANC1 .. ANC4"""
 
+    cabin_ordering: list[CabinCode] = ["Y"]
+    """The ordering of cabins by quality, from best to worst.
+
+    The cabin code for each cabin must be a string of length 1.
+
+    For example, this could be ["F", "J", "W", "Y"] for first, business, premium economy,
+    and economy, in that order.  We assume that any customer who books a fare
+    for a given cabin will be satisfied by a seat in that specific cabin, or any
+    better cabin.  The default value of ["Y"] signals that there is only one cabin
+    type in this carrier's fleet.
+
+    This ordering must be comprehensive for all cabins on all this carrier's legs. There
+    cannot be a cabin on any leg operated by this carrier which does not appear on this
+    list. The converse need not hold; it is acceptable for some legs to have fewer than
+    the complete set of cabins.
+    """
+
     classes: list[str] | list[tuple[str, str]] = []
     """A list of fare classes.
 
     This list can be a simple list of fare classes, or a list of 2-tuples where
     the first element is the fare class and the second element is the cabin.
 
-    One convention is to use Y0, Y1, ... to label fare classes from the highest
-    fare (Y0) to the lowest fare (Yn).  You can also use Y, B, M, H,... etc.
-    An example of classes is below.
+    If using the simple list format, the first character of each class must be
+    one of the cabin codes defined in `cabin_ordering`.  For example, if two cabins
+    of types "F" and "Y" are possible, the fare classes could be:
 
     Example
     -------
     ```{yaml}
     classes:
-      - Y0
-      - Y1
+      - F0
+      - F1
       - Y2
       - Y3
       - Y4
       - Y5
     ```
 
-    If using cabins, it is reasonable to name the classes in consistent manner,
-    but this is optional, and arbitrary class names are still allowed. All class
-    names should still be unique, and cabin identifiers should be replicated
-    identically for classes that share a cabin.  Thus the list might look like this:
+    If using the 2-tuple format, the second item in each tuple must match one of the
+    cabin codes, but the class names can be anything (including replicating the cabin names).
+    For example:
 
     ```{yaml}
     classes:
-      - (F0, F)
-      - (F1, F)
-      - (Y0, Y)
-      - (Y1, Y)
-      - (Y2, Y)
-      - (Y3, Y)
+      - (F, F)
+      - (A, F)
+      - (Y, Y)
+      - (H, Y)
+      - (L, Y)
+      - (Q, Y)
     ```
+
+    Either way, all class names must be unique across the complete set of classes; you
+    cannot have a class "X" associated with two different cabins.
     """
 
     truncation_rule: Literal[1, 2, 3] = 3
@@ -313,3 +339,30 @@ class Carrier(Named, extra="forbid"):
         if x < 0.0 or x > 2.0:
             warnings.warn("cp_upper_bound should be in the range (0, 2)", stacklevel=2)
         return v
+
+    @model_validator(mode="after")
+    def _check_cabin_code_alignment(self) -> Self:
+        # check that there is at least one cabin
+        if not self.cabin_ordering:
+            raise ValueError("cabin_ordering must have at least one cabin code")
+        # check all cabin codes are unique
+        if len(set(self.cabin_ordering)) != len(self.cabin_ordering):
+            raise ValueError("cabin codes must be unique")
+        # check all classes
+        class_codes = set()
+        for c in self.classes:
+            if isinstance(c, str):
+                if len(c) < 1:
+                    raise ValueError("class code must have at least one character")
+                if c[0] not in self.cabin_ordering:
+                    raise ValueError("class codes must begin with a cabin code character")
+                class_codes.add(c)
+            elif isinstance(c, (list, tuple)):
+                if len(c[0]) < 1:
+                    raise ValueError("class code must have at least one character")
+                if c[1] not in self.cabin_ordering:
+                    raise ValueError(f"cabin code {c[1]} not found in cabin ordering {list(self.cabin_ordering)}")
+                class_codes.add(c[0])
+        if len(class_codes) != len(self.classes):
+            raise ValueError("class codes must be unique")
+        return self

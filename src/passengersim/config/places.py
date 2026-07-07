@@ -144,6 +144,16 @@ class Place(Named, extra="forbid", validate_assignment=True):
     airline / route / etc.
     """
 
+    tags: dict[str, str] = {}
+    """Optional dictionary of tags associated with this place.
+
+    Tags can be used to store arbitrary key-value pairs of information related to
+    this place. This may be useful for categorization, filtering, or adding metadata.
+    Tags can also be used in RM actions to apply different strategies based on
+    place characteristics. For example, a tag could indicate whether a place is
+    within the Schengen area, allowing RM actions to adjust their behavior accordingly.
+    """
+
     @field_validator("time_zone")
     def _valid_time_zone(cls, v: str):
         """Check for valid time zones."""

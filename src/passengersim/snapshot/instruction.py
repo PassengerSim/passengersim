@@ -36,7 +36,6 @@ class SnapshotInstruction:
         if not content:
             return
         if self.filepath:
-            print(f"writing snapshot to file: {self.filepath}")
             with self.filepath.open(mode=self.mode) as f:
                 if self.why:
                     f.write(self.why)

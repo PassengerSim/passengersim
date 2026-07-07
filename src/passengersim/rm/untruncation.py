@@ -9,9 +9,9 @@ if TYPE_CHECKING:
     from passengersim.driver import Simulation
 
 
-class LegUntruncation(RmAction):
+class LegDetruncation(RmAction):
     """
-    Leg-level demand untruncation action.
+    Leg-level demand detruncation action.
 
     This action will detruncate demand on legs using the specified algorithm.
     It is called only once at the beginning of each sample.
@@ -42,17 +42,17 @@ class LegUntruncation(RmAction):
 
         self.which_data = which_data
         """
-        Which data to use for untruncation.
+        Which data to use for detruncation.
         """
 
         self.algorithm: Literal["em", "em_py", "none", "naive1", "naive2", "naive3", "pd", "mfem"] = algorithm
         """
-        Untruncation algorithm.
+        Detruncation algorithm.
 
         There are several available algorithms:
 
         `none`
-            applies no untruncation, and assumes that demand was the same as sales.
+            applies no detruncation, and assumes that demand was the same as sales.
             Applying this algorithm is still important even if no detruncation is
             desired, as PassengerSim tracks historical demand separately from sales
             and without "none" the historical demand used in forecasting would be
@@ -104,9 +104,9 @@ class LegUntruncation(RmAction):
         """
         Minimum value for the mean of the demand distribution.
 
-        If the computed mean is less than this value, untruncation will result in
+        If the computed mean is less than this value, detruncation will result in
         zero demand. Setting this to a very small but non-zero value can help avoid
-        thin-path problems, where untruncation results in some non-zero demand on
+        thin-path problems, where detruncation results in some non-zero demand on
         every path-class, even though many path-classes have zero historical sales and
         probably will stay that way.
         """
@@ -126,14 +126,14 @@ class LegUntruncation(RmAction):
 
         # MFEM runs multiple legs
         if self.algorithm == "mfem":
-            raise NotImplementedError("MFEM untruncation is not implemented yet.")
+            raise NotImplementedError("MFEM detruncation is not implemented yet.")
             # leg_mfem(sim, _carrier, _dcp_index)
             # return
 
         for leg in sim.eng.legs.set_filters(carrier=self.carrier):
             if self.algorithm in ["em", "none", "naive1", "naive3"]:
                 # snapshot_instruction = get_snapshot_instruction(
-                #     sim, leg=leg, only_type="leg_untruncation", debug=_debug
+                #     sim, leg=leg, only_type="leg_detruncation", debug=_debug
                 # )
                 snapshot_instruction = None
                 leg.forecast.detruncate_demand(
@@ -149,14 +149,12 @@ class LegUntruncation(RmAction):
                 )
 
             else:
-                raise NotImplementedError(f"Untruncation algorithm '{self.algorithm}' is not implemented.")
-                # for bkt in leg.buckets:
-                #     self.do_single_bucket(leg, bkt, _dcp_index, _debug)
+                raise NotImplementedError(f"Detruncation algorithm '{self.algorithm}' is not implemented.")
 
 
-class PathUntruncation(RmAction):
+class PathDetruncation(RmAction):
     """
-    Path-level demand untruncation tool.
+    Path-level demand detruncation tool.
     """
 
     produces: set[str] = {"path_demand"}
@@ -184,17 +182,17 @@ class PathUntruncation(RmAction):
 
         self.which_data = which_data
         """
-        Which data to use for untruncation.
+        Which data to use for detruncation.
         """
 
         self.algorithm = algorithm
         """
-        Untruncation algorithm.
+        Detruncation algorithm.
 
         There are several available algorithms:
 
         `none`
-            applies no untruncation, and assumes that demand was the same as sales.
+            applies no detruncation, and assumes that demand was the same as sales.
             Applying this algorithm is still important even if no detruncation is
             desired, as PassengerSim tracks historical demand separately from sales
             and without "none" the historical demand used in forecasting would be
@@ -246,9 +244,9 @@ class PathUntruncation(RmAction):
         """
         Minimum value for the mean of the demand distribution.
 
-        If the computed mean is less than this value, untruncation will result in
+        If the computed mean is less than this value, detruncation will result in
         zero demand. Setting this to a very small but non-zero value can help avoid
-        thin-path problems, where untruncation results in some non-zero demand on
+        thin-path problems, where detruncation results in some non-zero demand on
         every path-class, even though many path-classes have zero historical sales and
         probably will stay that way.
         """
@@ -268,15 +266,12 @@ class PathUntruncation(RmAction):
 
         # MFEM runs multiple legs
         if self.algorithm == "mfem":
-            raise NotImplementedError("MFEM untruncation is not implemented yet.")
+            raise NotImplementedError("MFEM detruncation is not implemented yet.")
             # leg_mfem(sim, _carrier, _dcp_index)
             # return
 
         for pth in sim.eng.paths.set_filters(carrier=self.carrier):
             if self.algorithm in ["em", "none", "naive1", "naive3"]:
-                # snapshot_instruction = get_snapshot_instruction(
-                #     sim, leg=leg, only_type="leg_untruncation", debug=_debug
-                # )
                 snapshot_instruction = None
                 pth.forecast.detruncate_demand(
                     dcp_index,
@@ -291,6 +286,9 @@ class PathUntruncation(RmAction):
                 )
 
             else:
-                raise NotImplementedError(f"Untruncation algorithm '{self.algorithm}' is not implemented.")
-                # for bkt in leg.buckets:
-                #     self.do_single_bucket(leg, bkt, _dcp_index, _debug)
+                raise NotImplementedError(f"Detruncation algorithm '{self.algorithm}' is not implemented.")
+
+
+# legacy names - we are standardizing on using "detruncation" but provide these type aliases for backward compatability.
+LegUntruncation = LegDetruncation
+PathUntruncation = PathDetruncation

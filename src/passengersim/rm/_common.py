@@ -159,7 +159,7 @@ class RmAction(ABC):
         carrier: str = "",
         minimum_sample: int = 10,
         cfg: Config | None = None,
-        snapshot_filters: Sequence | None = None,
+        snapshot_filters: GenericSnapshotFilter | Sequence[GenericSnapshotFilter] | None = None,
     ):
         self.carrier = carrier
         """The carrier upon which to apply this action."""
@@ -212,7 +212,6 @@ class RmAction(ABC):
             for snap_filter in self._snapshot_filters:
                 instruction = snap_filter.resolve(sim.eng, days_prior, *args, **kwargs)
                 if instruction:
-                    print(f"triggered snapshot filter: {snap_filter}, instruction: {instruction}")
                     return instruction
         return None
 

@@ -8,6 +8,7 @@ from passengersim.cli._app import app
 
 @app.command()
 def info():
+    """Print info about PassengerSim (versions, licenses, etc.)"""
     print(
         f"""\
 :seat: [bold dark_goldenrod]PassengerSim[/bold dark_goldenrod]

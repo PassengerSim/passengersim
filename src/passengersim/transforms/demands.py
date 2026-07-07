@@ -160,6 +160,7 @@ def set_demand_reference_prices(
     mult_on_lowest_price: float = 1.0,
     *,
     inplace: bool = False,
+    force: bool = False,
 ) -> Config:
     """Set reference prices on all demands equal to a multiple of the lowest price in the market.
 
@@ -167,6 +168,14 @@ def set_demand_reference_prices(
     ----------
     cfg : Config
     mult_on_lowest_price : float
+    inplace : bool, default False
+        Modify the configuration in place if True, otherwise return a modified copy.
+    force : bool, default False
+        If True, set reference prices regardless of their current values.
+        If False, raise an error if existing reference prices are not already some
+        consistent multiple of the lowest price. Normally we will not want to globally
+        manipulate the existing reference prices according to a homogenous algorithm
+        if they have been set heterogeneously by some other mechanism.
 
     Returns
     -------
@@ -180,13 +189,20 @@ def set_demand_reference_prices(
     if not inplace:
         cfg = cfg.model_copy(deep=True)
 
-    from passengersim.config.checks.demand import check_reference_price_scaling
+    if force:
+        from passengersim.config.checks.markets import check_min_fare_price_by_market
 
-    df = check_reference_price_scaling(cfg)
-    # this will have thrown an error if the reference prices are not consistent
-    # across segments, so if we get here we know they are ok
-    for d in cfg.demands:
-        d.reference_price = mult_on_lowest_price * df.loc[d.market_identifier, "min_price"]
+        min_fare_price_by_market = check_min_fare_price_by_market(cfg)
+        for d in cfg.demands:
+            d.reference_price = mult_on_lowest_price * min_fare_price_by_market[d.market_identifier]["min_price"]
+    else:
+        from passengersim.config.checks.demand import check_reference_price_scaling
+
+        df = check_reference_price_scaling(cfg)
+        # this will have thrown an error if the reference prices are not consistent
+        # across segments, so if we get here we know they are ok
+        for d in cfg.demands:
+            d.reference_price = mult_on_lowest_price * df.loc[d.market_identifier, "min_price"]
     return cfg
 
 

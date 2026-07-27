@@ -6,9 +6,11 @@ import warnings
 from typing import Annotated, Any, Literal
 
 from pydantic import Field, ValidationInfo, confloat, conint, field_validator, model_validator
+from pydantic.functional_validators import AfterValidator, BeforeValidator
 
 from passengersim.utils import iso_to_unix
 
+from .places import LimitConnectTime, _inflate_simple_mct, _reformat_mct
 from .pretty import PrettyModel
 from .speed_limits import SpeedLimits
 
@@ -90,6 +92,45 @@ class ConnectionBuilderSettings(PrettyModel, extra="forbid", validate_assignment
     met, potentially relaxing circuity rules at each iteration.  This setting also
     allows for the relaxation of maximum connect times, by adding this many minutes
     to all maximum connection times at each iteration.
+    """
+
+    min_connect_time: Annotated[
+        LimitConnectTime | int | None,
+        AfterValidator(_inflate_simple_mct),
+        BeforeValidator(_reformat_mct),
+    ] = None
+    """
+    Global default Minimum Connect Time (MCT) in minutes.
+
+    These values are used as the global defaults for any `Airport` that does not
+    have its own specific minimum connect time set.  They can be given as a single
+    integer, which will be applied to all connection types, or differentiated by
+    connection type (domestic-domestic, domestic-international, etc.).  Connection
+    types can be given using their full name (with underscore) or using shorthand
+    codes (DD, DI, ID, II), or as a list of 4 integers in the order DD, DI, ID, II.
+
+    If not set, the simulation's built-in default minimum connect times are used.
+    """
+
+    max_connect_time: Annotated[
+        LimitConnectTime | int | None,
+        AfterValidator(_inflate_simple_mct),
+        BeforeValidator(_reformat_mct),
+    ] = None
+    """
+    Global default Maximum Connect Time in minutes.
+
+    Any generated path that has a connection time greater than the applicable value
+    (expressed in minutes) is invalidated.  These values are used as the global
+    defaults for any `Airport` that does not have its own specific maximum connect
+    time set.  They can be given as a single integer, which will be applied to all
+    connection types, or differentiated by connection type (domestic-domestic,
+    domestic-international, etc.).  Connection types can be given using their full
+    name (with underscore) or using shorthand codes (DD, DI, ID, II), or as a list
+    of 4 integers in the order DD, DI, ID, II.
+
+    If not set, the simulation's built-in default maximum connect time (240 minutes)
+    is used.
     """
 
 
@@ -273,9 +314,18 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     standard TODD curve associated with the market's `delta_t`.
     """
 
-    max_connect_time: conint(ge=0) = 240
+    max_connect_time: Annotated[
+        int | None,
+        Field(
+            ge=0,
+            deprecated=(
+                "`max_connect_time` is deprecated and will be removed in a future version. "
+                "Use `connection_builder.max_connect_time` instead"
+            ),
+        ),
+    ] = None
     """
-    Maximum connection time for automatically generated paths.
+    Deprecated. See `connection_builder.max_connect_time` instead.
 
     Any generated path that has a connection time greater than this value (expressed
     in minutes) is invalidated.
@@ -347,6 +397,27 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
                 self.connection_builder.existing_paths = "none"
             # Clear the deprecated field
             self.__dict__["manual_paths"] = None
+        return self
+
+    @model_validator(mode="after")
+    def _migrate_max_connect_time(self):
+        """Migrate max_connect_time to connection_builder.max_connect_time."""
+        # Access via __dict__ to avoid triggering the deprecation warning
+        # when the value is just None (i.e. the user didn't set it).
+        max_connect_time_value = self.__dict__.get("max_connect_time")
+        if max_connect_time_value is not None:
+            warnings.warn(
+                "`max_connect_time` is deprecated and will be removed in a future "
+                "version. Use `connection_builder.max_connect_time` instead",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            # Only migrate if the new location has not been set explicitly, so an
+            # explicit connection_builder.max_connect_time always wins.
+            if self.connection_builder.max_connect_time is None:
+                self.connection_builder.max_connect_time = max_connect_time_value
+            # Clear the deprecated field
+            self.__dict__["max_connect_time"] = None
         return self
 
     generate_3seg: bool | None = False

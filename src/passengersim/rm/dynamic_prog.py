@@ -489,6 +489,9 @@ class UnbucketedDynamicProgram(RmAction):
 
 
 class LegDynamicProgram(UnbucketedDynamicProgram):
+    requires: set[str] = {"leg_forecast"}
+    produces: set[str] = {"bid_prices"}
+
     def _run_udp_optimizer(self, leg, cabin_code, snapshot_instruction, starting_dcp_index: int):
         dp = self._udp_engine
         dp.solve_for_leg(

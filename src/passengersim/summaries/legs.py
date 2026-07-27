@@ -92,7 +92,7 @@ class SimTabLegs(GenericSimulationTables):
         pd.DataFrame
         """
         if "leg_defs" not in self._data:
-            self._data["leg_defs"] = legs_to_dataframe(self.config.legs).set_index("leg_id")
+            self._data["leg_defs"] = legs_to_dataframe(self.config.legs)
         return self._data["leg_defs"]
 
     @property

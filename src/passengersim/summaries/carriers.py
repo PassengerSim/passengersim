@@ -153,6 +153,9 @@ class SimTabCarriers(GenericSimulationTables):
         doc="Carrier-level summary data from each sample.",
     )
 
+    # TODO: the `carrier_history2` should be renamed `carrier_history`.  Users should still
+    #       be able to call for `carrier_history2` and receive back this dataframe but also
+    #       get a deprecation warning.
     carrier_history2: pd.DataFrame | None = SimulationTableItem(
         aggregation_func=aggregate_by_concat_dataframe("carrier_history2"),
         extraction_func=extract_carrier_history2,

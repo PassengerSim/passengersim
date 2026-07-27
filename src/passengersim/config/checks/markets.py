@@ -202,3 +202,37 @@ def _simtab_market_max_flows(summary: SimulationTables) -> pd.DataFrame:
         ),
         axis=1,
     )
+
+
+def check_market_windows(cfg: Config) -> pd.DataFrame:
+    """Check that each market has Paths that serve a similar notional service day."""
+    legs_df = cfg.dataframes.legs
+    earliest_dep = {}
+    latest_dep = {}
+    earliest_arr = {}
+    latest_arr = {}
+    for p in cfg.paths:
+        mkt = p.market_identifier
+        deptime = legs_df.loc[p.legs[0]].dep_time
+        arrtime = legs_df.loc[p.legs[-1]].arr_time
+        if mkt in earliest_dep:
+            earliest_dep[mkt] = min(earliest_dep[mkt], deptime)
+            latest_dep[mkt] = max(latest_dep[mkt], deptime)
+            earliest_arr[mkt] = min(earliest_arr[mkt], arrtime)
+            latest_arr[mkt] = max(latest_arr[mkt], arrtime)
+        else:
+            earliest_dep[mkt] = deptime
+            latest_dep[mkt] = deptime
+            earliest_arr[mkt] = arrtime
+            latest_arr[mkt] = arrtime
+    df = pd.DataFrame.from_dict(
+        dict(
+            earliest_dep=earliest_dep,
+            latest_dep=latest_dep,
+            earliest_arr=earliest_arr,
+            latest_arr=latest_arr,
+        )
+    )
+    df["dep_hours_span"] = (df["latest_dep"] - df["earliest_dep"]) / 3600
+    df["arr_hours_span"] = (df["latest_arr"] - df["earliest_arr"]) / 3600
+    return df

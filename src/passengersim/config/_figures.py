@@ -96,6 +96,7 @@ def fig_booking_curves(cfg: Config, raw_df: bool = False) -> alt.Chart | pd.Data
             y=alt.Y("proportion:Q", title="Cumulative Proportion of Bookings"),
             color=alt.Color("segment:N", title="Passenger Segment"),
         )
+        .properties(title="Customer Arrival Curves")
     )
 
 
@@ -605,6 +606,7 @@ def fig_duration_by_distance(cfg: Config, carrier: str | None = None) -> alt.Cha
                 "dest",
             ],
         )
+        .properties(title="Leg Block Time vs Distance")
         .interactive()
     )
 
@@ -754,10 +756,19 @@ def fig_demand_vs_capacity(cfg: Config) -> alt.Chart:
     * **Arriving** – total base demand destined for each airport vs. total
       seats arriving at that airport.
 
-    Points are colored by the airport's *path flow share* (the fraction of
-    leg-touches at that airport that are connecting passengers), using a
-    viridis color scale. A red diagonal 1:1 reference line is included in
-    each panel.
+    Points are colored by the airport's *path flow share*. This is computed by
+    taking an enumeration of all paths that utilize each airport, and finding
+    the fraction of all those paths where this airport is a connection rather
+    than the path origin or destination.  We expect hubs to have relatively
+    high path flow shares, focus cities (if any carriers are not operating a
+    strict hub-and-spoke system) to have lower values, and spokes to have low
+    or zero path flow shares.
+
+    A red diagonal 1:1 reference line is also included in each panel.  If the
+    network is well calibrated the spoke airports should have marks close to or
+    slightly below the red line, while hub airports can be well above the line
+    (i.e. local passengers at that airport need not be available in sufficient
+    quantity to fill planes at that airport).
 
     Parameters
     ----------
@@ -1036,7 +1047,7 @@ def fig_hub_schedule(
     if carrier is not None:
         base_df = base_df[base_df["carrier"] == carrier]
     df1 = base_df.query(f"orig == '{hub}'")
-    df1 = df1[
+    df1 = df1.reset_index()[
         [
             "orig",
             "dest",
@@ -1060,7 +1071,7 @@ def fig_hub_schedule(
     df1["far_unixtime_ms"] = df1["arr_time"] * 1000 + hub_offset_milliseconds
 
     df2 = base_df.query(f"dest == '{hub}'")
-    df2 = df2[
+    df2 = df2.reset_index()[
         [
             "orig",
             "dest",
@@ -1289,7 +1300,7 @@ def fig_market_schedule(
 
     # Get legs dataframe for quick lookup
     legs_df = cfg.dataframes.legs
-    leg_map = {row["leg_id"]: row for _, row in legs_df.iterrows()}
+    leg_map = {legid: row for legid, row in legs_df.iterrows()}
 
     # Collect all paths for this market
     paths = [p for p in cfg.paths if p.orig == orig and p.dest == dest]
@@ -1405,12 +1416,14 @@ def fig_market_schedule(
                 alt.Tooltip("dest:N", title="Leg Dest"),
                 alt.Tooltip("arr_time_nominal:N", title="Arrival Time"),
             ]
-            + [
-                alt.Tooltip("avg_load_factor:Q", title="Avg Load Factor", format=".2f"),
-                alt.Tooltip("avg_local:Q", title="Avg Local", format=".2f"),
-            ]
-            if simtab is not None
-            else [],
+            + (
+                [
+                    alt.Tooltip("avg_load_factor:Q", title="Avg Load Factor", format=".2f"),
+                    alt.Tooltip("avg_local:Q", title="Avg Local", format=".2f"),
+                ]
+                if simtab is not None
+                else []
+            ),
         )
     )
 
@@ -1483,6 +1496,7 @@ def fig_reference_price_by_distance(cfg: Config) -> alt.Chart:
             color="segment:N",
             tooltip=["orig", "dest", "distance", "reference_price", "segment"],
         )
+        .properties(title="Reference Prices by Distance")
     )
 
 

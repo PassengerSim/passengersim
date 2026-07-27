@@ -410,6 +410,7 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
                 "additional_settings",
                 "connection_builder",
                 "manual_paths",
+                "max_connect_time",
                 "speed_limits",
                 "use_standard_todd_curves",
             ]:
@@ -425,6 +426,11 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
         if config.simulation_controls.additional_settings:
             self.eng.additional_settings(**config.simulation_controls.additional_settings)
 
+        # Apply the global default minimum and maximum connect times from the
+        # connection builder settings.  These act as global defaults for any Airport
+        # that does not set its own specific local value.
+        self._apply_global_connect_times(config.simulation_controls.connection_builder)
+
         # There is a default array of DCPs, we'll override it with the data from the
         # input file (if available)
         if len(config.dcps) > 0:
@@ -436,6 +442,36 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
             if self.dcp_list[-1] != 0:
                 self.eng.add_dcp(len(self.dcp_list), 0)
                 self.dcp_list.append(0)
+
+    def _apply_global_connect_times(self, connection_builder) -> None:
+        """
+        Apply global default connect times from the connection builder settings.
+
+        The `min_connect_time` and `max_connect_time` settings on
+        `ConnectionBuilderSettings` are pushed through to the core
+        `SimulationEngine`, where they serve as global defaults for any `Airport`
+        that does not set its own specific local value.
+
+        Parameters
+        ----------
+        connection_builder : ConnectionBuilderSettings
+            The connection builder settings holding the optional global minimum
+            and maximum connect time defaults.
+        """
+        min_ct = connection_builder.min_connect_time
+        if min_ct is not None:
+            assert isinstance(min_ct, passengersim.config.LimitConnectTime)
+            self.eng.min_connect_time_dd = min_ct.domestic_domestic
+            self.eng.min_connect_time_di = min_ct.domestic_international
+            self.eng.min_connect_time_id = min_ct.international_domestic
+            self.eng.min_connect_time_ii = min_ct.international_international
+        max_ct = connection_builder.max_connect_time
+        if max_ct is not None:
+            assert isinstance(max_ct, passengersim.config.LimitConnectTime)
+            self.eng.max_connect_time_dd = max_ct.domestic_domestic
+            self.eng.max_connect_time_di = max_ct.domestic_international
+            self.eng.max_connect_time_id = max_ct.international_domestic
+            self.eng.max_connect_time_ii = max_ct.international_international
 
     def _init_circuity(self, config):
         """
@@ -1045,7 +1081,13 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
         """
         self.cnx.delete_experiment(self.eng.name)
         logger.debug("building connections")
-        num_paths = self.eng.build_connections(**dict(self.config.simulation_controls.connection_builder))
+        # The min/max connect time settings are applied to the engine globals
+        # separately (see _apply_global_connect_times); exclude them here so the
+        # core build_connections does not receive unexpected keyword arguments.
+        cnx_builder_kwargs = self.config.simulation_controls.connection_builder.model_dump(
+            exclude={"min_connect_time", "max_connect_time"}
+        )
+        num_paths = self.eng.build_connections(**cnx_builder_kwargs)
         self.eng.compute_hhi()
         if num_paths and self.cnx.is_open:
             database.tables.create_table_path_defs(self.cnx._connection, self.eng.paths)

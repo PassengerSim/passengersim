@@ -1,8 +1,10 @@
 import pytest
+from pandas import testing as pdt
 from pytest import approx
 
 from passengersim import MultiSimulation, Simulation, demo_network
 from passengersim.config import Config
+from passengersim.config.dataframes import legs_to_dataframe
 from passengersim.summaries import SimulationTables
 
 DEFAULT_TOLERANCE = dict(rtol=1e-04, atol=1e-06)
@@ -133,6 +135,13 @@ def test_table_basic(summary: SimulationTables):
         / n_trials
     )
     assert dmd_nogo == pytest.approx(segm_nogo)
+
+
+def test_leg_defs(summary: SimulationTables, config: Config):
+    expected = legs_to_dataframe(config.legs)
+
+    assert summary.leg_defs is summary.leg_defs
+    pdt.assert_frame_equal(summary.leg_defs, expected)
 
 
 TABLES = [

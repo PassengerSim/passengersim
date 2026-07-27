@@ -7,7 +7,7 @@ from passengersim.config import Config
 from .choice_models import check_choice_model_restrictions
 from .demand import check_demands_without_fares, check_demands_without_paths, check_reference_price_scaling
 from .fares import check_fare_restrictions, check_fares_without_demands
-from .markets import check_markets_without_fares, check_min_fare_price_by_market
+from .markets import check_market_windows, check_markets_without_fares, check_min_fare_price_by_market
 from .todd import check_todd_curves
 
 

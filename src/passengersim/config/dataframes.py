@@ -36,7 +36,7 @@ def legs_to_dataframe(legs: list[Leg]) -> pd.DataFrame:
             if k not in row:
                 row[k] = v
         data.append(row)
-    return pd.DataFrame(data)
+    return pd.DataFrame(data).set_index("leg_id")
 
 
 def demands_to_dataframe(demands: list[Demand]) -> pd.DataFrame:

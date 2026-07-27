@@ -39,12 +39,17 @@ simulation_controls:
   tot_z_factor: 2.0
   prorate_revenue: true
   dwm_lite: false
-  max_connect_time: 120
   disable_ap: true
   demand_multiplier: 1.0
   timeframe_demand_allocation: pods
   connection_builder:
     nonstop_leg_path_id_alignment: false
+    min_connect_time:
+      DD: 20
+      DI: 30
+      ID: 60
+      II: 60
+    max_connect_time: 120
 
 choice_models:
   business:

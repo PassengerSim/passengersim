@@ -13,7 +13,7 @@ from .generic import (
     GenericSimulationTables,
     SimulationTableItem,
 )
-from .tools import aggregate_by_concat_dataframe
+from .tools import aggregate_by_concat_dataframe, aggregate_by_summing_dataframe
 
 if TYPE_CHECKING:
     import altair as alt
@@ -124,6 +124,19 @@ def extract_forecast_accuracy(sim: Simulation) -> pd.DataFrame | None:
     return df
 
 
+def extract_spill(sim: Simulation) -> pd.DataFrame | None:
+    """Extract forecast accuracy from the Carrier class."""
+    combined_data = []
+    for cxr in sim.eng.carriers:
+        data = cxr.get_spill_counters()
+        combined_data += data
+    if len(combined_data) == 0:
+        return None
+    df = pd.DataFrame.from_dict(combined_data)
+    # df = df.set_index(["carrier", "booking_class"]).reset_index()
+    return df
+
+
 class SimTabCarriers(GenericSimulationTables):
     """Container for summary tables and figures extracted from a Simulation.
 
@@ -166,6 +179,12 @@ class SimTabCarriers(GenericSimulationTables):
         aggregation_func=aggregate_by_concat_dataframe("forecast_accuracy"),
         extraction_func=extract_forecast_accuracy,
         doc="Summary of forecast history, based on UA's EDGAR approach",
+    )
+
+    spill: pd.DataFrame | None = SimulationTableItem(
+        aggregation_func=aggregate_by_summing_dataframe("spill"),
+        extraction_func=extract_spill,
+        doc="SWhat did the customer choose, given their first choice?",
     )
 
     def _fig_carrier_attribute(

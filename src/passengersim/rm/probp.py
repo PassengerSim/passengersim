@@ -106,7 +106,9 @@ class ProbabilisticBidPrice(RmAction):
             return
 
         # Make sure each sample is initialized
-        if sim.eng.last_dcp_index <= 1:
+        if sim.eng.last_dcp_index <= 1 and (
+            self.capacity_sharing_start_lf > 0.01 or self.capacity_sharing_start_dcp_index > 0
+        ):
             for leg in sim.eng.legs.set_filters(carrier=self.carrier):
                 leg.capacity_sharing = False
 

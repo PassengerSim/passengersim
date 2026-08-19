@@ -50,7 +50,7 @@ class ToddCurve(PrettyModel, extra="forbid"):
     around the peak hours.
     """
 
-    probabilities: dict[int, float] | None = None
+    probabilities: dict[int, float]
     """Define a TODD curve.
 
     This must be a dictionary with integer keys in the range (0, 23) inclusive,
@@ -87,9 +87,9 @@ class ToddCurve(PrettyModel, extra="forbid"):
                 )
         return values
 
-    @field_validator("probabilities", mode="before")
+    @field_validator("probabilities")
     @classmethod
-    def _validate_probabilities(cls, v: dict | None) -> dict[int, float] | None:
+    def _validate_probabilities(cls, v: dict) -> dict[int, float]:
         """Validate and normalize the probabilities dictionary.
 
         - Any missing keys in 0-23 are filled in with 0.0.
@@ -101,18 +101,16 @@ class ToddCurve(PrettyModel, extra="forbid"):
 
         Parameters
         ----------
-        v : dict or None
-            The raw probabilities value to validate. May be ``None`` (no curve
-            defined) or a mapping of hour keys to probability values. Keys may
-            be integers or any type coercible to ``int``; values may be any type
-            coercible to ``float``.
+        v : dict
+            The raw probabilities mapping to validate. Keys may be integers or
+            any type coercible to ``int``; values may be any type coercible to
+            ``float``.
 
         Returns
         -------
-        dict[int, float] or None
-            ``None`` if ``v`` is ``None``; otherwise a fully populated dict
-            with integer keys 0–23 and non-negative float values that sum to
-            exactly 1.0.
+        dict[int, float]
+            A fully populated dict with integer keys 0–23 and non-negative
+            float values that sum to exactly 1.0.
 
         Raises
         ------
@@ -124,9 +122,6 @@ class ToddCurve(PrettyModel, extra="forbid"):
             If all provided values are zero (the distribution cannot be
             normalized).
         """
-        if v is None:
-            return v
-
         # Ensure all keys are integers in the valid range 0-23
         normalized: dict[int, float] = {}
         for key, val in v.items():

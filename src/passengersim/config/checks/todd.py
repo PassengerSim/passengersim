@@ -37,7 +37,46 @@ def check_todd_curves(
     raw_df: bool = False,
     also_none: bool = False,
     n_draws: int = 100_000,
+    mph: float | None = None,
 ):
+    """Check the choice distributions produced by configured TODD curves.
+
+    The check creates one synthetic nonstop itinerary for every local
+    departure hour, then simulates choices against each configured TODD
+    curve.
+
+    Parameters
+    ----------
+    cfg : Config
+        PassengerSim configuration to check.
+    orig, dest : str
+        Airport codes for the synthetic market.
+    carrier : str, optional
+        Carrier used for the synthetic itineraries. The first configured
+        carrier is used by default.
+    segment : str, default ``"business"``
+        Demand segment whose choice model is used.
+    raw_df : bool, default False
+        Return the underlying choice counts instead of an Altair chart.
+    also_none : bool, default False
+        Also simulate choices without a TODD curve.
+    n_draws : int, default 100000
+        Number of simulated choices per TODD curve.
+    mph : float, optional
+        Gate-to-gate speed for the synthetic itineraries. When omitted, a
+        speed is derived from the configured schedule-validation limits.
+
+    Returns
+    -------
+    pandas.DataFrame or altair.Chart
+        Hourly choice counts or a faceted chart of those counts.
+
+    Raises
+    ------
+    ValueError
+        If required TODD or choice-model configuration is missing, or if the
+        synthetic speed is not positive and finite.
+    """
 
     cfg = cfg.model_copy(deep=True)
 
@@ -54,15 +93,18 @@ def check_todd_curves(
     place_d = cfg.places[dest] = lookup_airport(dest)
 
     distance = get_mileage(cfg.places, orig, dest)
-    if distance < cfg.simulation_controls.speed_limits.SHORT_HAUL_MAX_DISTANCE:
-        mph = cfg.simulation_controls.speed_limits.SHORT_HAUL_MAXIMUM_SPEED - 25
-    elif distance > cfg.simulation_controls.speed_limits.LONG_HAUL_MIN_DISTANCE:
-        mph = cfg.simulation_controls.speed_limits.LONG_HAUL_MINIMUM_SPEED + 25
-    else:
-        mph = (
-            cfg.simulation_controls.speed_limits.SHORT_HAUL_MAXIMUM_SPEED
-            + cfg.simulation_controls.speed_limits.LONG_HAUL_MINIMUM_SPEED
-        ) / 2
+    if mph is None:
+        if distance < cfg.simulation_controls.speed_limits.SHORT_HAUL_MAX_DISTANCE:
+            mph = cfg.simulation_controls.speed_limits.SHORT_HAUL_MAXIMUM_SPEED - 25
+        elif distance > cfg.simulation_controls.speed_limits.LONG_HAUL_MIN_DISTANCE:
+            mph = cfg.simulation_controls.speed_limits.LONG_HAUL_MINIMUM_SPEED + 25
+        else:
+            mph = (
+                cfg.simulation_controls.speed_limits.SHORT_HAUL_MAXIMUM_SPEED
+                + cfg.simulation_controls.speed_limits.LONG_HAUL_MINIMUM_SPEED
+            ) / 2
+    if not np.isfinite(mph) or mph <= 0:
+        raise ValueError("mph must be a positive, finite number")
     duration = distance / mph * 3600
 
     # pick a carrier if none was set
@@ -73,7 +115,7 @@ def check_todd_curves(
 
     # set legs departing every hour
     new_legs = []
-    for h in range(1, 24):
+    for h in range(0, 24):
         dep_timestamp = datetime.fromisoformat(f"2023-01-07T{h:02d}:06:00").replace(tzinfo=ZoneInfo(place_o.time_zone))
         dep_unixtime = dep_timestamp.timestamp()
         arr_unixtime = dep_unixtime + duration
@@ -125,9 +167,18 @@ def check_todd_curves(
     )
     cfg.fares.append(f)
 
+    # remove all restrictions from fares and choice models to avoid filtering out paths
+    for fare in cfg.fares:
+        fare.restrictions = []
+    for cm in cfg.choice_models.values():
+        cm.restrictions = {}
+
     sim = Simulation(cfg)
     sim.setup_scenario()
     pths = [p for p in sim.paths.set_filters(**{"orig": orig, "dest": dest})]
+    dep_hour_by_path = {
+        p.path_id: datetime.fromtimestamp(p.dep_time, tz=ZoneInfo(place_o.time_zone)).hour for p in pths
+    }
     dmd = sim.demands.select(orig=orig, dest=dest, segment=segment)
     f = sim.fares.select(orig=orig, dest=dest, booking_class="Y99")
 
@@ -159,7 +210,7 @@ def check_todd_curves(
         .reset_index()
         .melt(id_vars="path_id", var_name="todd_curve", value_name="choices")
     )
-    df["dep_hour"] = df["path_id"] % 9000
+    df["dep_hour"] = df["path_id"].map(dep_hour_by_path)
 
     if raw_df:
         return df

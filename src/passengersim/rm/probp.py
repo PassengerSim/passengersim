@@ -113,6 +113,8 @@ class ProbabilisticBidPrice(RmAction):
                 leg.capacity_sharing = False
 
         if self.capacity_sharing:
+            #            for leg in sim.eng.legs.set_filters(carrier=self.carrier):
+            #                leg.capacity_sharing = True
             if self.capacity_sharing_start_dcp_index >= sim.eng.last_dcp_index:
                 for leg in sim.eng.legs.set_filters(carrier=self.carrier):
                     leg.capacity_sharing = True
@@ -132,9 +134,12 @@ class ProbabilisticBidPrice(RmAction):
         snapshot_instruction = self.apply_snapshot_filters(sim, days_prior)
 
         # num_cabins = len(self.cabins) if self.cabins is not None else 0
+        # Run for the entire leg
         debug_output = z.run(
             "", maxiter=self.maxiter, bid_price_vector=self.bid_price_vector, snapshot_instruction=snapshot_instruction
         )
+
+        # Now, if we're doing multi-cabin
         if self.cabins:
             for c in self.cabins:
                 debug_output = z.run(

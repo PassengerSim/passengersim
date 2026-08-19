@@ -496,7 +496,9 @@ def fig_speed_by_distance(cfg: Config, carrier: str | None = None) -> alt.Chart:
 
     from passengersim.config.places import calculate_mean_bearing
 
-    df = cfg.dataframes.legs.eval("speed = distance / (duration_minutes / 60)")
+    # ``leg_id`` is the index of the legs DataFrame.  Materialize it as a
+    # column so Altair can serialize the field used by the tooltip.
+    df = cfg.dataframes.legs.reset_index().eval("speed = distance / (duration_minutes / 60)")
 
     df = df.join(cfg.dataframes.places[["lat", "lon", "name"]].set_index("name").add_prefix("orig_"), on="orig").join(
         cfg.dataframes.places[["lat", "lon", "name"]].set_index("name").add_prefix("dest_"), on="dest"
@@ -564,8 +566,12 @@ def fig_duration_by_distance(cfg: Config, carrier: str | None = None) -> alt.Cha
 
     from passengersim.config.places import calculate_mean_bearing
 
-    df = cfg.dataframes.legs.eval("speed = distance / (duration_minutes / 60)").eval(
-        "duration_hours = duration_minutes / 60"
+    # ``leg_id`` is the index of the legs DataFrame.  Materialize it as a
+    # column so Altair can serialize the field used by the tooltip.
+    df = (
+        cfg.dataframes.legs.reset_index()
+        .eval("speed = distance / (duration_minutes / 60)")
+        .eval("duration_hours = duration_minutes / 60")
     )
 
     df = df.join(cfg.dataframes.places[["lat", "lon", "name"]].set_index("name").add_prefix("orig_"), on="orig").join(

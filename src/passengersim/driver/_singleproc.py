@@ -1020,7 +1020,12 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
             assert len(leg_market.fares) > 0, f"No fares found for market {leg_market}"
             for fare in leg_market.fares:
                 if fare.carrier_name == leg.carrier_name:
-                    leg.set_bucket_blank_value(fare.booking_class, fare.price)
+                    try:
+                        leg.set_bucket_blank_value(fare.booking_class, fare.price)
+                    except IndexError:
+                        pass
+                        # this can happen if there is a fare for a booking class that is not in the leg's buckets,
+                        # which might happen for certain configuration checks
 
         self.eng.base_time = config.simulation_controls.reference_epoch()
 

@@ -1,17 +1,25 @@
-"""Unit tests for the ToddCurve.probabilities pydantic validator."""
+"""Tests for TODD configuration and diagnostic helpers."""
 
 import warnings
 
 import pytest
 from pydantic import ValidationError
 
+import passengersim as pax
+from passengersim.config.checks import check_todd_curves
 from passengersim.config.todd_curves import ToddCurve
 
 
-def test_probabilities_none():
-    """None (the default) should pass through unchanged."""
-    t = ToddCurve(name="test", probabilities=None)
-    assert t.probabilities is None
+def test_probabilities_none_raises():
+    """An explicit null probability mapping is invalid."""
+    with pytest.raises(ValidationError):
+        ToddCurve(name="test", probabilities=None)
+
+
+def test_probabilities_missing_raises():
+    """Every TODD curve must define a probability mapping."""
+    with pytest.raises(ValidationError):
+        ToddCurve(name="test")
 
 
 def test_probabilities_already_normalized_no_warning():
@@ -91,3 +99,45 @@ def test_probabilities_keys_span_full_24_hour_range():
     t = ToddCurve(name="test", probabilities={0: 1.0, 23: 1.0})
     assert abs(t.probabilities[0] - 0.5) < 1e-9
     assert abs(t.probabilities[23] - 0.5) < 1e-9
+
+
+def test_check_todd_curves_explicit_speed_covers_all_departure_hours():
+    """An explicit speed must bypass validation limits and label every hour."""
+    cfg = pax.Config.from_yaml(pax.demo_network("3MKT"))
+    cfg.todd_curves = {
+        "morning": ToddCurve(name="morning", probabilities={8: 1.0}),
+    }
+
+    # BOS-LAX falls between these distance thresholds. The legacy speed
+    # fallback would average the two configured zero speeds, while a supplied
+    # speed must take precedence.
+    speed_limits = cfg.simulation_controls.speed_limits
+    speed_limits.SHORT_HAUL_MAX_DISTANCE = 500
+    speed_limits.LONG_HAUL_MIN_DISTANCE = 3_000
+    speed_limits.SHORT_HAUL_MINIMUM_SPEED = 0
+    speed_limits.SHORT_HAUL_MAXIMUM_SPEED = 0
+    speed_limits.LONG_HAUL_MINIMUM_SPEED = 0
+
+    result = check_todd_curves(
+        cfg,
+        orig="BOS",
+        dest="LAX",
+        mph=500,
+        n_draws=100,
+        raw_df=True,
+    )
+
+    assert set(result["dep_hour"]) == set(range(24))
+    assert result["choices"].sum() == 100
+
+
+@pytest.mark.parametrize("mph", [0, -1, float("inf"), float("nan")])
+def test_check_todd_curves_rejects_invalid_explicit_speed(mph):
+    """Synthetic itinerary speed must be positive and finite."""
+    cfg = pax.Config.from_yaml(pax.demo_network("3MKT"))
+    cfg.todd_curves = {
+        "morning": ToddCurve(name="morning", probabilities={8: 1.0}),
+    }
+
+    with pytest.raises(ValueError, match="mph must be a positive, finite number"):
+        check_todd_curves(cfg, orig="BOS", dest="ORD", mph=mph, raw_df=True)

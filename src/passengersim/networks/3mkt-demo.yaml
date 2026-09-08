@@ -771,7 +771,7 @@ demands:
     choice_model: leisure
     curve: c2
     distance: 864.0
-    group_sizes: [0.4, 0.3, 0.2, 0.1]
+    party_size: [0.4, 0.3, 0.2, 0.1]
   - orig: ORD
     dest: LAX
     segment: business
@@ -788,7 +788,7 @@ demands:
     distance: 1745
     choice_model: leisure
     curve: c2
-    group_sizes: [0.4, 0.3, 0.2, 0.1]
+    party_size: [0.4, 0.3, 0.2, 0.1]
   - orig: BOS
     dest: LAX
     segment: business
@@ -805,7 +805,7 @@ demands:
     #    distance: 2611
     choice_model: leisure
     curve: c2
-    group_sizes: [0.4, 0.3, 0.2, 0.1]
+    party_size: [0.4, 0.3, 0.2, 0.1]
 
 fares:
   - carrier: AL1

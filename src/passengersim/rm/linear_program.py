@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import random
+import sys
 import warnings
 from abc import ABC, abstractmethod
 from collections import defaultdict
@@ -33,6 +34,7 @@ class LinearProgramming(RmAction):
     """
 
     requires: set[str] = {"path_forecast"}
+    produces: set[str] = {"bid_prices"}
     frequency = "dcp"
     lp = {}
 
@@ -76,7 +78,7 @@ class LinearProgramming(RmAction):
             elif self.algorithm.lower() == "ssa":
                 s = StochasticSampleSolver(self.carrier, self.debug)
             elif self.algorithm.lower() == "ssblp":
-                raise ValueError("Not implemented yet")
+                s = SSBLP(self.carrier, self.debug)
             else:
                 raise ValueError("Unknown algorithm")
             s.initialize(sim.eng)
@@ -122,8 +124,6 @@ class LpBase(ABC):
 
 
 # ##########################################################################################
-
-
 class DLP(LpBase):
     """Deterministic LP, can be used to get displacement for UDP
     Can also set bid-prices as a demo of why deterministic LP isn't used
@@ -639,7 +639,236 @@ class LpPiecewise2(LpBase):
 
 # ##########################################################################################
 class SSBLP(LpBase):
-    """Stochastic Sales-Based LP, following [Ratliff 2025]
-    Currrently a placeholder, with planned implementation in June 2026"""
+    """Stochastic Sales-Based LP, following [Ratliff 2025]"""
 
-    pass
+    __slots__ = (
+        "carrier",
+        "solver",
+        "objective",
+        "lp_vars",
+        "constraints",
+        "epsilon",
+        "num_samples",
+        "set_bp",
+        "debug",
+    )
+
+    def __init__(self, _carrier: str, _debug: bool):
+        self.carrier = _carrier
+        self.constraints = {}
+        self.debug = _debug
+        self.solver = None
+        self.lp_vars = {}
+        self.num_samples = 5
+        self.objective = None
+
+    def initialize(self, eng: SimulationEngine):
+        self.solver = pywraplp.Solver.CreateSolver("GLOP")
+        self.objective = self.solver.Objective()
+        self.objective.SetMaximization()
+
+        tmp = DynamicProgram(eng, self.carrier)
+        tmp.initialize()  # This step sets up the PcPtr structures, will refactor later to make this a separate call
+
+        self.debug = True
+
+        # Create LP decision variables
+        self.lp_vars = {}
+        sample_vars = defaultdict(list)
+        if self.debug:
+            print(f"********** Sample = {eng.sample}, setup decision variables **********")
+        for mkt_key, mkt in eng.markets.items():
+            for path in mkt.paths:
+                cxr = path.carrier_name
+                if cxr != self.carrier:
+                    continue
+                for pc in path.pathclasses:
+                    price = pc.decision_fare
+                    pc_fcst = pc.forecast
+                    for t in range(eng.last_dcp_index, 16):
+                        y_name = f"y_{pc.identifier}_{t}"
+                        # y_name = f"y_{mkt_key}_{cxr}_{path.path_id}_{pc.booking_class}_{t}"
+                        self.lp_vars[y_name] = y = self.solver.NumVar(0, self.solver.infinity(), y_name)
+                        if self.debug:
+                            print("  Set Obj:", y, price)
+                        self.objective.SetCoefficient(y, 0.0)
+                        print(y_name)
+
+                        # x variables, one per stochastic sample
+                        for s in range(self.num_samples):
+                            mu = pc_fcst.get_mean_in_timeframe(s)
+                            sigma = pc_fcst.get_stdev_in_timeframe(s)
+                            sample_demand = max(random.normalvariate(mu=mu, sigma=sigma), 0.0)
+                            x_name = f"x_{mkt_key}_{cxr}_{path.path_id}_{pc.booking_class}_{s}_{t}"
+                            self.lp_vars[x_name] = x = self.solver.NumVar(0, sample_demand, x_name)
+                            sample_vars[s].append(x)
+                            self.objective.SetCoefficient(x, price / self.num_samples)
+                            print(x_name)
+
+                # Nesting constraints
+                # Suppose we have Y0, Y1 & Y2, we do this for each sample:
+                #   x_Y2 <= y_Y2
+                #   x_Y2 + x_Y1 <= y_Y2 + y_Y1
+                #   x_Y2 + x_Y1 + x_Y0 <= y_Y2 + y_Y1 + y_Y0
+                # We are already inside the loop over markets & paths
+                classes = ["Y5", "Y4", "Y3", "Y2", "Y1", "Y0"]
+                for t in range(eng.last_dcp_index, 16):
+                    for s in range(self.num_samples):
+                        nest_name = f"Nest-{mkt_key}-{path.path_id}-{t}-{s}"
+                        nest_c = self.solver.Constraint(0, self.solver.infinity(), nest_name)
+                        print(nest_name)
+
+                        # Now iterate over the classes
+                        for ci1 in range(len(classes)):
+                            tmp = ""
+                            for ci2 in range(ci1, len(classes)):
+                                bc = classes[ci2]
+                                x_name = f"x_{mkt_key}_{cxr}_{path.path_id}_{pc.booking_class}_{s}_{t}"
+                                y_name = f"y_{path.path_id}-{bc}_{t}"
+                                x = self.lp_vars[x_name]
+                                y = self.lp_vars[y_name]
+                                nest_c.SetCoefficient(x, -1.0)
+                                nest_c.SetCoefficient(y, 1.0)
+                                tmp += bc + " "
+                            if self.debug:
+                                print("    constraint for:", tmp)
+
+                if len(self.lp_vars) > 0:
+                    sys.exit(0)
+
+                # for j in range(len(pc_vars)):
+                #     nest_name = f"Nest-{p_id}-{s}-{j}"
+                #     if self.debug:
+                #         print("  Create sample nest constraint:", nest_name)
+                #     nest_c = self.solver.Constraint(0, self.solver.infinity(), nest_name)
+                #     for i in range(j, len(pc_vars)):
+                #         x = sample_vars[s][i]
+                #         y = pc_vars[i]
+                #         if self.debug:
+                #             print("    Coeffs:", x, y)
+                #         nest_c.SetCoefficient(x, -1.0)
+                #         nest_c.SetCoefficient(y, 1.0)
+
+        # Create capacity constraints
+        if len(self.lp_vars) == 0:
+            return
+        self.constraints = {}
+        for leg in eng.legs.set_filters(carrier=self.carrier):
+            rem_cap = leg.capacity - leg.sold
+            ct_name = f"Leg-{leg.flt_no}"
+            if self.debug:
+                print("Capacity constraint", ct_name, rem_cap)
+            ct = self.solver.Constraint(0, rem_cap, ct_name)
+            for pc_id in leg.pathclass_identifiers:
+                for t in range(eng.last_dcp_index, 16):
+                    name = f"y_{pc_id}_{t}"
+                    if self.debug:
+                        print("  Adding cap constraint for", name)
+                    ct.SetCoefficient(self.lp_vars[name], 1)
+            self.constraints[leg.flt_no] = ct
+        sys.exit(0)
+
+    def initialize2(self, eng: SimulationEngine):
+        self.solver = pywraplp.Solver.CreateSolver("GLOP")
+        self.objective = self.solver.Objective()
+        self.objective.SetMaximization()
+
+        tmp = DynamicProgram(eng, self.carrier)
+        tmp.initialize()  # This step sets up the PcPtr structures, will refactor later to make this a separate call
+
+        # create LP decision variables, which are how many passengers to accept for each path class
+        self.lp_vars = {}
+        if self.debug:
+            print(f"********** Sample = {eng.sample}, setup decision variables **********")
+        for path in eng.paths:  # .set_filters(carrier=self.carrier):
+            if path.carrier_name != self.carrier:
+                continue
+            if self.debug:
+                print("Path:", path)
+
+            p_id = f"{path.carrier_name}_{path.orig}_{path.dest}_{path.path_id}"
+            c_name = f"PathRev-{p_id}"
+            rev_c = self.solver.Constraint(0, self.solver.infinity(), c_name)
+
+            pc_vars = []
+            sample_vars = defaultdict(list)
+            for pc in path.pathclasses:
+                y_name = "y_" + pc.identifier
+                fare = pc.fare_price
+                pc_dmd = pc.fcst_mean
+                self.lp_vars[y_name] = y = self.solver.NumVar(0, pc_dmd, y_name)
+                if self.debug:
+                    print("  Set Obj:", y, fare)
+                self.objective.SetCoefficient(y, 0.0)
+                rev_c.SetCoefficient(y, fare)
+                pc_vars.append(y)
+
+                # Sample variables
+                rev = fare / self.num_samples
+                for s in range(self.num_samples):
+                    sample_demand = max(random.normalvariate(mu=pc_dmd, sigma=pc.fcst_std_dev), 0.0)
+                    x_name = f"x_{s}_{pc.identifier}"
+                    self.lp_vars[x_name] = x = self.solver.NumVar(0, sample_demand, x_name)
+                    sample_vars[s].append(x)
+                    if self.debug:
+                        print("  Set Obj", x, rev, pc_dmd, round(sample_demand, 2))
+                    self.objective.SetCoefficient(x, rev)
+                    if self.debug:
+                        print("  Set Constraint", c_name, x, -1.0 * rev)
+                    rev_c.SetCoefficient(x, -1.0 * rev)
+
+            # Nesting constraints
+            # Suppose we have Y0, Y1 & Y2, we do this for each sample:
+            #   x_Y2 <= y_Y2
+            #   x_Y2 + x_Y1 <= y_Y2 + y_Y1
+            #   x_Y2 + x_Y1 + x_Y0 <= y_Y2 + y_Y1 + y_Y0
+            for s in range(self.num_samples):
+                for j in range(len(pc_vars)):
+                    nest_name = f"SampleNest-{p_id}-{s}-{j}"
+                    if self.debug:
+                        print("  Create sample nest constraint:", nest_name)
+                    nest_c = self.solver.Constraint(0, self.solver.infinity(), nest_name)
+                    for i in range(j, len(pc_vars)):
+                        x = sample_vars[s][i]
+                        y = pc_vars[i]
+                        if self.debug:
+                            print("    Coeffs:", x, y)
+                        nest_c.SetCoefficient(x, -1.0)
+                        nest_c.SetCoefficient(y, 1.0)
+
+        # Create capacity constraints
+        self.constraints = {}
+        for leg in eng.legs.set_filters(carrier=self.carrier):
+            rem_cap = leg.capacity - leg.sold
+            ct_name = f"Leg-{leg.flt_no}"
+            if self.debug:
+                print("Capacity constraint", ct_name, rem_cap)
+            ct = self.solver.Constraint(0, rem_cap, ct_name)
+            for pc_id in leg.pathclass_identifiers:
+                name = "y_" + pc_id
+                if self.debug:
+                    print("  Adding variable", name)
+                ct.SetCoefficient(self.lp_vars[name], 1)
+            self.constraints[leg.flt_no] = ct
+
+    def update(self, eng: SimulationEngine):
+        self.initialize(eng)
+
+    # Solve and write displacement costs (bid prices) back to the engine
+    def solve(self, eng: SimulationEngine, debug: bool = False):
+        return
+        """
+        Solve the LP and write dual values (displacement costs / bid prices)
+        back to each leg.
+        """
+        status = self.solver.Solve()
+        if self.test_status(status):
+            for leg in eng.legs.set_filters(carrier=self.carrier):
+                dual = self.constraints[leg.flt_no].dual_value()
+                leg.displacement = max(dual, 0)
+                if self.set_bp:
+                    leg.bid_price = leg.displacement
+                print(f"Dual for {leg} = {round(dual, 2)}")
+            for k, var in self.lp_vars.items():
+                if k[0] != "x":
+                    print(k, round(var.solution_value(), 2))

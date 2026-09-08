@@ -517,6 +517,12 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     This can be activated to populate the `demand_history` summary table, if desired.
     """
 
+    dedupe_offers: bool = True
+    """Eliminate Offers from the choice set that are sricly dominated.
+       i.e. higher price, but same Path and same restrictions
+       Normally leave this on, but we can turn it off for some of the unit tests
+    """
+
     show_progress_bar: bool = True
     """
     Show a progress bar while running.

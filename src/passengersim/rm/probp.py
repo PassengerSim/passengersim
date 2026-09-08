@@ -92,7 +92,7 @@ class ProbabilisticBidPrice(RmAction):
         """Whether to use SubBP (True) or ProBP (False)."""
 
     def rm_engine(self, sim: Simulation) -> ProBP:
-        # We a reference to a ProBP object, as the CoreProBP code caches
+        # We have a reference to a ProBP object, as the CoreProBP code caches
         # the data structures it needs for each iteration
         if self._pro_bp_engine is None:
             engine = ProBP(sim.eng, self.carrier)
@@ -105,24 +105,7 @@ class ProbabilisticBidPrice(RmAction):
         if not self.should_run(sim, days_prior):
             return
 
-        # Make sure each sample is initialized
-        if sim.eng.last_dcp_index <= 1 and (
-            self.capacity_sharing_start_lf > 0.01 or self.capacity_sharing_start_dcp_index > 0
-        ):
-            for leg in sim.eng.legs.set_filters(carrier=self.carrier):
-                leg.capacity_sharing = False
-
-        if self.capacity_sharing:
-            #            for leg in sim.eng.legs.set_filters(carrier=self.carrier):
-            #                leg.capacity_sharing = True
-            if self.capacity_sharing_start_dcp_index >= sim.eng.last_dcp_index:
-                for leg in sim.eng.legs.set_filters(carrier=self.carrier):
-                    leg.capacity_sharing = True
-            elif self.capacity_sharing_start_lf > 0.01:
-                for leg in sim.eng.legs.set_filters(carrier=self.carrier):
-                    for cab in leg.cabins:
-                        if cab.name == "Y" and cab.sold / cab.capacity >= self.capacity_sharing_start_lf:
-                            leg.capacity_sharing = True
+        self.setup_capacity_sharing2(sim)
 
         z = self.rm_engine(sim)
 
@@ -151,3 +134,41 @@ class ProbabilisticBidPrice(RmAction):
 
         if debug_output:
             print(debug_output)
+
+    def setup_capacity_sharing(self, sim):
+        if self.capacity_sharing:
+            if sim.eng.last_dcp_index < self.capacity_sharing_start_dcp_index:
+                for leg in sim.eng.legs.set_filters(carrier=self.carrier):
+                    leg.capacity_sharing = False
+            else:
+                for leg in sim.eng.legs.set_filters(carrier=self.carrier):
+                    if self.capacity_sharing_start_lf < 0.01:
+                        leg.capacity_sharing = True
+                    else:
+                        for cab in leg.cabins:
+                            if cab.name == "Y" and cab.sold / cab.capacity > self.capacity_sharing_start_lf:
+                                leg.capacity_sharing = True
+
+    def setup_capacity_sharing2(self, sim):
+        for leg in sim.eng.legs.set_filters(carrier=self.carrier):
+            leg.capacity_sharing = self.capacity_sharing
+
+    def setup_capacity_sharing_old(self, sim):
+        # Make sure each sample is initialized
+        if sim.eng.last_dcp_index <= 1 and (
+            self.capacity_sharing_start_lf > 0.01 or self.capacity_sharing_start_dcp_index > 0
+        ):
+            for leg in sim.eng.legs.set_filters(carrier=self.carrier):
+                leg.capacity_sharing = False
+
+        if self.capacity_sharing:
+            #            for leg in sim.eng.legs.set_filters(carrier=self.carrier):
+            #                leg.capacity_sharing = True
+            if self.capacity_sharing_start_dcp_index >= sim.eng.last_dcp_index:
+                for leg in sim.eng.legs.set_filters(carrier=self.carrier):
+                    leg.capacity_sharing = True
+            elif self.capacity_sharing_start_lf > 0.01:
+                for leg in sim.eng.legs.set_filters(carrier=self.carrier):
+                    for cab in leg.cabins:
+                        if cab.name == "Y" and cab.sold / cab.capacity >= self.capacity_sharing_start_lf:
+                            leg.capacity_sharing = True

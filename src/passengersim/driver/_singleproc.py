@@ -869,8 +869,8 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
                     raise ValueError(f"Booking curve not defined for demand {dmd}")
             if dmd_config.todd_curve in self.todd_curves:
                 dmd.dwm = self.todd_curves[dmd_config.todd_curve]
-            if dmd_config.group_sizes is not None:
-                dmd.add_group_sizes(dmd_config.group_sizes)
+            if dmd_config.party_size is not None:
+                dmd.add_party_size(dmd_config.party_size)
             if dmd_config.prob_saturday_night is not None:
                 dmd.prob_saturday_night = dmd_config.prob_saturday_night
             dmd.prob_num_days = dmd_config.prob_num_days

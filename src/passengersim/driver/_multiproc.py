@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import concurrent.futures
+import getpass
 import json
 import multiprocessing
 import pathlib
+import syslog
 import threading
 import time
 import traceback
@@ -429,6 +431,16 @@ class MultiSimulation(BaseSimulation, CallbackMixin):
 
         return result_future
 
+    def log_config(self):
+        user_name = getpass.getuser()
+        trials = self.config.simulation_controls.num_trials
+        samples = self.config.simulation_controls.num_samples
+        syslog.openlog(ident="PassegerSim", facility=syslog.LOG_USER)
+        msg = f"user={user_name}, trials={trials}, samples={samples}"
+        # Send a basic informational log message
+        syslog.syslog(syslog.LOG_INFO, msg)
+        syslog.closelog()
+
     def run[SimulationTablesT: GenericSimulationTables](
         self,
         *,
@@ -440,6 +452,7 @@ class MultiSimulation(BaseSimulation, CallbackMixin):
         cache_dir: pathlib.Path | None = None,
     ):
         summarizer = check_summarizer(summarizer)
+        # self.log_config()
 
         if cache_dir is not None:
             from ._cache_run import cache_run

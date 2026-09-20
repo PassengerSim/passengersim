@@ -14,7 +14,8 @@ def clean_restrictions(cfg: Config, *, inplace: bool = False) -> Config:
     present in any fare, as they are basically superfluous. It also removes
     any restrictions from fares that are not present in any choice model, for
     the same reason. This helps to keep the configuration clean reduces memory
-    usage by not storing unnecessary restrictions.
+    usage by not storing unnecessary restrictions. Restriction names are
+    matched case-insensitively, while their original spelling is preserved.
 
     Parameters
     ----------
@@ -29,24 +30,21 @@ def clean_restrictions(cfg: Config, *, inplace: bool = False) -> Config:
     if not inplace:
         cfg = cfg.model_copy(deep=True)
 
-    all_restrictions_in_fares = set()
-    for f in cfg.fares:
-        for r in f.restrictions:
-            all_restrictions_in_fares.add(r)
+    fare_restrictions = {r.casefold() for fare in cfg.fares for r in fare.restrictions}
+    choice_model_restrictions = {
+        r.casefold() for choice_model in cfg.choice_models.values() for r in (choice_model.restrictions or {})
+    }
+    shared_restrictions = fare_restrictions & choice_model_restrictions
 
-    all_restrictions_in_choicemodels = set()
-    for cm in cfg.choice_models.values():
-        for r in cm.restrictions:
-            all_restrictions_in_choicemodels.add(r)
+    for choice_model in cfg.choice_models.values():
+        if choice_model.restrictions:
+            choice_model.restrictions = {
+                name: value
+                for name, value in choice_model.restrictions.items()
+                if name.casefold() in shared_restrictions
+            }
 
-    for r in all_restrictions_in_choicemodels - all_restrictions_in_fares:
-        for cm in cfg.choice_models.values():
-            if r in cm.restrictions:
-                del cm.restrictions[r]
-
-    for r in all_restrictions_in_fares - all_restrictions_in_choicemodels:
-        for f in cfg.fares:
-            if r in f.restrictions:
-                f.restrictions.remove(r)
+    for fare in cfg.fares:
+        fare.restrictions = [r for r in fare.restrictions if r.casefold() in shared_restrictions]
 
     return cfg

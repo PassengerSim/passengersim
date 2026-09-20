@@ -1,9 +1,49 @@
 import json
+import warnings
 
 import pytest
 
 from passengersim import demo_network
 from passengersim.config import Carrier, Config, DatabaseConfig, manipulate
+from passengersim.config.checks import check_config
+
+
+@pytest.mark.parametrize(
+    "burn_samples, num_samples, num_trials, expected",
+    [
+        (49, 799, 1, ["burn_samples is 49"]),
+        (50, 799, 1, ["Only 749 usable samples"]),
+        (49, 798, 1, ["burn_samples is 49", "Only 749 usable samples"]),
+        (50, 800, 1, []),
+        (51, 802, 1, []),
+        (0, 750, 1, ["burn_samples is 0"]),
+        (0, 1, 1, ["burn_samples is 0", "Only 1 usable samples"]),
+        (50, 425, 2, []),
+        (50, 424, 2, ["Only 748 usable samples"]),
+        (49, 424, 2, ["burn_samples is 49"]),
+    ],
+)
+def test_sample_count_warnings(burn_samples, num_samples, num_trials, expected):
+    """Check strict warning thresholds, including pooled trials and zero burn."""
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        Config(
+            simulation_controls={
+                "burn_samples": burn_samples,
+                "num_samples": num_samples,
+                "num_trials": num_trials,
+            }
+        )
+    assert len(caught) == len(expected)
+    for warning, message in zip(caught, expected):
+        assert warning.category is UserWarning
+        assert str(warning.message).startswith(message)
+
+
+@pytest.mark.parametrize("burn_samples", [100, 101])
+def test_burn_samples_must_leave_usable_samples(burn_samples):
+    with pytest.raises(ValueError, match="burn_samples must be strictly less than samples"):
+        Config(simulation_controls={"burn_samples": burn_samples, "num_samples": 100})
 
 
 @pytest.fixture
@@ -105,6 +145,27 @@ def test_restriction_stripping(config):
         assert not fare.restrictions
     for fare in config.fares:
         assert not fare.restrictions
+
+
+def test_restriction_check_matches_case_insensitively(config: Config, capsys):
+    for choice_model in config.choice_models.values():
+        if choice_model.restrictions:
+            choice_model.restrictions = {name.upper(): value for name, value in choice_model.restrictions.items()}
+    for fare in config.fares:
+        fare.restrictions = [name.lower() for name in fare.restrictions]
+
+    fare_names = {name for fare in config.fares for name in fare.restrictions}
+    choice_model_names = {
+        name for choice_model in config.choice_models.values() for name in (choice_model.restrictions or {})
+    }
+    assert fare_names != choice_model_names
+    assert {name.casefold() for name in fare_names} == {name.casefold() for name in choice_model_names}
+
+    check_config(config)
+
+    output = capsys.readouterr().out
+    assert "choice model and fare restrictions match" in output
+    assert "choice model and fare restrictions don't match" not in output
 
 
 def test_reference_price_variation_vs_multiplier(config: Config):

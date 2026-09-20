@@ -3,9 +3,9 @@ from __future__ import annotations
 import concurrent.futures
 import getpass
 import json
+import logging
 import multiprocessing
 import pathlib
-import syslog
 import threading
 import time
 import traceback
@@ -435,11 +435,16 @@ class MultiSimulation(BaseSimulation, CallbackMixin):
         user_name = getpass.getuser()
         trials = self.config.simulation_controls.num_trials
         samples = self.config.simulation_controls.num_samples
-        syslog.openlog(ident="PassegerSim", facility=syslog.LOG_USER)
         msg = f"user={user_name}, trials={trials}, samples={samples}"
         # Send a basic informational log message
-        syslog.syslog(syslog.LOG_INFO, msg)
-        syslog.closelog()
+        try:
+            import syslog
+        except ImportError:
+            logging.getLogger(__name__).info(msg)
+        else:
+            syslog.openlog(ident="PassegerSim", facility=syslog.LOG_USER)
+            syslog.syslog(syslog.LOG_INFO, msg)
+            syslog.closelog()
 
     def run[SimulationTablesT: GenericSimulationTables](
         self,

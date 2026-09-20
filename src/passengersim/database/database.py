@@ -111,6 +111,24 @@ class Database:
         self.open()
         self._db_writer = None
 
+    def __del__(self):
+        # Windows cannot unlink an open SQLite file. Close the Python
+        # connection before TemporaryDirectory's finalizer runs. Native writers
+        # own their cleanup and must not be called during cyclic collection.
+        # Read __dict__ directly because construction may have failed and
+        # __getattr__ delegates to a connection that might not exist yet.
+        try:
+            connection = self.__dict__.get("_connection")
+            if connection is not None:
+                connection.close()
+            temporary = self.__dict__.get("_temp_dir")
+            if temporary is not None:
+                temporary.cleanup()
+        except Exception:
+            # Destructors can run during interpreter shutdown; explicit close
+            # remains the appropriate way to report transaction errors.
+            pass
+
     def connect_to_simulation_engine(self, sim: SimulationEngine):
         # close the regular Python sqlite connection
         self.close()

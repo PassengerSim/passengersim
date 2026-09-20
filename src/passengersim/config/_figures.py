@@ -34,6 +34,7 @@ from passengersim.utils.colors import common_carrier_colors
 from passengersim.utils.mapping import PROJECTION1_CONUS, PROJECTION1_WORLD, conus_only, world_only
 
 from .base import Config
+from .checks.markets import check_market_max_flows
 from .dataframes import booking_curves_to_dataframe, frat5_curves_to_dataframe
 from .legs import Leg
 from .places import Place
@@ -51,6 +52,7 @@ __all__ = [
     "fig_market_schedule",
     "fig_reference_price_by_distance",
     "fig_maximum_fare_ratio_by_distance",
+    "fig_market_demand_saturation",
 ]
 
 
@@ -626,6 +628,7 @@ def plotly_route_map(
     projection_type: str = "robinson",
     height: int = 400,
     title: str | bool = True,
+    zoom: float = 1,
 ):
     """Plot a route map using Plotly.
 
@@ -657,6 +660,9 @@ def plotly_route_map(
         Chart title. If True, a title is generated automatically from the
         carrier name (e.g., ``"AA Routes"`` or ``"All Routes"``). If False or
         an empty string, no title is shown.
+    zoom : float, default 1
+        Initial zoom level for the map. Values greater than 1 zoom in and
+        values between 0 and 1 zoom out.
 
     Returns
     -------
@@ -671,6 +677,11 @@ def plotly_route_map(
 
     df_places = cfg.dataframes.places
     df_legs = cfg.dataframes.legs
+
+    # Remove all places that are not on some leg
+    all_ends = set(cfg.dataframes.legs.orig).union(set(cfg.dataframes.legs.dest))
+    df_places = df_places[df_places["name"].isin(all_ends)]
+
     if carrier is not None:
         df_legs = df_legs[df_legs["carrier"] == carrier]
     df_legs = df_legs.join(
@@ -728,6 +739,7 @@ def plotly_route_map(
             scope="world",
             projection_type=projection_type,
             projection_rotation=dict(lon=center_lon, lat=center_lat, roll=0),
+            projection_scale=zoom,
         ),
         height=height,
         margin={"r": 0, "t": 0, "l": 0, "b": 0},
@@ -1168,10 +1180,11 @@ def fig_hub_schedule(
 
     if coloring == "spoke":
         common_encoding["color"] = alt.Color("spoke:N", legend=None)
-    elif coloring == "spoke.region":
-        regions = {p: plc.tags["region"] for p, plc in cfg.places.items()}
-        df["region"] = df["spoke"].map(regions)
-        common_encoding["color"] = alt.Color("region:N")
+    elif isinstance(coloring, str) and coloring.startswith("spoke."):
+        region = coloring.split(".", 1)[1]
+        regions = {p: plc.tags[region] for p, plc in cfg.places.items()}
+        df[region] = df["spoke"].map(regions)
+        common_encoding["color"] = alt.Color(f"{region}:N")
     elif coloring is not None:
         raise ValueError("unrecognized coloring")
 
@@ -1558,3 +1571,43 @@ def fig_maximum_fare_ratio_by_distance(cfg: Config) -> alt.Chart:
             tooltip=["carrier", "orig", "dest", "distance", "FareRatio"],
         )
     )
+
+
+def fig_market_demand_saturation(cfg: Config, raw_df: bool = False) -> alt.Chart | pd.DataFrame:
+    """Create a figure showing the demand saturation by market.
+
+    Demand saturation is a measure that compares the total base demand in a market
+    (total over all market segments) and compares that to the total seats available
+    in all paths on that market.  Because PassengerSim generally assumes that all
+    modeled demand has a maximum willingness to pay of at least the lowest possible
+    fare, we would expect that the total base demand in a market should not be wildly
+    more than the number of seats available in the market.
+    """
+    df = check_market_max_flows(cfg).rename_axis(index="mkt_id").reset_index()
+    df["orig"] = df["mkt_id"].str.split("~").str[0]
+    df["dest"] = df["mkt_id"].str.split("~").str[1]
+    df["saturation_ratio"] = df["total_demand"] / df["max_flow"]
+    if raw_df:
+        return df
+    min_total_base_demand = df.total_demand.min()
+    max_total_base_demand = df.total_demand.max()
+    return (
+        alt.Chart(df)
+        .mark_circle()
+        .encode(
+            y=alt.Y(
+                "total_demand",
+                title="Total Base Demand",
+                scale=alt.Scale(domain=[min_total_base_demand, max_total_base_demand]),
+            ),
+            x=alt.X("max_flow", title="Market Flow Capacity"),
+            tooltip=[
+                alt.Tooltip("orig:N", title="Origin"),
+                alt.Tooltip("dest:N", title="Destination"),
+                alt.Tooltip("total_demand", title="Total Base Demand", format=".2f"),
+                alt.Tooltip("max_flow", title="Market Flow Capacity", format=",.0f"),
+                alt.Tooltip("saturation_ratio", title="Saturation Ratio", format=",.4f"),
+            ],
+        )
+        .interactive()
+    ).properties(title="Market Demand Saturation")

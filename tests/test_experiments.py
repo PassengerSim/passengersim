@@ -40,12 +40,12 @@ def test_experiments_interface(tmp_path):
         # experiments.run should have written a report to the output directory
         assert isinstance(experiments.report_filename, pathlib.Path)
         filename1 = experiments.report_filename
-        raw_report = experiments.report_filename.read_text()
+        raw_report = experiments.report_filename.read_text(encoding="utf-8")
         assert re.search(r"Figure 1: </span>Carrier Revenues</h2>", raw_report)
 
         # test the write_report method
         outfile = summaries.write_report("demo-output-1/meta.html", base_config=cfg)
-        raw_output = outfile.read_text()
+        raw_output = outfile.read_text(encoding="utf-8")
         assert re.search(r"Figure 1: </span>Carrier Revenues</h2>", raw_output)
 
         def nothing_to_see_here(summary):
@@ -69,7 +69,7 @@ def test_experiments_interface(tmp_path):
         assert experiments.report_filename != filename1
         assert experiments.report_filename.exists()
 
-        raw_report = experiments.report_filename.read_text()
+        raw_report = experiments.report_filename.read_text(encoding="utf-8")
         assert re.search(r"Figure 1: </span>Carrier Revenues</h2>", raw_report)
         assert re.search(r"<h1 id=\"bonus-section\">Bonus Section", raw_report)
         assert re.search(r"Figure [1-9]+: </span>Bonus Figure</h2>", raw_report)
@@ -86,7 +86,7 @@ def test_experiments_interface(tmp_path):
             for i in [str(file) for file in pathlib.Path("demo-output-1").rglob("*") if file.is_file()]:
                 print("found file in demo-output-1:", i)
             raise FileNotFoundError(raw_report_1_file)
-        raw_report_1 = pathlib.Path(raw_report_1_file).read_text()
+        raw_report_1 = pathlib.Path(raw_report_1_file).read_text(encoding="utf-8")
         assert re.search(r"Figure 1: </span>Carrier Revenues</h2>", raw_report_1)
         assert not re.search(r"<h1 id=\"bonus-section\">Bonus Section", raw_report_1)
         assert not re.search(r"Figure [1-9]+: </span>Bonus Figure</h2>", raw_report_1)
@@ -113,7 +113,7 @@ def test_experiments_rerun(tmp_path):
             return cfg
 
         # no existing saved result, check "raise" for use_existing
-        with raises(FileNotFoundError, match="demo-output-2/low_dmd/.*.pxsim"):
+        with raises(FileNotFoundError, match=r"demo-output-2[/\\]low_dmd[/\\].*\.pxsim"):
             _ = experiments.run(use_existing="raise")
 
         # no existing saved result, if "ignore" for use_existing should get empty
@@ -156,7 +156,38 @@ def test_experiments_rerun(tmp_path):
 
         # if the disk file is missing, and also the cache is missing, we should get an error
         experiments.experiments[0].cached = None
+        # Lazy summaries retain SQLite readers. Windows requires releasing them
+        # before deleting the backing file; Unix permits unlinking open files.
+        for results in (summary_1, summary_2, summary_3, summary_4):
+            for summary in results.values():
+                if summary._file_store is not None:
+                    summary._file_store.close()
+                    summary._file_store = None
+        del summary_1, summary_2, summary_3, summary_4
+        import gc
+
+        gc.collect()
         for pxfile in experiments.output_dir.joinpath("low_dmd").rglob("*.pxsim"):
             pxfile.unlink()
-        with raises(FileNotFoundError, match="demo-output-2/low_dmd/.*.pxsim"):
+        with raises(FileNotFoundError, match=r"demo-output-2[/\\]low_dmd[/\\].*\.pxsim"):
             _ = experiments.run(use_existing="raise", check_content=False)
+
+
+def test_rejected_summary_releases_file_handle(tmp_path):
+    import sqlite3
+    from types import SimpleNamespace
+
+    from passengersim.utils.kvstore import KVStore
+
+    filename = tmp_path / "rejected.pxsim"
+    store = KVStore(filename)
+    summary = SimpleNamespace(_file_store=store, config=None, metadata=lambda key: {})
+    config = SimpleNamespace(find_differences=lambda other: {"changed": True})
+    _, accepted = Experiments._check_loaded_summary(
+        summary, config, "rejected", check_versions=False, source_file=str(filename)
+    )
+    assert accepted is None
+    assert summary._file_store is None
+    with raises(sqlite3.ProgrammingError, match="closed"):
+        store.conn.execute("select 1")
+    filename.unlink()

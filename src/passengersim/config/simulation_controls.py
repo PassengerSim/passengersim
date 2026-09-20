@@ -291,7 +291,7 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     prorate_revenue: bool = True
 
     revenue_alpha: float = 0.0
-    """Used to exponentially smooth revenue per PathClass, to get optimizationFare"""
+    """Used to exponentially smooth revenue per PathClass, to get optimizationPrice"""
 
     save_orders: bool = False
 

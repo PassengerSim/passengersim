@@ -944,13 +944,25 @@ class Config(YamlConfig, extra="forbid"):
 
     @model_validator(mode="after")
     def _burn_samples(self) -> Self:
-        """burn_samples must be strictly less than samples"""
+        """Reject an empty study period and warn about insufficient sampling."""
         if self.simulation_controls.burn_samples >= self.simulation_controls.num_samples:
             raise ValueError(
                 "burn_samples must be strictly less than samples. It will default to 100 if you haven't set a value"
             )
-        if self.simulation_controls.burn_samples == 0 and self.simulation_controls.num_samples > 10:
-            raise ValueError("to ensure meaningful results, burn_samples may not be zero when num_samples > 10.")
+        controls = self.simulation_controls
+        if controls.burn_samples < 50:
+            warnings.warn(
+                f"burn_samples is {controls.burn_samples}; at least 50 burned samples per trial are recommended "
+                "to ensure meaningful results.",
+                stacklevel=2,
+            )
+        usable_samples = controls.num_trials * (controls.num_samples - controls.burn_samples)
+        if usable_samples < 750:
+            warnings.warn(
+                f"Only {usable_samples} usable samples remain after burn across all trials; "
+                "at least 750 usable samples are recommended to ensure meaningful results.",
+                stacklevel=2,
+            )
         return self
 
     @model_validator(mode="after")
@@ -1507,7 +1519,12 @@ class Config(YamlConfig, extra="forbid"):
             elif k in {"outputs"}:
                 val = "<outputs config>"
             elif k in {"db"}:
-                val = f"<database config, engine={v.engine}, filename={v.filename}>"
+                if v is None:
+                    val = "<None>"
+                elif isinstance(v, DatabaseConfig):
+                    val = f"<database config, engine={v.engine}, filename={v.filename}>"
+                else:
+                    val = repr(v)
             elif k in {"simulation_controls"}:
                 if v.num_trials == 1:
                     val = f"<simulation controls with {v.num_samples} samples, {v.burn_samples} burn>"
@@ -1571,5 +1588,6 @@ class Config(YamlConfig, extra="forbid"):
         """Print a quick summary of RM systems on each carrier."""
         for c, cx in self.carriers.items():
             print(f"{c}: {cx.rm_system}")
-            for opt, val in cx.rm_system_options.items():
-                print(f"  - {opt}: {val}")
+            if cx.rm_system_options is not None and cx.rm_system_options is not False:
+                for opt, val in cx.rm_system_options.items():
+                    print(f"  - {opt}: {val}")

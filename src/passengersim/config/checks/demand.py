@@ -214,8 +214,11 @@ def check_demand_generation(
         sim = Simulation(cfg)
     end_time = sim.eng.base_time
 
-    n_demands = len(cfg.demands)
-    segments = [d.segment for d in cfg.demands]
+    # Materialize the same engine sequence used to populate the accumulator so
+    # its row labels cannot drift from the data if engine ordering ever changes.
+    sim_demands = list(sim.demands)
+    n_demands = len(sim_demands)
+    segments = [d.segment for d in sim_demands]
     n_tf = len(cfg.dcps)
 
     counter_array = np.zeros([n_demands, n_tf], dtype=np.int32)
@@ -228,7 +231,7 @@ def check_demand_generation(
             cfg.simulation_controls,
             allocate=False,
         )
-        for n, dmd in enumerate(sim.demands):
+        for n, dmd in enumerate(sim_demands):
             num_pax = int(dmd.scenario_demand + 0.5)  # rounding
             dmd_by_tf = sim.eng.allocate_demand_to_tf(
                 dmd, num_pax=num_pax, tf_k_factor=cfg.simulation_controls.tf_k_factor, end_ts=end_time
@@ -251,7 +254,7 @@ def check_demand_generation(
         tf_draws = draw_table[:, tf].sum(0)
         wtp = np.empty(tf_draws, dtype=np.float32)
         z = 0
-        for n, dmd in enumerate(sim.demands):
+        for n, dmd in enumerate(sim_demands):
             cm = dmd.choice_model
             dmd_n_draws = draw_table[n, tf]
             if dmd_n_draws > 0:
@@ -317,9 +320,6 @@ def check_demand_generation(
     for bc, nan_tfs in unavailable_tfs.items():
         if nan_tfs:
             frat_5_estimates_ap.loc[frat_5_estimates_ap.index[-nan_tfs:], bc] = np.nan
-
-    # put segments in order of mean WTP, highest first
-    segments = segment_stats.index.tolist()
 
     output = DemandGenChecks(
         orig,
@@ -450,7 +450,9 @@ def _viz_segment_stats(raw_data: DemandGenChecks, height: int, width: int) -> al
         Layered Altair chart (bars + reference-price error bar).
     """
     segment_stats = raw_data.segment_stats
-    segments = raw_data.segments
+    # Segment statistics are intentionally displayed from highest to lowest
+    # mean WTP, independently of the demand-row order in ``raw_data.segments``.
+    segments = segment_stats.index.tolist()
     ref_prices = raw_data.reference_price
     emults = raw_data.emults
 

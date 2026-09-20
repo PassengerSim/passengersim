@@ -76,7 +76,14 @@ class SimTabLegs(GenericSimulationTables):
             "avg_local": "100.0 * gt_sold_local / gt_sold",
             # "avg_sold": "gt_sold / @n_total_samples",
         },
-        doc="Leg-level summary data.",
+        doc="""Leg-level summary data.
+
+        Within this table, there are several columns labeled with a "gt_" prefix.
+        Each of these is the "grand total" value, totalling up the revenue, sold
+        seats, and capacity across all non-burned samples in the simulation. To
+        convert these totals to mean (average) values, you need to divide by the
+        number of non-burned samples that were simulated.
+        """,
     )
 
     @property

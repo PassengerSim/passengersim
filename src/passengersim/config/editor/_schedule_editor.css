@@ -1,0 +1,499 @@
+.passengersim-schedule-editor {
+  color: var(--jp-ui-font-color1, #202124);
+  display: block;
+  font-family: var(--jp-ui-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  max-width: 100%;
+}
+
+.passengersim-schedule-editor .pse-shell {
+  border: 1px solid var(--jp-border-color2, #d5d9df);
+  border-radius: 4px;
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: 8px;
+  position: relative;
+}
+
+.passengersim-schedule-editor .pse-header,
+.passengersim-schedule-editor .pse-footer,
+.passengersim-schedule-editor .pse-status,
+.passengersim-schedule-editor .pse-toolbar {
+  align-items: center;
+  display: flex;
+}
+
+.passengersim-schedule-editor .pse-header {
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.passengersim-schedule-editor .pse-title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 0;
+}
+
+.passengersim-schedule-editor .pse-subtitle {
+  color: var(--jp-ui-font-color2, #5f6368);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.passengersim-schedule-editor .pse-toolbar {
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.passengersim-schedule-editor button,
+.passengersim-schedule-editor select,
+.passengersim-schedule-editor input {
+  background: var(--jp-layout-color1, #fff);
+  border: 1px solid var(--jp-border-color2, #c9ced6);
+  border-radius: 3px;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  min-height: 28px;
+  padding: 3px 8px;
+}
+
+.passengersim-schedule-editor input {
+  box-sizing: border-box;
+}
+
+.passengersim-schedule-editor button:not(:disabled) {
+  cursor: pointer;
+}
+
+.passengersim-schedule-editor button:not(:disabled):hover {
+  background: var(--jp-layout-color2, #f2f4f7);
+}
+
+.passengersim-schedule-editor button:focus-visible,
+.passengersim-schedule-editor select:focus-visible,
+.passengersim-schedule-editor input:focus-visible,
+.passengersim-schedule-editor .pse-draggable:focus-visible {
+  outline: 2px solid var(--jp-brand-color1, #1976d2);
+  outline-offset: 2px;
+}
+
+.passengersim-schedule-editor button:disabled,
+.passengersim-schedule-editor select:disabled,
+.passengersim-schedule-editor input:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.passengersim-capacity-editor .pce-bank-panel {
+  background: var(--jp-layout-color2, #f7f8fa);
+  border: 1px solid var(--jp-border-color2, #d5d9df);
+  border-bottom: 0;
+  padding: 6px 8px;
+}
+
+.passengersim-capacity-editor .pce-bank-controls,
+.passengersim-capacity-editor .pce-bank-buttons,
+.passengersim-capacity-editor .pce-bank-totals,
+.passengersim-capacity-editor .pce-leg-inspector,
+.passengersim-capacity-editor .pce-capacity-summary,
+.passengersim-capacity-editor .pce-popover-actions {
+  align-items: center;
+  display: flex;
+}
+
+.passengersim-capacity-editor .pce-bank-controls {
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+
+.passengersim-capacity-editor .pce-bank-controls label,
+.passengersim-capacity-editor .pce-capacity-form label {
+  align-items: center;
+  display: inline-flex;
+  font-size: 11px;
+  gap: 5px;
+}
+
+.passengersim-capacity-editor .pce-bank-select {
+  min-width: 130px;
+}
+
+.passengersim-capacity-editor .pce-bank-name {
+  min-width: 120px;
+  width: 160px;
+}
+
+.passengersim-capacity-editor .pce-bank-buttons {
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.passengersim-capacity-editor .pce-save-bank,
+.passengersim-capacity-editor .pce-apply-capacity {
+  background: var(--jp-brand-color1, #1976d2);
+  border-color: var(--jp-brand-color1, #1976d2);
+  color: #fff;
+  font-weight: 600;
+}
+
+.passengersim-capacity-editor .pce-delete-leg {
+  border-color: var(--jp-error-color1, #c62828);
+  color: var(--jp-error-color1, #c62828);
+  margin-right: auto;
+}
+
+.passengersim-capacity-editor .pce-delete-leg:not(:disabled):hover {
+  background: var(--jp-error-color3, #fdecec);
+}
+
+.passengersim-capacity-editor .pce-bank-totals {
+  color: var(--jp-ui-font-color2, #5f6368);
+  font-size: 12px;
+  gap: 20px;
+  min-height: 24px;
+  padding-top: 4px;
+}
+
+.passengersim-capacity-editor .pce-arrival-total,
+.passengersim-capacity-editor .pce-departure-total {
+  color: var(--jp-ui-font-color1, #202124);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.passengersim-capacity-editor .pce-flight-hit {
+  cursor: pointer;
+}
+
+.passengersim-capacity-editor .pse-leg-row.pce-active .pse-flight-line {
+  stroke-width: 3;
+}
+
+.passengersim-capacity-editor .pse-leg-row.pce-staged .pse-flight-line {
+  stroke-dasharray: 6 2;
+}
+
+.passengersim-capacity-editor .pse-leg-row.pse-selected .pse-flight-line {
+  filter: drop-shadow(0 0 2px var(--jp-ui-font-color1, #202124));
+  stroke-width: 4;
+}
+
+.passengersim-capacity-editor .pce-selectable:focus-visible .pse-flight-line {
+  filter: drop-shadow(0 0 2px var(--jp-brand-color1, #1976d2));
+  stroke-width: 4;
+}
+
+.passengersim-capacity-editor .pce-leg-inspector {
+  background: var(--jp-layout-color2, #f7f8fa);
+  border: 1px solid var(--jp-border-color2, #d5d9df);
+  border-top: 0;
+  gap: 16px;
+  justify-content: space-between;
+  min-height: 34px;
+  padding: 5px 8px;
+}
+
+.passengersim-capacity-editor .pce-inspector-label {
+  color: var(--jp-ui-font-color2, #5f6368);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.passengersim-capacity-editor .pce-selected-summary,
+.passengersim-capacity-editor .pce-capacity-summary {
+  font-size: 12px;
+}
+
+.passengersim-capacity-editor .pce-capacity-summary {
+  gap: 8px;
+}
+
+.passengersim-capacity-editor .pce-capacity-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.passengersim-capacity-editor .pce-capacity-popover {
+  background: var(--jp-layout-color1, #fff);
+  border: 1px solid var(--jp-border-color2, #c9ced6);
+  border-radius: 4px;
+  box-shadow: 0 3px 12px rgb(0 0 0 / 22%);
+  color: var(--jp-ui-font-color1, #202124);
+  min-width: 250px;
+  padding: 10px;
+  position: absolute;
+  z-index: 10001;
+}
+
+.passengersim-capacity-editor .pce-popover-heading {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.passengersim-capacity-editor .pce-capacity-form,
+.passengersim-capacity-editor .pce-capacity-presets,
+.passengersim-capacity-editor .pce-cabin-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.passengersim-capacity-editor .pce-capacity-presets {
+  align-items: flex-start;
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.passengersim-capacity-editor .pce-capacity-presets > span {
+  color: var(--jp-ui-font-color2, #5f6368);
+  flex-basis: 100%;
+  font-size: 10px;
+}
+
+.passengersim-capacity-editor .pce-preset {
+  min-height: 24px;
+  padding: 2px 7px;
+}
+
+.passengersim-capacity-editor .pce-scalar-capacity,
+.passengersim-capacity-editor .pce-cabin-fields label {
+  justify-content: space-between;
+}
+
+.passengersim-capacity-editor .pce-capacity-form input {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  width: 90px;
+}
+
+.passengersim-capacity-editor .pce-popover-actions {
+  gap: 6px;
+  justify-content: flex-end;
+  padding-top: 3px;
+}
+
+@media (max-width: 680px) {
+  .passengersim-capacity-editor .pce-bank-totals,
+  .passengersim-capacity-editor .pce-leg-inspector {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+}
+
+.passengersim-schedule-editor .pse-snap-label,
+.passengersim-schedule-editor .pse-skip-label {
+  align-items: center;
+  display: inline-flex;
+  font-size: 12px;
+  gap: 6px;
+}
+
+.passengersim-schedule-editor .pse-status {
+  color: var(--jp-ui-font-color2, #5f6368);
+  font-size: 12px;
+  gap: 12px;
+  min-height: 22px;
+}
+
+.passengersim-schedule-editor .pse-drag-readout {
+  color: var(--jp-brand-color1, #1976d2);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.passengersim-schedule-editor .pse-modified {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.passengersim-schedule-editor [data-phase="error"] .pse-status-message {
+  color: var(--jp-error-color1, #c62828);
+}
+
+.passengersim-schedule-editor [data-phase="finished"] .pse-status-message {
+  color: var(--jp-success-color1, #2e7d32);
+}
+
+.passengersim-schedule-editor .pse-legend {
+  align-items: center;
+  display: flex;
+  font-size: 10px;
+  gap: 10px;
+  min-height: 18px;
+  overflow-x: auto;
+  padding-bottom: 3px;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+.passengersim-schedule-editor .pse-legend-title {
+  color: var(--jp-ui-font-color2, #5f6368);
+  font-weight: 600;
+}
+
+.passengersim-schedule-editor .pse-legend-item {
+  align-items: center;
+  display: inline-flex;
+  gap: 4px;
+}
+
+.passengersim-schedule-editor .pse-legend-swatch {
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  border-radius: 50%;
+  box-sizing: border-box;
+  height: 8px;
+  width: 8px;
+}
+
+.passengersim-schedule-editor .pse-chart-viewport {
+  border: 1px solid var(--jp-border-color2, #d5d9df);
+  overflow: auto;
+}
+
+.passengersim-schedule-editor .pse-chart {
+  min-width: 560px;
+  width: 100%;
+}
+
+.passengersim-schedule-editor .pse-tooltip {
+  background: var(--jp-layout-color1, #fff);
+  border: 1px solid var(--jp-border-color2, #c9ced6);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 18%);
+  color: var(--jp-ui-font-color1, #202124);
+  font-size: 11px;
+  line-height: 1.35;
+  max-width: 320px;
+  padding: 6px 8px;
+  pointer-events: none;
+  position: absolute;
+  white-space: pre-line;
+  z-index: 10000;
+}
+
+.passengersim-schedule-editor .pse-svg {
+  background: var(--jp-layout-color0, #fff);
+  display: block;
+  overflow: visible;
+}
+
+.passengersim-schedule-editor .pse-axis line {
+  stroke: var(--jp-border-color1, #9aa0a6);
+  stroke-width: 1;
+}
+
+.passengersim-schedule-editor .pse-axis text,
+.passengersim-schedule-editor .pse-leg-label {
+  fill: var(--jp-ui-font-color2, #5f6368);
+  font-size: 10px;
+}
+
+.passengersim-schedule-editor .pse-axis-title {
+  fill: var(--jp-ui-font-color1, #202124) !important;
+  font-size: 11px !important;
+  font-weight: 600;
+}
+
+.passengersim-schedule-editor .pse-row-guide {
+  stroke: var(--jp-border-color3, #e8eaed);
+  stroke-width: 1;
+}
+
+.passengersim-schedule-editor .pse-flight-line {
+  stroke-linecap: round;
+  stroke-width: 1.5;
+}
+
+.passengersim-schedule-editor .pse-flight-hit {
+  cursor: ew-resize;
+  pointer-events: stroke;
+  stroke: transparent;
+  touch-action: none;
+}
+
+.passengersim-schedule-editor .pse-shell[data-phase="rebuilding"] .pse-flight-hit,
+.passengersim-schedule-editor .pse-shell[data-phase="finished"] .pse-flight-hit {
+  cursor: default;
+}
+
+.passengersim-schedule-editor .pse-hub-marker {
+  pointer-events: none;
+}
+
+.passengersim-schedule-editor .pse-leg-row {
+  opacity: 1;
+  transition: opacity 100ms ease;
+}
+
+.passengersim-schedule-editor .pse-leg-row.pse-dimmed {
+  opacity: 0.12;
+}
+
+.passengersim-schedule-editor .pse-leg-row.pse-selected .pse-flight-line {
+  stroke-width: 3.5;
+}
+
+.passengersim-capacity-editor .pse-leg-row.pce-pending-deletion .pse-flight-line {
+  opacity: 0.45;
+  stroke-dasharray: 3 2;
+}
+
+.passengersim-capacity-editor .pse-leg-row.pce-pending-deletion .pse-leg-label {
+  fill: var(--jp-error-color1, #c62828);
+}
+
+.passengersim-schedule-editor .pse-leg-row.pse-changed .pse-leg-label {
+  fill: var(--jp-ui-font-color1, #202124);
+  font-weight: 700;
+}
+
+.passengersim-schedule-editor .pse-dragging .pse-flight-line {
+  stroke-width: 3.5;
+}
+
+.passengersim-schedule-editor .pse-empty {
+  align-items: center;
+  color: var(--jp-ui-font-color2, #5f6368);
+  display: flex;
+  font-size: 13px;
+  justify-content: center;
+  min-height: 180px;
+}
+
+.passengersim-schedule-editor .pse-footer {
+  gap: 16px;
+  justify-content: flex-end;
+  padding-top: 8px;
+}
+
+.passengersim-schedule-editor .pse-finish {
+  background: var(--jp-brand-color1, #1976d2);
+  border-color: var(--jp-brand-color1, #1976d2);
+  color: #fff;
+  font-weight: 600;
+}
+
+.passengersim-schedule-editor .pse-finish:not(:disabled):hover {
+  background: var(--jp-brand-color0, #1565c0);
+}
+
+@media (max-width: 680px) {
+  .passengersim-schedule-editor .pse-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .passengersim-schedule-editor .pse-toolbar {
+    justify-content: flex-start;
+  }
+
+  .passengersim-schedule-editor .pse-footer {
+    align-items: flex-end;
+    flex-direction: column;
+  }
+}

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import heapq
+import warnings
 from datetime import datetime, timedelta
 from typing import Literal
 from zoneinfo import ZoneInfo
@@ -451,3 +452,205 @@ def check_time_windows(
     dashboard_right = start_end_times & wiggle_room
 
     return _check_time_windows(df, dmd) | dashboard_right
+
+
+def check_schedule_choices(
+    obj: CoreDemand | Config,
+    *,
+    orig: str | None = None,
+    dest: str | None = None,
+    carrier: str | None = None,
+    segment: str | None = None,
+    n_draws: int = 100_000,
+    raw_df: bool = False,
+    floor_price: float = 0.0,
+    floor_price_by_path: dict[int, float] | None = None,
+    adv_purch: int = 999,
+) -> pd.DataFrame | alt.FacetChart:
+    """Check the time-of-day choices for a given demand.
+
+    This function creates offers for all paths that serve a given demand,
+    conditional on the given floor price and advance purchase.  We assume that
+    every leg has capacity remaining, and every carrier offers the lowest price
+    fare that matches or exceeds the given floor price, and that would be available
+    if the customer arrives `adv_purch` days before departure.  This function
+    then simulates choices for the given demand with that choice set, and
+    returns the relative purchase distribution across the available offers.
+
+    Parameters
+    ----------
+    obj : CoreDemand or Config
+        Demand to check, or a configuration from which to construct one.
+    orig, dest, segment : str, optional
+        Demand identifiers used when ``obj`` is a configuration. Defaults to
+        ``"ISP"``, ``"LSE"``, and the first configured choice-model segment,
+        respectively.
+    carrier : str, optional
+        Limit paths and fares to this carrier. By default, offers from all
+        carriers are included.
+    n_draws : int, default 100000
+        Number of simulated customers.
+    raw_df : bool, default False
+        Return the offer-level results instead of an Altair chart.
+    floor_price : float, default 0.0
+        Default minimum fare price eligible for an offer.
+    floor_price_by_path : dict[int, float], optional
+        Minimum fare prices keyed by path ID. Values override ``floor_price``
+        for the specified paths and may be either higher or lower than the
+        default. Paths omitted from this mapping use ``floor_price``.
+    adv_purch : int, default 999
+        Days before departure at which fares must be available. A fare is
+        eligible when its advance-purchase restriction does not exceed this
+        value.
+
+    Returns
+    -------
+    pandas.DataFrame or altair.FacetChart
+        Offer-level choice results or a chart faceted by carrier. The
+        ``purchase_probability`` column is relative to all draws, while
+        ``choice_share`` is conditional on choosing an offer.
+
+    Raises
+    ------
+    TypeError
+        If ``obj`` is not a core demand or configuration.
+    ValueError
+        If no matching demand or eligible offers are available.
+    """
+    if isinstance(obj, Config):
+        if orig is None:
+            orig = "ISP"
+        if dest is None:
+            dest = "LSE"
+        if segment is None:
+            try:
+                segment = next(iter(obj.choice_models))
+            except StopIteration as err:
+                raise ValueError("No choice models defined in config") from err
+
+        cfg = obj.model_copy(deep=True)
+        cfg.simulation_controls.allow_unused_restrictions = True
+        cfg.demands = [
+            demand
+            for demand in cfg.demands
+            if demand.orig == orig and demand.dest == dest and demand.segment == segment
+        ]
+        if not cfg.demands:
+            raise ValueError(f"No demand found for {orig}~{dest}@{segment}")
+        cfg.fares = [
+            fare
+            for fare in cfg.fares
+            if fare.orig == orig and fare.dest == dest and (carrier is None or fare.carrier == carrier)
+        ]
+
+        # Build connections from the real configured legs. The single-demand
+        # helper used by other diagnostics may synthesize a path, which would
+        # hide the schedule this check is intended to analyze.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            sim = Simulation(cfg)
+        sim.setup_scenario()
+        dmd = sim.demands.select(orig=orig, dest=dest, segment=segment)
+    elif isinstance(obj, CoreDemand):
+        dmd = obj
+    else:
+        raise TypeError("obj must be a core.Demand or Config object")
+
+    if not np.isfinite(floor_price) or floor_price < 0:
+        raise ValueError("floor_price must be a nonnegative, finite number")
+    if floor_price_by_path is None:
+        floor_price_by_path = {}
+    for path_id, path_floor_price in floor_price_by_path.items():
+        if not np.isfinite(path_floor_price) or path_floor_price < 0:
+            raise ValueError(f"floor_price_by_path[{path_id!r}] must be a nonnegative, finite number")
+
+    # A fare can be reused across every path marketed by its carrier. Build the
+    # lookup once because the core demand exposes fares through an iterator.
+    # Apply floor prices below at the path level so an override lower than the
+    # global floor can still select the carrier's cheaper fares.
+    fares_by_carrier: dict[str, list] = {}
+    for fare in dmd.fares:
+        if carrier is not None and fare.carrier_name != carrier:
+            continue
+        if fare.adv_purch > adv_purch:
+            continue
+        fares_by_carrier.setdefault(fare.carrier_name, []).append(fare)
+
+    for fares in fares_by_carrier.values():
+        fares.sort(key=lambda fare: (fare.price, fare.booking_class, fare.fare_id))
+
+    offers = []
+    rows = []
+    for path in dmd.market.paths:
+        if carrier is not None and path.carrier_name != carrier:
+            continue
+        fares = fares_by_carrier.get(path.carrier_name)
+        if not fares:
+            continue
+
+        path_floor_price = floor_price_by_path.get(path.path_id, floor_price)
+        fare = next((fare for fare in fares if fare.price >= path_floor_price), None)
+        if fare is None:
+            continue
+        offers.append(Offer(path, fare, fare.price))
+        routing = "-".join([path.get_leg_orig(0), *(path.get_leg_dest(i) for i in range(path.num_legs()))])
+        rows.append(
+            {
+                "path_id": path.path_id,
+                "carrier": path.carrier_name,
+                "routing": routing,
+                "booking_class": fare.booking_class,
+                "price": fare.price,
+                # The core local-time getter applies the origin GMT offset. Treat
+                # that adjusted timestamp as naive so Altair displays wall time.
+                "departure": pd.to_datetime(path.get_leg_dep_time_local(0), unit="s"),
+                "arrival": pd.to_datetime(path.get_leg_arr_time_local(path.num_legs() - 1), unit="s"),
+                "duration": path.duration,
+            }
+        )
+
+    if not offers:
+        filters = f"floor_price={floor_price}, adv_purch={adv_purch}"
+        if carrier is not None:
+            filters += f", carrier={carrier!r}"
+        raise ValueError(f"No eligible offers for {dmd.identifier} ({filters})")
+
+    choices = np.asarray(dmd.simulate_choices(offers, n_draws=n_draws), dtype=np.int64)
+    df = pd.DataFrame(rows)
+    df["choices"] = choices
+    df["purchase_probability"] = df["choices"] / n_draws
+    total_purchases = int(choices.sum())
+    df["choice_share"] = df["choices"] / total_purchases if total_purchases else 0.0
+    df = df.sort_values(["departure", "carrier", "path_id"], ignore_index=True)
+
+    if raw_df:
+        return df
+
+    return (
+        alt.Chart(
+            df,
+            title=alt.TitleParams(f"Schedule Choices for {dmd.identifier}", anchor="middle", fontSize=14),
+        )
+        .mark_bar()
+        .encode(
+            x=alt.X("departure:T", title="Local Departure Time", axis=alt.Axis(format="%H:%M")),
+            y=alt.Y("choice_share:Q", title="Share of Purchases", axis=alt.Axis(format=".0%")),
+            color=alt.Color("carrier:N", title="Carrier", legend=None),
+            detail=alt.Detail("path_id:N"),
+            tooltip=[
+                alt.Tooltip("path_id:N", title="Path ID"),
+                alt.Tooltip("carrier:N", title="Carrier"),
+                alt.Tooltip("routing:N", title="Routing"),
+                alt.Tooltip("departure:T", title="Departure", format="%H:%M"),
+                alt.Tooltip("arrival:T", title="Arrival", format="%H:%M"),
+                alt.Tooltip("duration:Q", title="Duration (minutes)", format=",.0f"),
+                alt.Tooltip("booking_class:N", title="Booking Class"),
+                alt.Tooltip("price:Q", title="Price", format="$.2f"),
+                alt.Tooltip("choices:Q", title="Choices", format=","),
+                alt.Tooltip("purchase_probability:Q", title="Purchase Probability", format=".2%"),
+                alt.Tooltip("choice_share:Q", title="Choice Share", format=".2%"),
+            ],
+        )
+        .facet(row=alt.Row("carrier:N", title=None))
+        .resolve_scale(y="shared")
+    )

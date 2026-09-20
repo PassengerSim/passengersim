@@ -1017,7 +1017,8 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
             except KeyError:
                 # no market for this leg, so no fares, that's ok
                 continue
-            assert len(leg_market.fares) > 0, f"No fares found for market {leg_market}"
+            if leg_market.demands:
+                assert len(leg_market.fares) > 0, f"No fares found for market {leg_market}"
             for fare in leg_market.fares:
                 if fare.carrier_name == leg.carrier_name:
                     try:

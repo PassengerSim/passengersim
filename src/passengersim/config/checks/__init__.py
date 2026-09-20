@@ -4,11 +4,16 @@ import textwrap
 
 from passengersim.config import Config
 
-from .choice_models import check_choice_model_restrictions
+from .choice_models import check_choice_model_restrictions, check_choice_models
 from .demand import check_demands_without_fares, check_demands_without_paths, check_reference_price_scaling
 from .fares import check_fare_restrictions, check_fares_without_demands
-from .markets import check_market_windows, check_markets_without_fares, check_min_fare_price_by_market
-from .todd import check_todd_curves
+from .markets import (
+    check_market_max_flows,
+    check_market_windows,
+    check_markets_without_fares,
+    check_min_fare_price_by_market,
+)
+from .todd import check_schedule_choices, check_todd_curves
 
 
 def _bad(s, e):
@@ -73,10 +78,13 @@ def check_config(cfg: Config):
     else:
         _warn("no choice model restrictions found")
 
-    if r.keys() != r1.keys():
+    fare_restriction_names = {name.casefold() for name in r}
+    choice_model_restriction_names = {name.casefold() for name in r1}
+    if fare_restriction_names != choice_model_restriction_names:
         _bad(
             "choice model and fare restrictions don't match",
-            f"{len(r)} fare restrictions vs {len(r1)} choice model restrictions",
+            f"{len(fare_restriction_names)} fare restrictions vs "
+            f"{len(choice_model_restriction_names)} choice model restrictions",
         )
     else:
         _good("choice model and fare restrictions match")

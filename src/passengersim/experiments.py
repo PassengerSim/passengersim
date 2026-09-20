@@ -378,6 +378,16 @@ class Experiments(CallbackMixin):
             summary itself if it passes all checks, or ``None`` if it should
             not be reused.
         """
+
+        def reject(message):
+            # Rejected lazy results will not be returned to a caller who could
+            # close them. Release the SQLite handle now, including when an
+            # exception traceback or diagnostic tool retains the summary.
+            if summary._file_store is not None:
+                summary._file_store.close()
+                summary._file_store = None
+            return message, None
+
         if source_file is None:
             try:
                 source_file = summary.metadata("store.filename")
@@ -396,14 +406,14 @@ class Experiments(CallbackMixin):
             versions = summary.metadata("version")
         except KeyError:
             msg = f"Loaded {tag} from {source_file}, but the PassengerSim version is unknown"
-            return msg, None
+            return reject(msg)
 
         public_version = versions.get("passengersim", None)
         core_version = versions.get("passengersim_core", None)
 
         if check_versions and public_version is None:
             msg = f"Loaded {tag} from {source_file}, but the PassengerSim version is unknown"
-            return msg, None
+            return reject(msg)
 
         if check_versions and public_version != _passengersim_version:
             msg = (
@@ -411,11 +421,11 @@ class Experiments(CallbackMixin):
                 f"but the PassengerSim version has changed: "
                 f"running {_passengersim_version}, found {public_version}"
             )
-            return msg, None
+            return reject(msg)
 
         if check_versions and core_version is None:
             msg = f"Loaded {tag} from {source_file}, but the PassengerSim.Core version is unknown"
-            return msg, None
+            return reject(msg)
 
         if check_versions and core_version != _passengersim_core_version:
             msg = (
@@ -423,15 +433,15 @@ class Experiments(CallbackMixin):
                 f"but the PassengerSim.Core version has changed: "
                 f"running {_passengersim_core_version}, found {core_version}"
             )
-            return msg, None
+            return reject(msg)
 
         if isinstance(check, ValidationError):
             msg = f"Loaded {tag} from {source_file}, but the config is invalid:\n{str(check)[:4000]}"
-            return msg, None
+            return reject(msg)
 
         if check_content and check:
             msg = f"Loaded {tag} from {source_file}, but the config has changed:\n{str(check)[:4000]}"
-            return msg, None
+            return reject(msg)
 
         if check:
             msg = f"Loaded {tag} from {source_file}, although the config has changed:\n{str(check)[:4000]}"

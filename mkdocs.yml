@@ -102,6 +102,8 @@ nav:
       - user-guide/rm-systems/probp.md
     - Writing Configs: user-guide/writing-configs.md
     - Dynamic Config: user-guide/dynamic-config.nbconvert.ipynb
+    - Schedule Editor: user-guide/schedule-editor.md
+    - Capacity Editor: user-guide/capacity-editor.md
     - Database:
       - user-guide/database/index.md
       - user-guide/database/carrier_summary.md
@@ -145,6 +147,10 @@ nav:
       - API/config/choice_model.md
       - API/config/database.md
       - API/config/demands.md
+      - Notebook Editors:
+        - API/config/editor/__init__.md
+        - Schedule: API/config/editor/schedule.md
+        - Capacity: API/config/editor/capacity.md
       - API/config/fares.md
       - API/config/frat5_curves.md
       - API/config/legs.md

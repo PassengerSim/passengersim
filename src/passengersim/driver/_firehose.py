@@ -20,7 +20,15 @@ class Firehose:
         self._firehose_buffers = {}
         """A mapping of firehose topic to buffer, for topics with a writable destination."""
 
-    def attach_firehose(self, topic: str, destination: str | bool | TextIO | None) -> None:
+    def attach_firehose(
+        self,
+        topic: str,
+        destination: str | bool | TextIO | None,
+        *,
+        orig: str | None = None,
+        dest: str | None = None,
+        segment: str | None = None,
+    ) -> None:
         """Attach a firehose logger destination for a topic.
 
         Parameters
@@ -30,11 +38,22 @@ class Firehose:
         destination : str or bool or file-like or None
             Destination passed through to the engine. Writable destinations are
             also stored locally so they can be returned by :meth:`get_firehose`.
+        orig : str or None, default None
+            For the ``"choice"`` topic, only log customers whose demand has this origin.
+        dest : str or None, default None
+            For the ``"choice"`` topic, only log customers whose demand has this destination.
+        segment : str or None, default None
+            For the ``"choice"`` topic, only log customers whose demand has this segment.
+
+        Notes
+        -----
+        Choice filters use exact, case-sensitive matches. Omitted filters are wildcards.
+        Demand filters are not supported by other firehose topics.
         """
         if not isinstance(destination, str | bool | type(None)):
             # when adding a file-like object, attach here so we can get it back later if needed
             self._firehose_buffers[topic] = destination
-        self.eng.attach_firehose_logger(topic, destination)
+        self.eng.attach_firehose_logger(topic, destination, orig=orig, dest=dest, segment=segment)
 
     def get_firehose(self, topic: str) -> TextIO | None:
         """Return the cached writable firehose destination for a topic.

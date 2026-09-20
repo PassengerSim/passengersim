@@ -23,3 +23,15 @@ def test_multiprocessing_failure(cfg):
         ValueError, match="Keyword argument 'bid_price_vector' does not match any configuration parameter in 'V'."
     ):
         _summary = sim.run()
+
+
+def test_config_logging_without_syslog(cfg, monkeypatch, caplog):
+    """Windows has no syslog module but must still run multi-trial simulations."""
+    import logging
+    import sys
+
+    monkeypatch.setitem(sys.modules, "syslog", None)
+    sim = pax.MultiSimulation(cfg)
+    with caplog.at_level(logging.INFO, logger="passengersim.driver._multiproc"):
+        sim.log_config()
+    assert "trials=2, samples=40" in caplog.text

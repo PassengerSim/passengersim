@@ -23,10 +23,10 @@ def fig_forecasts_and_bid_prices(
           name as booking_class,
           forecast_mean
         FROM leg_bucket_detail
-        WHERE sample >= ?1
-          AND trial == ?2
-          AND days_prior == ?3
-          AND leg_id == ?4
+        WHERE sample >= ?
+          AND trial == ?
+          AND days_prior == ?
+          AND leg_id == ?
         """,
         (burn, trial, days_prior, leg_id),
     )
@@ -37,10 +37,10 @@ def fig_forecasts_and_bid_prices(
           sample,
           bid_price
         FROM leg_detail
-        WHERE sample >= ?1
-          AND trial == ?2
-          AND days_prior == ?3
-          AND leg_id == ?4
+        WHERE sample >= ?
+          AND trial == ?
+          AND days_prior == ?
+          AND leg_id == ?
         """,
         (burn, trial, days_prior, leg_id),
     )

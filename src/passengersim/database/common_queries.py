@@ -64,12 +64,12 @@ def fare_class_mix(db: Database, scenario: str, burn_samples: int = 100) -> pd.D
     FROM
         fare_summary
     WHERE
-        sample >= ?2
-        AND scenario = ?1
+        sample >= ?
+        AND scenario = ?
     GROUP BY carrier, booking_class
     ORDER BY carrier, booking_class;
     """
-    return db.dataframe(qry, (scenario, burn_samples)).set_index(["carrier", "booking_class"])
+    return db.dataframe(qry, (burn_samples, scenario)).set_index(["carrier", "booking_class"])
 
 
 @deprecated_cnx_keyword()
@@ -118,17 +118,17 @@ def od_fare_class_mix(db: Database, orig: str, dest: str, scenario: str, burn_sa
                 fare_detail LEFT JOIN fare_defs USING (fare_id)
             WHERE
                 days_prior = 0
-                AND sample >= ?2
-                AND scenario = ?1
-                AND orig = ?3
-                AND dest = ?4
+                AND sample >= ?
+                AND scenario = ?
+                AND orig = ?
+                AND dest = ?
             GROUP BY
                 trial, sample, carrier, booking_class
     ) tmp
     GROUP BY carrier, booking_class
     ORDER BY carrier, booking_class;
     """
-    return db.dataframe(qry, (scenario, burn_samples, orig, dest)).set_index(["carrier", "booking_class"])
+    return db.dataframe(qry, (burn_samples, scenario, orig, dest)).set_index(["carrier", "booking_class"])
 
 
 @deprecated_cnx_keyword()
@@ -151,13 +151,13 @@ def load_factors(db: Database, scenario: str, burn_samples: int = 100) -> pd.Dat
           FROM leg_detail
                    JOIN leg_defs USING (leg_id)
           WHERE days_prior = 0
-            AND sample >= ?2
-            AND scenario = ?1
+            AND sample >= ?
+            AND scenario = ?
           GROUP BY trial, sample, carrier
          ) tmp
     GROUP BY carrier
     """
-    return db.dataframe(qry, (scenario, burn_samples))
+    return db.dataframe(qry, (burn_samples, scenario))
 
 
 @deprecated_cnx_keyword()
@@ -191,12 +191,12 @@ def load_factor_distribution(
         FROM leg_detail
                    JOIN leg_defs USING (leg_id)
           WHERE days_prior = 0  -- only after all sales are recorded
-            AND sample >= ?2    -- only after burn period
-            AND scenario = ?1   -- only for this scenario
+            AND sample >= ?    -- only after burn period
+            AND scenario = ?   -- only for this scenario
     )
     GROUP BY carrier
     """
-    return db.dataframe(qry, (scenario, burn_samples))
+    return db.dataframe(qry, (burn_samples, scenario))
 
 
 @deprecated_cnx_keyword()
@@ -229,12 +229,12 @@ def total_demand(db: Database, scenario: str, burn_samples: int = 100) -> float:
             demand_detail
         WHERE
             days_prior = 0
-            AND sample >= ?2
-            AND scenario = ?1
+            AND sample >= ?
+            AND scenario = ?
         GROUP BY
             trial, sample) tmp;
     """
-    return db.dataframe(qry, (scenario, burn_samples)).iloc[0, 0]
+    return db.dataframe(qry, (burn_samples, scenario)).iloc[0, 0]
 
 
 @deprecated_cnx_keyword()
@@ -294,15 +294,15 @@ def bookings_by_timeframe(
                  SUM(sold * price) AS revenue
           FROM fare_detail LEFT JOIN fare_defs USING (fare_id)
           WHERE
-                sample >= ?2
-                AND scenario = ?1
+                sample >= ?
+                AND scenario = ?
           GROUP BY trial, sample, carrier, booking_class, days_prior) a
     GROUP BY carrier, booking_class, days_prior, trial
     ORDER BY carrier, booking_class, days_prior, trial;
     """
 
     if from_fare_detail:
-        return db.dataframe(qry_fare, (scenario, burn_samples)).set_index(
+        return db.dataframe(qry_fare, (burn_samples, scenario)).set_index(
             ["trial", "carrier", "booking_class", "days_prior"]
         )
 
@@ -320,7 +320,7 @@ def bookings_by_timeframe(
     FROM
         bookings_by_timeframe
     WHERE
-        scenario = ?1
+        scenario = ?
     GROUP BY
         carrier, booking_class, days_prior, trial
     ORDER BY
@@ -372,13 +372,13 @@ def leg_forecasts(db: Database, *, scenario: str = None, burn_samples: int = 100
     FROM
         leg_bucket_detail LEFT JOIN leg_defs USING (leg_id)
     WHERE
-        sample >= ?1
-        AND scenario = ?2
+        sample >= ?
+        AND scenario = ?
     GROUP BY
         carrier, leg_id, bucket_number, name, days_prior
     """
     if scenario is None:
-        qry = qry.replace("AND scenario = ?2", "")
+        qry = qry.replace("AND scenario = ?", "")
         params = (burn_samples,)
     else:
         params = (burn_samples, scenario)
@@ -639,13 +639,13 @@ def path_forecasts(db: Database, *, scenario: str = None, burn_samples: int = 10
     FROM
         path_class_detail
     WHERE
-        sample >= ?1
-        AND scenario = ?2
+        sample >= ?
+        AND scenario = ?
     GROUP BY
         path_id, booking_class, days_prior
     """
     if scenario is None:
-        qry = qry.replace("AND scenario = ?2", "")
+        qry = qry.replace("AND scenario = ?", "")
         params = (burn_samples,)
     else:
         params = (burn_samples, scenario)
@@ -685,11 +685,11 @@ def demand_to_come(db: Database, *, scenario: str = None, burn_samples: int = 10
     FROM
         demand_detail
     WHERE
-        sample >= ?1
-        AND scenario = ?2
+        sample >= ?
+        AND scenario = ?
     """
     if scenario is None:
-        qry = qry.replace("AND scenario = ?2", "")
+        qry = qry.replace("AND scenario = ?", "")
         params = (burn_samples,)
     else:
         params = (burn_samples, scenario)
@@ -746,7 +746,7 @@ def demand_to_come_summary(db: Database, scenario: str, burn_samples: int = 100)
     FROM
         tmp_demand_summary
     WHERE
-        sample >= ?1
+        sample >= ?
     GROUP BY
         segment, days_prior
     ORDER BY
@@ -759,7 +759,7 @@ def demand_to_come_summary(db: Database, scenario: str, burn_samples: int = 100)
     SELECT
         segment, days_prior, mean_future_demand, stdev_future_demand
     FROM demand_to_come_summary
-    WHERE scenario = ?1
+    WHERE scenario = ?
     """
     dmd = db.dataframe(qry, (scenario,))
     dhs = dmd.set_index(["segment", "days_prior"])
@@ -807,7 +807,7 @@ def carrier_history(db: Database, *, scenario: str = None, burn_samples: int = 1
         max_days_prior = int(
             db.dataframe(
                 """
-                SELECT max(days_prior) FROM leg_bucket_detail WHERE scenario == ?1
+                SELECT max(days_prior) FROM leg_bucket_detail WHERE scenario == ?
                 """,
                 (scenario,),
             ).iloc[0, 0]
@@ -915,7 +915,7 @@ def bid_price_history(
     FROM leg_detail
         LEFT JOIN leg_defs ON leg_detail.leg_id = leg_defs.leg_id
     WHERE
-        sample >= ?1
+        sample >= ?
     GROUP BY
         carrier, days_prior
     """
@@ -933,7 +933,7 @@ def bid_price_history(
         bid_price_stdev,
         fraction_some_cap,
         fraction_zero_cap
-    FROM bid_price_general_summary WHERE scenario == ?1
+    FROM bid_price_general_summary WHERE scenario == ?
     """
     bph = db.dataframe(
         qry,
@@ -952,7 +952,7 @@ def bid_price_history(
     FROM leg_detail
         LEFT JOIN leg_defs ON leg_detail.leg_id = leg_defs.leg_id
     WHERE
-        sample >= ?1
+        sample >= ?
         AND leg_detail.sold < leg_defs.capacity
     GROUP BY
         carrier, days_prior
@@ -969,7 +969,7 @@ def bid_price_history(
         some_cap_bid_price_mean_unweighted,
         some_cap_bid_price_stdev,
         some_cap_bid_price_mean_capweighted
-    FROM bid_price_somecap_summary WHERE scenario == ?1
+    FROM bid_price_somecap_summary WHERE scenario == ?
     """
     bph_some_cap = db.dataframe(
         qry2,
@@ -1029,7 +1029,7 @@ def displacement_history(
     FROM leg_detail
         LEFT JOIN leg_defs ON leg_detail.leg_id = leg_defs.leg_id
     WHERE
-        sample >= ?1
+        sample >= ?
     GROUP BY
         scenario, carrier, days_prior
     ORDER BY
@@ -1044,7 +1044,7 @@ def displacement_history(
     qry = """
     SELECT carrier, days_prior, displacement_mean, displacement_stdev
     FROM displacement_summary
-    WHERE scenario == ?1
+    WHERE scenario == ?
     """
     df = db.dataframe(
         qry,
@@ -1114,8 +1114,8 @@ def local_and_flow_yields(db: Database, *, scenario: str = None, burn_samples: i
             LEFT JOIN path_defs USING (path_id)
         WHERE
             days_prior == 0
-            AND sample >= ?1
-            AND scenario == ?2
+            AND sample >= ?
+            AND scenario == ?
         GROUP BY
             path_id
     )
@@ -1156,7 +1156,7 @@ def local_and_flow_yields(db: Database, *, scenario: str = None, burn_samples: i
         ) f2 ON f2.leg2 == leg_defs.leg_id
     """
     if scenario is None:
-        qry = qry.replace("AND scenario == ?2", "")
+        qry = qry.replace("AND scenario == ?", "")
         params = (burn_samples,)
     else:
         params = (burn_samples, scenario)
@@ -1177,8 +1177,8 @@ def leg_local_and_flow_by_class(db: Database, scenario: str, burn_samples: int =
         WHERE
             days_prior == 0
             AND leg2 IS NULL
-            AND scenario == ?1
-            AND sample >= ?2
+            AND scenario == ?
+            AND sample >= ?
         """,
         (
             scenario,
@@ -1215,8 +1215,8 @@ def leg_local_and_flow_by_class(db: Database, scenario: str, burn_samples: int =
             AND leg_bucket_detail.trial == pthcls.trial
             AND leg_bucket_detail.sample == pthcls.sample
     WHERE
-        leg_bucket_detail.scenario == ?1
-        AND leg_bucket_detail.sample >= ?2
+        leg_bucket_detail.scenario == ?
+        AND leg_bucket_detail.sample >= ?
         AND days_prior == 0
     GROUP BY
         leg_id,
@@ -1264,12 +1264,12 @@ def edgar(db: Database, *, scenario: str = None, burn_samples: int = 100) -> pd.
         FROM
             edgar
         WHERE
-            sample >= ?1
-            AND scenario = ?2
+            sample >= ?
+            AND scenario = ?
         """
 
     if scenario is None:
-        qry = qry.replace("AND scenario = ?2", "")
+        qry = qry.replace("AND scenario = ?", "")
         params = (burn_samples,)
     else:
         params = (burn_samples, scenario)

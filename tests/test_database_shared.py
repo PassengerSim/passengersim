@@ -7,7 +7,10 @@ import pytest
 import passengersim as pax
 from passengersim.database import Database
 
-pytestmark = pytest.mark.filterwarnings("error:.*cnx.*:DeprecationWarning")
+pytestmark = [
+    pytest.mark.filterwarnings("error:.*cnx.*:DeprecationWarning"),
+    pytest.mark.filterwarnings("error:Binding .* is a named parameter:DeprecationWarning"),
+]
 
 
 def config(filename):

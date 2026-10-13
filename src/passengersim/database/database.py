@@ -296,7 +296,7 @@ class Database:
             """
         INSERT OR REPLACE INTO runtime_configs(
             scenario, pxsim_version, configs
-        ) VALUES (?1, ?2, ?3)
+        ) VALUES (?, ?, ?)
         """,
             (
                 cfg.scenario,
@@ -311,7 +311,7 @@ class Database:
         if scenario:
             rawjson = next(
                 self.execute(
-                    "SELECT configs, max(updated_at) FROM runtime_configs WHERE scenario = ?1",
+                    "SELECT configs, max(updated_at) FROM runtime_configs WHERE scenario = ?",
                     (scenario,),
                 )
             )[0]
@@ -373,7 +373,7 @@ class Database:
         if not self.is_open:
             raise ValueError("database is not open")
         try:
-            return next(self.execute("SELECT sql FROM sqlite_master WHERE name = ?1", (name,)))[0]
+            return next(self.execute("SELECT sql FROM sqlite_master WHERE name = ?", (name,)))[0]
         except Exception:
             raise
 
@@ -398,7 +398,7 @@ class Database:
 
     def index_names(self, table_name) -> list[str]:
         """List of all named indexes on a given table."""
-        qry = "SELECT name FROM sqlite_master WHERE type=='index' AND tbl_name==?1"
+        qry = "SELECT name FROM sqlite_master WHERE type=='index' AND tbl_name==?"
         return [i[0] for i in self._connection.execute(qry, (table_name,))]
 
     def add_indexes(self, fare_detail=True, leg_detail=True):

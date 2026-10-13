@@ -52,7 +52,7 @@ def create_table_leg_defs(db: Database | sqlite3.Connection, legs: Iterable | No
                 capacity,
                 distance
             ) VALUES (
-                ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9
+                ?, ?, ?, ?, ?, ?, ?, ?, ?
             )
             """,
             (
@@ -98,7 +98,7 @@ def create_table_fare_restriction_defs(db: Database | sqlite3.Connection, restri
                 restriction_id,
                 restriction
             ) VALUES (
-                ?1, ?2
+                ?, ?
             )
             """,
             (idx, restriction),
@@ -155,7 +155,7 @@ def create_table_fare_defs(db: Database | sqlite3.Connection, fares: Iterable | 
                 restrictions,
                 category
             ) VALUES (
-                ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9
+                ?, ?, ?, ?, ?, ?, ?, ?, ?
             )
             """,
             (
@@ -202,7 +202,7 @@ def create_table_path_defs(db: Database | sqlite3.Connection, paths: Iterable | 
                 leg2,
                 distance
             ) VALUES (
-                ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8
+                ?, ?, ?, ?, ?, ?, ?, ?
             )
             """,
             (

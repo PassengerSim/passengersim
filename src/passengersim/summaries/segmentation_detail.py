@@ -61,14 +61,14 @@ def detailed_bookings_by_timeframe(
                  SUM(sold - sold_business) AS sold_leisure
           FROM fare_detail LEFT JOIN fare_defs USING (fare_id)
           WHERE
-                sample >= ?1
-                AND scenario = ?2
+                sample >= ?
+                AND scenario = ?
           GROUP BY trial, sample, carrier, orig, dest, booking_class, days_prior) a
     GROUP BY carrier, orig, dest, booking_class, days_prior, trial
     ORDER BY carrier, orig, dest, booking_class, days_prior, trial;
     """
     if scenario is None:
-        qry = qry.replace("AND scenario = ?2", "")
+        qry = qry.replace("AND scenario = ?", "")
         params = (burn_samples,)
     else:
         params = (burn_samples, scenario)

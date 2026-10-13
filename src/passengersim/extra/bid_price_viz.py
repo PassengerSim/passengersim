@@ -35,7 +35,7 @@ def fig_bid_prices_by_leg(
           days_prior,
           AVG(bid_price) as bid_price
         FROM leg_detail
-        WHERE sample >= ?1
+        WHERE sample >= ?
         GROUP BY
           flt_no,
           days_prior

@@ -1,4 +1,0 @@
-# Modify PassengerSim configs to enable advance purchase restrictions
-
-simulation_controls:
-  disable_ap: false

@@ -1,0 +1,55 @@
+{
+  "us25/baseline.pxsim": {
+    "provenance": "Historical tracked packaged artifact",
+    "sha256": "47616bcbb44861041bdd3c02196be2115692613ad0d03f9ce81b014c7ba2f48f",
+    "producer_versions": {
+      "machine.version": "Darwin Kernel Version 24.5.0: Tue Apr 22 19:54:33 PDT 2025; root:xnu-11417.121.6~2/RELEASE_ARM64_T8122",
+      "machine.python_version": "3.12.11",
+      "version.passengersim": "0.57.dev5+g843faf80f",
+      "version.passengersim_core": "0.57.dev0+g85ef573c.d20251014"
+    }
+  },
+  "us25/high-demand.pxsim": {
+    "provenance": "Historical tracked packaged artifact",
+    "sha256": "ec6a9400b057687f5ac4b617f58872b2970ca8fdb5d5cd875c7c1f1f7a300012",
+    "producer_versions": {
+      "machine.version": "Darwin Kernel Version 24.5.0: Tue Apr 22 19:54:33 PDT 2025; root:xnu-11417.121.6~2/RELEASE_ARM64_T8122",
+      "machine.python_version": "3.12.11",
+      "version.passengersim": "0.57.dev5+g843faf80f",
+      "version.passengersim_core": "0.57.dev0+g85ef573c.d20251014"
+    }
+  },
+  "legacy-callbacks.pxsim": {
+    "provenance": "documentation/labs/passengersim-output.20260920-233553.pxsim; immutable pre-v2 documentation output",
+    "sha256": "e6a68f42a424e83df5cb27221aa6a53b45a7e0b3423930ae0220ec95516d001b",
+    "producer_versions": {
+      "machine.version": "Darwin Kernel Version 25.6.0: Fri Jul 31 19:19:08 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T6050",
+      "machine.python_version": "3.12.13",
+      "version.passengersim": "0.91",
+      "version.passengersim_core": "0.91"
+    }
+  },
+  "legacy-custom-rm.pxsim": {
+    "provenance": "documentation/labs/passengersim-output.20260920-233556.pxsim; immutable pre-v2 documentation output",
+    "sha256": "e4f5d093d72c68e1756db71a787fd55956a3240e24cb6874379d9db6d752488a",
+    "producer_versions": {
+      "machine.version": "Darwin Kernel Version 25.6.0: Fri Jul 31 19:19:08 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T6050",
+      "machine.python_version": "3.12.13",
+      "version.passengersim": "0.91",
+      "version.passengersim_core": "0.91"
+    }
+  },
+  "legacy-summary.pxsim": {
+    "producer_commit": "8441230450ca73bdbac13165d2da3cd8dd9dfd3b",
+    "provenance": "Synthetic legacy key/value fixture produced by the pre-v2 writer at producer_commit, with the branch-only database snapshot table removed; Config object, callback, exception, unknown report",
+    "sha256": "4b067e0b1505672c017d07ffbea8bfbd852663a5dfc2a2410e8ce4f68c848844",
+    "samples": 42,
+    "producer_versions": {
+      "machine.version": "Darwin Kernel Version 25.6.0: Fri Jul 31 19:19:08 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T6050",
+      "machine.python_version": "3.12.13",
+      "version.passengersim": "0.91",
+      "version.passengersim_core": "0.92.dev61+gde09ccafc.d20261007"
+    },
+    "description": "Synthetic legacy key/value fixture; branch-only snapshot table removed."
+  }
+}

@@ -19,6 +19,7 @@ def summary() -> SimulationTables:
     input_file = demo_network("3mkt/01-base")
     cfg = Config.from_yaml(input_file)
     cfg.simulation_controls.num_trials = 1
+    cfg.simulation_controls.burn_samples = 100
     cfg.simulation_controls.num_samples = 500
     cfg.simulation_controls.allow_unused_restrictions = True
     cfg.outputs.reports.add(("od_fare_class_mix", "BOS", "ORD"))
@@ -48,10 +49,10 @@ def test_3mkt_01_time_zones():
 
 def test_3mkt_01_basic(summary, num_regression):
     assert isinstance(summary, SimulationTables)
-    assert isinstance(summary.cnx, Database)
-    # assert summary.cnx.is_open
-    assert summary.cnx.engine == "sqlite"
-    # assert str(summary.cnx.filename) == ":memory:"
+    assert isinstance(summary.db, Database)
+    # assert summary.db.is_open
+    assert summary.db.engine == "sqlite"
+    # assert str(summary.db.filename) == ":memory:"
     assert isinstance(summary.sim, Simulation)
     assert summary.sim.eng.carriers[0].name == "AL1"
     num_regression.check(

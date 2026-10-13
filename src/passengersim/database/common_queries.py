@@ -5,12 +5,15 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 
+from passengersim.utils._database_compat import deprecated_cnx_keyword
+
 from .database import Database
 
 logger = logging.getLogger("passengersim.database")
 
 
-def fare_class_mix(cnx: Database, scenario: str, burn_samples: int = 100) -> pd.DataFrame:
+@deprecated_cnx_keyword()
+def fare_class_mix(db: Database, scenario: str, burn_samples: int = 100) -> pd.DataFrame:
     """
     Fare class mix by carrier.
 
@@ -19,7 +22,7 @@ def fare_class_mix(cnx: Database, scenario: str, burn_samples: int = 100) -> pd.
 
     Parameters
     ----------
-    cnx : Database
+    db : Database
     scenario : str
     burn_samples : int, default 100
         The average total demand will be computed ignoring this many samples from the
@@ -50,8 +53,8 @@ def fare_class_mix(cnx: Database, scenario: str, burn_samples: int = 100) -> pd.
     GROUP BY
         trial, sample, scenario, carrier, booking_class
     """
-    cnx.execute(pre_qry)
-    cnx._commit_raw()
+    db.execute(pre_qry)
+    db._commit_raw()
 
     qry = """
     SELECT carrier, booking_class,
@@ -66,10 +69,11 @@ def fare_class_mix(cnx: Database, scenario: str, burn_samples: int = 100) -> pd.
     GROUP BY carrier, booking_class
     ORDER BY carrier, booking_class;
     """
-    return cnx.dataframe(qry, (scenario, burn_samples)).set_index(["carrier", "booking_class"])
+    return db.dataframe(qry, (scenario, burn_samples)).set_index(["carrier", "booking_class"])
 
 
-def od_fare_class_mix(cnx: Database, orig: str, dest: str, scenario: str, burn_samples: int = 100) -> pd.DataFrame:
+@deprecated_cnx_keyword()
+def od_fare_class_mix(db: Database, orig: str, dest: str, scenario: str, burn_samples: int = 100) -> pd.DataFrame:
     """
     Fare class mix by carrier for a particular origin-destination market.
 
@@ -78,7 +82,7 @@ def od_fare_class_mix(cnx: Database, orig: str, dest: str, scenario: str, burn_s
 
     Parameters
     ----------
-    cnx : Database
+    db : Database
     orig, dest : str
         Origin and destination to query.
     scenario : str
@@ -124,10 +128,11 @@ def od_fare_class_mix(cnx: Database, orig: str, dest: str, scenario: str, burn_s
     GROUP BY carrier, booking_class
     ORDER BY carrier, booking_class;
     """
-    return cnx.dataframe(qry, (scenario, burn_samples, orig, dest)).set_index(["carrier", "booking_class"])
+    return db.dataframe(qry, (scenario, burn_samples, orig, dest)).set_index(["carrier", "booking_class"])
 
 
-def load_factors(cnx: Database, scenario: str, burn_samples: int = 100) -> pd.DataFrame:
+@deprecated_cnx_keyword()
+def load_factors(db: Database, scenario: str, burn_samples: int = 100) -> pd.DataFrame:
     qry = """
     SELECT carrier,
            ROUND(AVG(sold)) AS avg_legs_sold,
@@ -152,11 +157,12 @@ def load_factors(cnx: Database, scenario: str, burn_samples: int = 100) -> pd.Da
          ) tmp
     GROUP BY carrier
     """
-    return cnx.dataframe(qry, (scenario, burn_samples))
+    return db.dataframe(qry, (scenario, burn_samples))
 
 
+@deprecated_cnx_keyword()
 def load_factor_distribution(
-    cnx: Database,
+    db: Database,
     scenario: str,
     burn_samples: int = 100,
     cutoffs=(0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95),
@@ -190,10 +196,11 @@ def load_factor_distribution(
     )
     GROUP BY carrier
     """
-    return cnx.dataframe(qry, (scenario, burn_samples))
+    return db.dataframe(qry, (scenario, burn_samples))
 
 
-def total_demand(cnx: Database, scenario: str, burn_samples: int = 100) -> float:
+@deprecated_cnx_keyword()
+def total_demand(db: Database, scenario: str, burn_samples: int = 100) -> float:
     """
     Average total demand.
 
@@ -203,7 +210,7 @@ def total_demand(cnx: Database, scenario: str, burn_samples: int = 100) -> float
 
     Parameters
     ----------
-    cnx : Database
+    db : Database
     scenario : str
     burn_samples : int, default 100
         The average total demand will be computed ignoring this many samples from the
@@ -227,11 +234,12 @@ def total_demand(cnx: Database, scenario: str, burn_samples: int = 100) -> float
         GROUP BY
             trial, sample) tmp;
     """
-    return cnx.dataframe(qry, (scenario, burn_samples)).iloc[0, 0]
+    return db.dataframe(qry, (scenario, burn_samples)).iloc[0, 0]
 
 
+@deprecated_cnx_keyword()
 def bookings_by_timeframe(
-    cnx: Database,
+    db: Database,
     scenario: str,
     from_fare_detail: bool = False,
     burn_samples: int = 100,
@@ -244,7 +252,7 @@ def bookings_by_timeframe(
 
     Parameters
     ----------
-    cnx : Database
+    db : Database
     scenario : str
     from_fare_detail : bool, default False
         Reconstruct this table from the `fare_detail` table.  This is generally
@@ -294,7 +302,7 @@ def bookings_by_timeframe(
     """
 
     if from_fare_detail:
-        return cnx.dataframe(qry_fare, (scenario, burn_samples)).set_index(
+        return db.dataframe(qry_fare, (scenario, burn_samples)).set_index(
             ["trial", "carrier", "booking_class", "days_prior"]
         )
 
@@ -318,10 +326,11 @@ def bookings_by_timeframe(
     ORDER BY
         carrier, booking_class, days_prior, trial;
     """
-    return cnx.dataframe(qry_bookings, (scenario,)).set_index(["trial", "carrier", "booking_class", "days_prior"])
+    return db.dataframe(qry_bookings, (scenario,)).set_index(["trial", "carrier", "booking_class", "days_prior"])
 
 
-def leg_forecasts(cnx: Database, *, scenario: str = None, burn_samples: int = 100) -> pd.DataFrame:
+@deprecated_cnx_keyword()
+def leg_forecasts(db: Database, *, scenario: str = None, burn_samples: int = 100) -> pd.DataFrame:
     """
     Average forecasts of demand by leg, bucket, and days to departure.
 
@@ -330,7 +339,7 @@ def leg_forecasts(cnx: Database, *, scenario: str = None, burn_samples: int = 10
 
     Parameters
     ----------
-    cnx : Database
+    db : Database
     scenario : str
     burn_samples : int, default 100
         The forecasts will be analyzed ignoring this many samples from the
@@ -373,12 +382,13 @@ def leg_forecasts(cnx: Database, *, scenario: str = None, burn_samples: int = 10
         params = (burn_samples,)
     else:
         params = (burn_samples, scenario)
-    return cnx.dataframe(qry, params).set_index(["carrier", "leg_id", "bucket_number", "booking_class", "days_prior"])
+    return db.dataframe(qry, params).set_index(["carrier", "leg_id", "bucket_number", "booking_class", "days_prior"])
 
 
+@deprecated_cnx_keyword()
 def _leg_bucket_trace(
     target_cols: str,
-    cnx: "Database",
+    db: "Database",
     scenario: str | None = None,
     burn_samples: int = 100,
     carrier: str | None = None,
@@ -395,7 +405,7 @@ def _leg_bucket_trace(
 
     Parameters
     ----------
-    cnx : Database
+    db : Database
     scenario : str
     burn_samples : int, default 100
         The forecasts will be analyzed ignoring this many samples from the
@@ -464,7 +474,7 @@ def _leg_bucket_trace(
         conds=" AND ".join(conditions),
         comma="," if columns else "",
     )
-    return cnx.dataframe(
+    return db.dataframe(
         qry,
         dict(
             scenario=scenario,
@@ -477,8 +487,9 @@ def _leg_bucket_trace(
     ).set_index(indexers + ["sample"])
 
 
+@deprecated_cnx_keyword()
 def leg_forecast_trace(
-    cnx: "Database",
+    db: "Database",
     scenario: str | None = None,
     burn_samples: int = 100,
     carrier: str | None = None,
@@ -495,7 +506,7 @@ def leg_forecast_trace(
 
     Parameters
     ----------
-    cnx : Database
+    db : Database
     scenario : str
     burn_samples : int, default 100
         The forecasts will be analyzed ignoring this many samples from the
@@ -524,7 +535,7 @@ def leg_forecast_trace(
     """
     return _leg_bucket_trace(
         "forecast_mean, forecast_stdev, forecast_closed_in_tf, forecast_closed_in_future",
-        cnx,
+        db,
         scenario=scenario,
         burn_samples=burn_samples,
         carrier=carrier,
@@ -534,8 +545,9 @@ def leg_forecast_trace(
     )
 
 
+@deprecated_cnx_keyword()
 def leg_sales_trace(
-    cnx: "Database",
+    db: "Database",
     scenario: str | None = None,
     burn_samples: int = 100,
     carrier: str | None = None,
@@ -552,7 +564,7 @@ def leg_sales_trace(
 
     Parameters
     ----------
-    cnx : Database
+    db : Database
     scenario : str
     burn_samples : int, default 100
         The forecasts will be analyzed ignoring this many samples from the
@@ -575,7 +587,7 @@ def leg_sales_trace(
     """
     return _leg_bucket_trace(
         "sold, revenue, auth",
-        cnx,
+        db,
         scenario=scenario,
         burn_samples=burn_samples,
         carrier=carrier,
@@ -585,7 +597,8 @@ def leg_sales_trace(
     )
 
 
-def path_forecasts(cnx: Database, *, scenario: str = None, burn_samples: int = 100) -> pd.DataFrame:
+@deprecated_cnx_keyword()
+def path_forecasts(db: Database, *, scenario: str = None, burn_samples: int = 100) -> pd.DataFrame:
     """
     Average forecasts of demand by path, class, and days to departure.
 
@@ -594,7 +607,7 @@ def path_forecasts(cnx: Database, *, scenario: str = None, burn_samples: int = 1
 
     Parameters
     ----------
-    cnx : Database
+    db : Database
     scenario : str
     burn_samples : int, default 100
         The forecasts will be analyzed ignoring this many samples from the
@@ -636,10 +649,11 @@ def path_forecasts(cnx: Database, *, scenario: str = None, burn_samples: int = 1
         params = (burn_samples,)
     else:
         params = (burn_samples, scenario)
-    return cnx.dataframe(qry, params).set_index(["path_id", "booking_class", "days_prior"])
+    return db.dataframe(qry, params).set_index(["path_id", "booking_class", "days_prior"])
 
 
-def demand_to_come(cnx: Database, *, scenario: str = None, burn_samples: int = 100) -> pd.DataFrame:
+@deprecated_cnx_keyword()
+def demand_to_come(db: Database, *, scenario: str = None, burn_samples: int = 100) -> pd.DataFrame:
     """
     Demand by market and timeframe across each sample.
 
@@ -650,7 +664,7 @@ def demand_to_come(cnx: Database, *, scenario: str = None, burn_samples: int = 1
 
     Parameters
     ----------
-    cnx : Database
+    db : Database
     scenario : str, optional
     burn_samples : int, default 100
         The demand will be returned ignoring this many samples from the
@@ -679,7 +693,7 @@ def demand_to_come(cnx: Database, *, scenario: str = None, burn_samples: int = 1
         params = (burn_samples,)
     else:
         params = (burn_samples, scenario)
-    dmd = cnx.dataframe(qry, params, dtype={"future_demand": np.int32})
+    dmd = db.dataframe(qry, params, dtype={"future_demand": np.int32})
     dhs = (
         dmd.set_index(["iteration", "trial", "sample", "segment", "orig", "dest", "days_prior"])["future_demand"]
         .unstack("days_prior")
@@ -688,7 +702,8 @@ def demand_to_come(cnx: Database, *, scenario: str = None, burn_samples: int = 1
     return dhs
 
 
-def demand_to_come_summary(cnx: Database, scenario: str, burn_samples: int = 100) -> pd.DataFrame:
+@deprecated_cnx_keyword()
+def demand_to_come_summary(db: Database, scenario: str, burn_samples: int = 100) -> pd.DataFrame:
     """
     Demand by market and timeframe across each sample.
 
@@ -699,7 +714,7 @@ def demand_to_come_summary(cnx: Database, scenario: str, burn_samples: int = 100
 
     Parameters
     ----------
-    cnx : Database
+    db : Database
     scenario : str
     burn_samples : int, default 100
         The demand will be returned ignoring this many samples from the
@@ -737,8 +752,8 @@ def demand_to_come_summary(cnx: Database, scenario: str, burn_samples: int = 100
     ORDER BY
         segment, days_prior DESC
     """
-    cnx.execute(qry, (burn_samples,))
-    cnx._commit_raw()
+    db.execute(qry, (burn_samples,))
+    db._commit_raw()
 
     qry = """
     SELECT
@@ -746,12 +761,13 @@ def demand_to_come_summary(cnx: Database, scenario: str, burn_samples: int = 100
     FROM demand_to_come_summary
     WHERE scenario = ?1
     """
-    dmd = cnx.dataframe(qry, (scenario,))
+    dmd = db.dataframe(qry, (scenario,))
     dhs = dmd.set_index(["segment", "days_prior"])
     return dhs
 
 
-def carrier_history(cnx: Database, *, scenario: str = None, burn_samples: int = 100) -> pd.DataFrame:
+@deprecated_cnx_keyword()
+def carrier_history(db: Database, *, scenario: str = None, burn_samples: int = 100) -> pd.DataFrame:
     """
     Sample-level details of carrier-level measures.
 
@@ -762,7 +778,7 @@ def carrier_history(cnx: Database, *, scenario: str = None, burn_samples: int = 
 
     Parameters
     ----------
-    cnx : Database
+    db : Database
     scenario : str, optional
     burn_samples : int, default 100
         The history will be returned ignoring this many samples from the
@@ -789,7 +805,7 @@ def carrier_history(cnx: Database, *, scenario: str = None, burn_samples: int = 
     if scenario is not None:
         qry_params["scenario"] = scenario
         max_days_prior = int(
-            cnx.dataframe(
+            db.dataframe(
                 """
                 SELECT max(days_prior) FROM leg_bucket_detail WHERE scenario == ?1
                 """,
@@ -798,7 +814,7 @@ def carrier_history(cnx: Database, *, scenario: str = None, burn_samples: int = 
         )
     else:
         max_days_prior = int(
-            cnx.dataframe(
+            db.dataframe(
                 """
                 SELECT max(days_prior) FROM leg_bucket_detail
                 """,
@@ -818,7 +834,7 @@ def carrier_history(cnx: Database, *, scenario: str = None, burn_samples: int = 
     """
     if scenario is None:
         qry1 = qry1.replace("AND scenario == @scenario", "")
-    bd1 = cnx.dataframe(qry1, qry_params).set_index(["iteration", "trial", "sample", "carrier"])
+    bd1 = db.dataframe(qry1, qry_params).set_index(["iteration", "trial", "sample", "carrier"])
     qry2 = """
     SELECT
         iteration, trial, sample, carrier,
@@ -832,12 +848,13 @@ def carrier_history(cnx: Database, *, scenario: str = None, burn_samples: int = 
     """
     if scenario is None:
         qry2 = qry2.replace("AND scenario == @scenario", "")
-    bd2 = cnx.dataframe(qry2, qry_params).set_index(["iteration", "trial", "sample", "carrier"])
+    bd2 = db.dataframe(qry2, qry_params).set_index(["iteration", "trial", "sample", "carrier"])
     return pd.concat([bd1, bd2], axis=1).unstack("carrier")
 
 
+@deprecated_cnx_keyword()
 def bid_price_history(
-    cnx: Database,
+    db: Database,
     scenario: str,
     burn_samples: int = 100,
     weighting: Literal["equal", "capacity"] = "equal",
@@ -851,7 +868,7 @@ def bid_price_history(
 
     Parameters
     ----------
-    cnx : Database
+    db : Database
     scenario : str
     burn_samples : int, default 100
         The bid prices will be analyzed ignoring this many samples from the
@@ -902,12 +919,12 @@ def bid_price_history(
     GROUP BY
         carrier, days_prior
     """
-    cnx.execute(preqry, (burn_samples,))
+    db.execute(preqry, (burn_samples,))
     try:
-        cnx._commit_raw()
+        db._commit_raw()
     except sqlite3.OperationalError:
         preqry = preqry.replace("CREATE TABLE IF NOT EXISTS", "CREATE TEMP TABLE IF NOT EXISTS")
-        cnx.execute(preqry, (burn_samples,))
+        db.execute(preqry, (burn_samples,))
     qry = """
     SELECT
         carrier,
@@ -918,7 +935,7 @@ def bid_price_history(
         fraction_zero_cap
     FROM bid_price_general_summary WHERE scenario == ?1
     """
-    bph = cnx.dataframe(
+    bph = db.dataframe(
         qry,
         (scenario,),
     )
@@ -940,12 +957,12 @@ def bid_price_history(
     GROUP BY
         carrier, days_prior
     """
-    cnx.execute(preqry2, (burn_samples,))
+    db.execute(preqry2, (burn_samples,))
     try:
-        cnx._commit_raw()
+        db._commit_raw()
     except sqlite3.OperationalError:
         preqry2 = preqry2.replace("CREATE TABLE IF NOT EXISTS", "CREATE TEMP TABLE IF NOT EXISTS")
-        cnx.execute(preqry2, (burn_samples,))
+        db.execute(preqry2, (burn_samples,))
     qry2 = """
     SELECT
         carrier, days_prior,
@@ -954,7 +971,7 @@ def bid_price_history(
         some_cap_bid_price_mean_capweighted
     FROM bid_price_somecap_summary WHERE scenario == ?1
     """
-    bph_some_cap = cnx.dataframe(
+    bph_some_cap = db.dataframe(
         qry2,
         (scenario,),
     ).set_index(["carrier", "days_prior"])
@@ -969,8 +986,9 @@ def bid_price_history(
     return bph
 
 
+@deprecated_cnx_keyword()
 def displacement_history(
-    cnx: Database,
+    db: Database,
     scenario: str,
     burn_samples: int = 100,
 ) -> pd.DataFrame:
@@ -983,7 +1001,7 @@ def displacement_history(
 
     Parameters
     ----------
-    cnx : Database
+    db : Database
     scenario : str
     burn_samples : int, default 100
         The bid prices will be analyzed ignoring this many samples from the
@@ -1017,18 +1035,18 @@ def displacement_history(
     ORDER BY
         carrier, days_prior DESC
     """
-    cnx.execute(preqry, (burn_samples,))
+    db.execute(preqry, (burn_samples,))
     try:
-        cnx._commit_raw()
+        db._commit_raw()
     except sqlite3.OperationalError:
         preqry = preqry.replace("CREATE TABLE IF NOT EXISTS", "CREATE TEMP TABLE IF NOT EXISTS")
-        cnx.execute(preqry, (burn_samples,))
+        db.execute(preqry, (burn_samples,))
     qry = """
     SELECT carrier, days_prior, displacement_mean, displacement_stdev
     FROM displacement_summary
     WHERE scenario == ?1
     """
-    df = cnx.dataframe(
+    df = db.dataframe(
         qry,
         (scenario,),
     )
@@ -1036,8 +1054,9 @@ def displacement_history(
     return df
 
 
+@deprecated_cnx_keyword()
 def leg_detail(
-    cnx: Database,
+    db: Database,
     scenario: str,
     burn_samples: int = 100,
 ) -> pd.DataFrame:
@@ -1051,7 +1070,7 @@ def leg_detail(
     FROM leg_detail l
     JOIN leg_defs d USING (leg_id)
     """
-    df = cnx.dataframe(
+    df = db.dataframe(
         qry,
         #        (scenario,),
     )
@@ -1060,7 +1079,8 @@ def leg_detail(
     return df
 
 
-def local_and_flow_yields(cnx: Database, *, scenario: str = None, burn_samples: int = 100) -> pd.DataFrame:
+@deprecated_cnx_keyword()
+def local_and_flow_yields(db: Database, *, scenario: str = None, burn_samples: int = 100) -> pd.DataFrame:
     """
     Compute yields for local (nonstop) and flow (connecting) passengers.
 
@@ -1070,7 +1090,7 @@ def local_and_flow_yields(cnx: Database, *, scenario: str = None, burn_samples: 
 
     Parameters
     ----------
-    cnx : Database
+    db : Database
     scenario : str, optional
     burn_samples : int, default 100
         The yields will be computed ignoring this many samples from the
@@ -1140,13 +1160,14 @@ def local_and_flow_yields(cnx: Database, *, scenario: str = None, burn_samples: 
         params = (burn_samples,)
     else:
         params = (burn_samples, scenario)
-    df = cnx.dataframe(qry, params)
+    df = db.dataframe(qry, params)
     return df
 
 
-def leg_local_and_flow_by_class(cnx: Database, scenario: str, burn_samples: int = 100) -> pd.DataFrame:
+@deprecated_cnx_keyword()
+def leg_local_and_flow_by_class(db: Database, scenario: str, burn_samples: int = 100) -> pd.DataFrame:
     logger.info("creating pthcls temp table")
-    cnx.execute(
+    db.execute(
         """
         CREATE TEMP TABLE IF NOT EXISTS pthcls AS
         SELECT
@@ -1166,7 +1187,7 @@ def leg_local_and_flow_by_class(cnx: Database, scenario: str, burn_samples: int 
     )
 
     logger.info("indexing pthcls temp table")
-    cnx.execute(
+    db.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_pthcls_1 ON pthcls (
             iteration, trial, sample, leg1, booking_class
@@ -1204,7 +1225,7 @@ def leg_local_and_flow_by_class(cnx: Database, scenario: str, burn_samples: int 
         leg_defs.dest,
         leg_bucket_detail.name
     """
-    df = cnx.dataframe(
+    df = db.dataframe(
         qry,
         (
             scenario,
@@ -1214,13 +1235,14 @@ def leg_local_and_flow_by_class(cnx: Database, scenario: str, burn_samples: int 
     return df
 
 
-def edgar(cnx: Database, *, scenario: str = None, burn_samples: int = 100) -> pd.DataFrame:
+@deprecated_cnx_keyword()
+def edgar(db: Database, *, scenario: str = None, burn_samples: int = 100) -> pd.DataFrame:
     """
     Forecast accuracy information.
 
     Parameters
     ----------
-    cnx : Database
+    db : Database
     scenario : str, optional
     burn_samples : int, default 100
         The demand will be returned ignoring this many samples from the
@@ -1251,5 +1273,5 @@ def edgar(cnx: Database, *, scenario: str = None, burn_samples: int = 100) -> pd
         params = (burn_samples,)
     else:
         params = (burn_samples, scenario)
-    e = cnx.dataframe(qry, params)  # , dtype={"edgar": np.int32})
+    e = db.dataframe(qry, params)  # , dtype={"edgar": np.int32})
     return e

@@ -6,7 +6,11 @@ import multiprocessing
 import os
 import pathlib
 import platform
+import sqlite3
+import stat
+import tempfile
 import time
+import traceback
 import warnings
 from collections.abc import Callable, Collection
 from datetime import UTC, datetime
@@ -18,6 +22,7 @@ import pandas as pd
 
 from passengersim.callbacks import CallbackData
 from passengersim.config import Config
+from passengersim.utils._database_compat import deprecated_cnx_keyword
 from passengersim.utils.filenaming import (
     filename_with_timestamp,
     filenames_with_timestamp,
@@ -28,6 +33,23 @@ from passengersim.utils.kvstore import KVStore
 if TYPE_CHECKING:
     from passengersim import Simulation
     from passengersim.database import Database
+
+
+def _restore_file_config(value: Config | dict[str, Any] | None) -> Config | None:
+    """Adapt retired archive fields without relaxing validation of new input."""
+    if not isinstance(value, dict):
+        return value
+    from copy import deepcopy
+
+    value = deepcopy(value)
+    controls = value.get("simulation_controls", {})
+    old = controls.get("pax_type_k_factor")
+    if old and old == controls.get("simple_k_factor"):
+        controls.pop("pax_type_k_factor")
+    for demand in value.get("demands", []):
+        if demand.get("group_sizes", False) is None:
+            demand.pop("group_sizes")
+    return Config.model_validate(value, context={"pxsim_archive": True})
 
 
 class MissingDataError(KeyError):
@@ -131,6 +153,10 @@ class SimulationTableItem:
             df = df.drop(columns=self._computed_fields.keys(), errors="ignore")
         return df
 
+    def _get_export(self, instance: GenericSimulationTables) -> pd.DataFrame | None:
+        """Return stored data unless a table supplies a specialized public view."""
+        return instance._data[self.name]
+
 
 class DatabaseTableItem:
     def __init__(
@@ -154,9 +180,14 @@ class DatabaseTableItem:
             partialmethod(lambda instance, *arg, **kwarg: self._requery(instance, *arg, **kwarg)),
         )
 
-    def __get__(self, instance, owner):
+    def __get__(
+        self, instance: GenericSimulationTables | None, owner: type[GenericSimulationTables]
+    ) -> pd.DataFrame | DatabaseTableItem:
+        """Return the descriptor or load its saved table before querying the database."""
         if instance is None:
             return self
+        if self.name not in instance._data and instance._file_store is not None and self.name in instance._file_store:
+            instance._data[self.name] = instance._file_store[self.name]
         if self.name not in instance._data:
             try:
                 instance.run_queries(items=[self.name])
@@ -181,8 +212,10 @@ class DatabaseTableItem:
         df = instance._data.get(self.name, None)
         return df
 
-    def _requery(self, instance: GenericSimulationTables, cnx: Database = None, **kwargs):
-        instance.run_queries(cnx=cnx, items=[self.name], **kwargs)
+    # Skip the forwarding lambda used by the generated requery method.
+    @deprecated_cnx_keyword(stacklevel=3)
+    def _requery(self, instance: GenericSimulationTables, db: Database = None, **kwargs):
+        instance.run_queries(db=db, items=[self.name], **kwargs)
         return self._get_raw(instance)
 
 
@@ -217,12 +250,13 @@ class GenericSimulationTables:
             return  # do not include intermediate abstract base classes
         cls.__subclasses.add(cls)
 
+    @deprecated_cnx_keyword()
     def __init__(
         self,
         data: dict[str, pd.DataFrame] = None,
         *,
         config: Config | None = None,
-        cnx: Database | None = None,
+        db: Database | None = None,
         sim: Simulation | None = None,
         n_total_samples: int = 0,
         items: Collection[str] = (),
@@ -237,8 +271,8 @@ class GenericSimulationTables:
         self.config = config
         """Configuration for the Simulation run."""
 
-        self.cnx = cnx
-        """Database connection for the Simulation run."""
+        self.db = db
+        """PassengerSim database wrapper for the Simulation run."""
 
         self.sim = sim
         """Simulation object for the Simulation run."""
@@ -268,7 +302,9 @@ class GenericSimulationTables:
         "_data",
         "config",
         "_config",
+        "db",
         "cnx",
+        "_trial_database_store",
         "sim",
         "n_total_samples",
         "meta_summaries",
@@ -278,6 +314,8 @@ class GenericSimulationTables:
         "_metadata",
         "callback_data",
         "_callback_data",
+        "_config_loaded",
+        "_callback_data_loaded",
     }
 
     def __setattr__(self, item, value):
@@ -315,12 +353,15 @@ class GenericSimulationTables:
                         data[name] = func(sim)
                     except Exception as err:
                         # do not let an exception here take down the whole report
-                        warnings.warn(f"Exception {type(err).__name__} in {name}: {err}", stacklevel=2)
+                        warnings.warn(
+                            f"Exception {type(err).__name__} in {name}: {err}\n{traceback.format_exc()}",
+                            stacklevel=2,
+                        )
         return cls(
             data,
             sim=sim,
             config=sim.config,
-            cnx=sim.cnx,
+            db=sim.db,
             n_total_samples=num_samples,
             callback_data=sim.callback_data,
         )
@@ -329,9 +370,10 @@ class GenericSimulationTables:
         """Extract summary data from a Simulation."""
         return self.__class__.extract(sim, self._items)
 
+    @deprecated_cnx_keyword()
     def run_queries(
         self,
-        cnx: Database = None,
+        db: Database = None,
         items: Collection[str] | None = None,
         *,
         scenario: str = None,
@@ -344,8 +386,8 @@ class GenericSimulationTables:
 
         Parameters
         ----------
-        cnx : Database, optional
-            Database connection to use for querying.
+        db : Database, optional
+            PassengerSim database wrapper to use for querying.
         items : Collection[str], optional
             The items to query.  If None, or if only "*" is given, then all
             available items will be queried.
@@ -356,8 +398,8 @@ class GenericSimulationTables:
             the burn_samples value from the configuration will be used if available,
             otherwise the default value of 100 will be used.
         """
-        if cnx is None:
-            cnx = self.cnx
+        if db is None:
+            db = self.db
         if items is None or len(items) == 1 and "*" in items:
             items = self._std_query.keys()
         else:
@@ -371,12 +413,12 @@ class GenericSimulationTables:
             burn_samples = 100
         for name, query in self._std_query.items():
             if name in items:
-                if cnx is None:
+                if db is None:
                     warnings.warn(f"no database connection available for {name}", stacklevel=2)
                     self._data[name] = ValueError(f"no database connection available for {name}")
                 else:
                     try:
-                        self._data[name] = query(cnx, scenario=scenario, burn_samples=burn_samples)
+                        self._data[name] = query(db, scenario=scenario, burn_samples=burn_samples)
                     except Exception as e:
                         warnings.warn(f"error in query for {name}: {e}", stacklevel=2)
                         self._data[name] = e
@@ -398,10 +440,67 @@ class GenericSimulationTables:
         result.callback_data = sum(s.callback_data for s in summaries)
         return result
 
+    def close(self):
+        """Close retained storage and invalidate all shared database aliases.
+
+        Persistent output files are preserved. Closing an active run or closing
+        from a different thread/process raises without removing its files.
+        """
+        store = self.__dict__.get("_trial_database_store")
+        if store is not None:
+            store.close()
+        elif self.db is not None:
+            self.db.close()
+        if self._file_store is not None:
+            self._file_store.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
+    @property
+    def db(self):
+        """The shared retained database, opened on first access by the caller."""
+        store = self.__dict__.get("_trial_database_store")
+        return store.database if store is not None else self.__dict__.get("db")
+
+    @db.setter
+    def db(self, value):
+        self.__dict__["db"] = value
+
+    @property
+    def cnx(self):
+        """Deprecated alias for the PassengerSim database wrapper."""
+        warnings.warn(".cnx is deprecated; use .db instead.", DeprecationWarning, stacklevel=2)
+        return self.db
+
+    @cnx.setter
+    def cnx(self, value):
+        # Assignment passes through this class's attribute whitelist first.
+        warnings.warn(".cnx is deprecated; use .db instead.", DeprecationWarning, stacklevel=3)
+        self.db = value
+
+    @property
+    def database_status(self):
+        """Trial completion and failure status for retained multiprocess results."""
+        store = self.__dict__.get("_trial_database_store")
+        return store.status if store is not None else None
+
+    @property
+    def trial_databases(self):
+        """Completed trial files owned by this live result, if available."""
+        store = getattr(self, "_trial_database_store", None)
+        return dict(store.completed) if store is not None else {}
+
     def __getstate__(self):
         state = self.__dict__.copy()
-        if "cnx" in state:
-            del state["cnx"]
+        # A local temporary-directory owner cannot survive a disk-cache/pickle
+        # round trip. Saved summaries never own or restore a detail database.
+        state.pop("_trial_database_store", None)
+        state.pop("db", None)
+        state.pop("cnx", None)
         if "sim" in state:
             del state["sim"]
         if "config" in state:
@@ -417,6 +516,10 @@ class GenericSimulationTables:
         return state
 
     def __setstate__(self, state):
+        # Legacy state may contain the old name; restoration is not deprecated API use.
+        state = state.copy()
+        legacy_db = state.pop("cnx", None)
+        state.setdefault("db", legacy_db)
         if "_config_yaml" in state:
             content = state.pop("_config_yaml")
             try:
@@ -433,8 +536,8 @@ class GenericSimulationTables:
                     pass
                 raise
         self.__dict__.update(state)
-        if "cnx" not in self.__dict__:
-            self.cnx = None
+        if "db" not in self.__dict__:
+            self.db = None
         if "sim" not in self.__dict__:
             self.sim = None
         if "_config" not in self.__dict__:
@@ -589,6 +692,24 @@ class GenericSimulationTables:
                 result._metadata["loaded.time"] = datetime.now(UTC).isoformat()
             return result
 
+    @property
+    def database_path(self):
+        """Absolute main-database path, or None when no file backs the result."""
+        store = self.__dict__.get("_trial_database_store")
+        if store is not None:
+            return store.consolidated_path
+        database = self.__dict__.get("db")
+        return database.database_path if database is not None else None
+
+    @property
+    def database_available(self):
+        """Whether this live result has retained detail data, without opening it."""
+        store = self.__dict__.get("_trial_database_store")
+        if store is not None:
+            return bool(store.available)
+        database = self.__dict__.get("db")
+        return database is not None and database.connection is not None
+
     def to_file(
         self,
         filename: str | pathlib.Path,
@@ -597,7 +718,7 @@ class GenericSimulationTables:
         preserve_config: bool = True,
         make_dirs: Literal[True, False, "git"] = True,
     ) -> pathlib.Path:
-        """Write simulation tables to a file.
+        """Atomically write simulation tables to a chunked PXSIM archive.
 
         Parameters
         ----------
@@ -618,8 +739,25 @@ class GenericSimulationTables:
 
         Returns
         -------
-        Path-like
-            The resolved filename for the saved outputs.
+        pathlib.Path
+            The output filename, with timestamp when requested.
+
+        Raises
+        ------
+        ValueError
+            Serialization fails or the target is a hard-link alias of the source.
+        OSError
+            File creation or atomic publication fails.
+
+        Notes
+        -----
+        Unloaded entries are copied without unpickling when possible. Loaded
+        values are serialized again to preserve in-place edits. Publication
+        failure leaves the existing target intact. Older readers that support
+        only the legacy layout cannot read newly written version 2 files.
+        Detailed simulation data stays in a separate SQLite file and is never
+        embedded or modified by this export. New files honor the process umask;
+        replacing an existing file preserves its permission bits.
         """
         if add_timestamp_ext:
             filename = filename_with_timestamp(filename, suffix=".pxsim")
@@ -628,74 +766,158 @@ class GenericSimulationTables:
         if make_dirs:
             git_ignores = ["*.pxsim", "*.pkl.lz4", "*.pkl"] if make_dirs != "git" else False
             make_parent_directory(filename, git_ignores)
-        kvs = KVStore(filename)
-        for k, v in self._data.items():
-            if preserve_config and k.endswith("_defs"):
-                # do not save *_defs tables, as they can be regenerated from the config
-                continue
-            if k.endswith("_") and not k.startswith("_"):
-                # do not save data with names that end with "_" but do not begin with "_",
-                # as these are cached joins that are not meant to be saved
-                continue
-            kvs[k] = v
-        if preserve_config:
-            kvs["_config_"] = self.config.model_dump(serialize_as_any=True)
-        kvs["_metadata_"] = self._metadata
-        kvs["_n_total_samples_"] = self.n_total_samples
-        if self.callback_data:
-            kvs["_callback_data_"] = self.callback_data
-        kvs.close()
+        if filename.is_symlink():
+            filename = filename.resolve()
+        if self._file_store is not None and filename.exists():
+            source_path = pathlib.Path(self._file_store.path)
+            if (
+                source_path.exists()
+                and source_path.resolve() != filename.resolve()
+                and os.path.samefile(source_path, filename)
+            ):
+                raise ValueError("Cannot export over a hard-link alias of the open source; use its original path")
+        # A private sibling directory keeps unfinished data inaccessible while
+        # ordinary file creation applies the umask without changing global state.
+        destination_mode = stat.S_IMODE(filename.stat().st_mode) if filename.exists() else None
+        temporary_directory = tempfile.TemporaryDirectory(prefix=".pxsim-", dir=filename.parent)
+        temporary = pathlib.Path(temporary_directory.name) / "archive.pxsim"
+        kvs = None
+        reopen = False
+        source_read_only = self._file_store.read_only if self._file_store is not None else False
+        try:
+            with temporary.open("xb"):
+                pass
+            kvs = KVStore(temporary, mode="w", format_version=2)
+            with kvs.transaction():
+                keys = set(self._data)
+                if self._file_store is not None:
+                    keys.update(k for k in self._file_store if not (k.startswith("_") and k.endswith("_")))
+                for k in keys:
+                    if preserve_config and k.endswith("_defs"):
+                        continue
+                    if k.endswith("_") and not k.startswith("_"):
+                        continue
+                    if k in self._data:
+                        kvs[k] = self._data[k]
+                    else:
+                        kvs.copy_entry_from(self._file_store, k)
+                if preserve_config:
+                    if not getattr(self, "_config_loaded", True) and self._file_store is not None:
+                        if "_config_" in self._file_store:
+                            kvs.copy_entry_from(self._file_store, "_config_")
+                    elif self.config is not None:
+                        kvs["_config_"] = self.config.model_dump(serialize_as_any=True)
+                kvs["_metadata_"] = self._metadata
+                kvs["_n_total_samples_"] = self.n_total_samples
+                if not getattr(self, "_callback_data_loaded", True) and self._file_store is not None:
+                    if "_callback_data_" in self._file_store:
+                        kvs.copy_entry_from(self._file_store, "_callback_data_")
+                elif self.callback_data:
+                    kvs["_callback_data_"] = self.callback_data
+            kvs.close()
+            kvs = None
+            if destination_mode is not None:
+                temporary.chmod(destination_mode)
+            source = self._metadata.get("store.filename")
+            if self._file_store is not None and source and pathlib.Path(source).resolve() == filename.resolve():
+                self._file_store.close()
+                reopen = True
+            # Replacing only after all summary data are complete prevents
+            # failed exports from destroying a previous good cache.
+            os.replace(temporary, filename)
+        finally:
+            try:
+                if kvs is not None:
+                    kvs.close()
+                if reopen:
+                    self._file_store = KVStore(filename, mode="r" if source_read_only else "rw")
+            finally:
+                temporary_directory.cleanup()
         return filename
 
     @classmethod
-    def from_file(cls, filename: str | pathlib.Path, read_latest: bool = True, lazy: bool = True):
-        """Load the object from a file.
+    def from_file(
+        cls,
+        filename: str | pathlib.Path,
+        read_latest: bool = True,
+        lazy: bool = True,
+        *,
+        read_only: bool = False,
+    ) -> Self:
+        """Load summary tables, configuration, and metadata from a saved result.
 
         Parameters
         ----------
-        filename : str or Path-like
-            The filename to load the object from.
+        filename : str or pathlib.Path
+            PXSIM or legacy pickle file to read.
         read_latest : bool, default True
-            If True, read the latest file matching the pattern.
+            Select the latest timestamped file when present.
         lazy : bool, default True
-            If True, load the data lazily (as needed).  Otherwise, load the data
-            immediately.
+            Load summary tables on demand.
+        read_only : bool, default False
+            Open the PXSIM archive read-only. Otherwise, attempt writable access
+            and fall back to read-only access if needed. This option does not
+            affect legacy pickles.
+
+        Returns
+        -------
+        Self
+            Loaded result. Close it, or use it as a context manager, to release
+            archive connections. Detailed simulation databases are not restored.
+
+        Raises
+        ------
+        FileNotFoundError
+            The selected file does not exist.
+        ValueError
+            Archive format, integrity, or configuration validation fails.
+
+        Notes
+        -----
+        Existing legacy PXSIM files are read without schema migration.
+        Only load trusted files: summary values use Python pickle.
         """
-
-        # if the file is a *.pkl or *.pkl.lz4 file, read it with the from_pickle method instead
-        if str(filename).endswith(".pkl") or str(filename).endswith(".pkl.lz4"):
-            return cls.from_pickle(filename, read_latest=read_latest)
-
+        if str(filename).endswith((".pkl", ".pkl.lz4")):
+            result = cls.from_pickle(filename, read_latest=read_latest)
+            return result
         if read_latest:
-            filename_glob = pathlib.Path(filename).with_suffix(".*.pxsim")
-            files = sorted(glob.glob(str(filename_glob)))
-            if not files:
-                if not os.path.exists(filename):
-                    raise FileNotFoundError(filename)
-            else:
+            files = sorted(glob.glob(str(pathlib.Path(filename).with_suffix(".*.pxsim"))))
+            if files:
                 filename = files[-1]
-
+        if not pathlib.Path(filename).exists():
+            raise FileNotFoundError(filename)
         result = cls()
-        result._file_store = KVStore(filename)
-        result._metadata = result._file_store["_metadata_"]
-        result.n_total_samples = result._file_store["_n_total_samples_"]
-        result._metadata["store.filename"] = filename
-        if not lazy:
-            for k in result._file_store:
-                if not (k.startswith("_") and k.endswith("_")):
-                    result._data[k] = result._file_store[k]
-                if k == "_callback_data_":
-                    result._callback_data = result._file_store[k]
-                if k == "_config_":
-                    try:
-                        temp = result._file_store["_config_"]
-                    except KeyError:
-                        pass
-                    else:
-                        if isinstance(temp, dict):
-                            temp = Config.model_validate(temp)
-                        result._config = temp
-        return result
+        try:
+            try:
+                result._file_store = KVStore(filename, mode="r" if read_only else "rw")
+            except (PermissionError, sqlite3.OperationalError) as error:
+                # Loading is a read operation even when optional later edits
+                # are permitted. Explicit KVStore writable opens remain strict.
+                if read_only or (
+                    isinstance(error, sqlite3.OperationalError)
+                    and getattr(error, "sqlite_errorcode", None) != sqlite3.SQLITE_CANTOPEN
+                ):
+                    raise
+                result._file_store = KVStore(filename, mode="r")
+            result._config_loaded = False
+            result._callback_data_loaded = False
+            result._metadata = result._file_store["_metadata_"]
+            result.n_total_samples = result._file_store["_n_total_samples_"]
+            result._metadata["store.filename"] = filename
+            result._metadata["database.available"] = False
+            if not lazy:
+                for k in result._file_store:
+                    if not (k.startswith("_") and k.endswith("_")):
+                        result._data[k] = result._file_store[k]
+                    if k == "_callback_data_":
+                        result.callback_data = result._file_store[k]
+                    if k == "_config_":
+                        temp = result._file_store[k]
+                        result.config = _restore_file_config(temp)
+            return result
+        except BaseException:
+            result.close()
+            raise
 
     def file_info(self):
         """Return information about the file store."""
@@ -725,16 +947,36 @@ class GenericSimulationTables:
         -------
         Self
             The summary tables object, with the specified data removed.
+
+        Raises
+        ------
+        PermissionError
+            The backing archive is read-only; no in-memory data is removed.
+
+        Warns
+        -----
+        UserWarning
+            Deletion succeeded but reclaiming unused disk space failed.
+
+        Notes
+        -----
+        Missing keys are ignored. Backing-file deletions are atomic and
+        complete before in-memory entries are removed.
         """
         if isinstance(keys, str):
             keys = [keys]
-        for key in keys:
-            if key in self._data:
-                del self._data[key]
-            if self._file_store is not None and key in self._file_store:
-                del self._file_store[key]
         if self._file_store is not None:
-            self._file_store.vacuum()
+            with self._file_store.transaction():
+                for key in keys:
+                    if key in self._file_store:
+                        del self._file_store[key]
+        for key in keys:
+            self._data.pop(key, None)
+        if self._file_store is not None:
+            try:
+                self._file_store.vacuum()
+            except Exception as error:
+                warnings.warn(f"Data removed, but PXSIM compaction failed: {error}", stacklevel=2)
         return self
 
     def to_xlsx(self, filename: str | pathlib.Path) -> None:
@@ -751,6 +993,9 @@ class GenericSimulationTables:
         with pd.ExcelWriter(filename) as writer:
             for k, v in self._data.items():
                 if isinstance(v, pd.DataFrame):
+                    descriptor = getattr(type(self), k, None)
+                    if isinstance(descriptor, SimulationTableItem):
+                        v = descriptor._get_export(self)
                     v.to_excel(writer, sheet_name=k)
 
     def to_html(
@@ -868,39 +1113,45 @@ class GenericSimulationTables:
         return matches
 
     @property
-    def config(self):
-        if self._config is None and self._file_store is not None:
+    def config(self) -> Config | None:
+        """Saved simulation configuration, loaded on first access, or None."""
+        if not getattr(self, "_config_loaded", self._config is not None) and self._file_store is not None:
             try:
                 temp = self._file_store["_config_"]
             except KeyError:
-                pass
+                self._config_loaded = True
             else:
-                if isinstance(temp, dict):
-                    temp = Config.model_validate(temp)
-                self._config = temp
+                self.config = _restore_file_config(temp)
         return self._config
 
     @config.setter
-    def config(self, value):
+    def config(self, value: Config | None) -> None:
+        """Replace the configuration and mark its lazy value as loaded."""
         self._config = value
+        self._config_loaded = True
 
     @config.deleter
-    def config(self):
-        self._config = None
+    def config(self) -> None:
+        """Clear the configuration without reloading it from the archive."""
+        self.config = None
 
     @property
-    def callback_data(self):
-        if not self._callback_data and self._file_store is not None:
+    def callback_data(self) -> CallbackData:
+        """Saved callback outputs, loaded on first access."""
+        if not getattr(self, "_callback_data_loaded", bool(self._callback_data)) and self._file_store is not None:
             try:
-                self._callback_data = self._file_store["_callback_data_"]
+                self.callback_data = self._file_store["_callback_data_"]
             except KeyError:
-                pass
+                self._callback_data_loaded = True
         return self._callback_data
 
     @callback_data.setter
-    def callback_data(self, value):
+    def callback_data(self, value: CallbackData) -> None:
+        """Replace callback data and mark its lazy value as loaded."""
         self._callback_data = value
+        self._callback_data_loaded = True
 
     @callback_data.deleter
-    def callback_data(self):
-        self._callback_data = CallbackData()
+    def callback_data(self) -> None:
+        """Clear callback data without reloading it from the archive."""
+        self.callback_data = CallbackData()

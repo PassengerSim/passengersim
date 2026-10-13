@@ -28,7 +28,7 @@ def fig_bid_prices_by_leg(
     """
     burn = sim.eng.config.simulation_controls.burn_samples
 
-    df = sim.cnx.dataframe(
+    df = sim.db.dataframe(
         """
         SELECT
           flt_no,

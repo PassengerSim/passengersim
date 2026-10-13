@@ -57,6 +57,9 @@ def test_first_come_first_served_3mkt_integration():
     fare_class_sales = summary.fare_class_mix["sold"]
     other_classes = fare_class_sales.index.get_level_values("booking_class") != "Y5"
     assert fare_class_sales.loc[other_classes].eq(0).all()
+
+    # Eliminate some index columns that we're not using
+    fare_class_sales = fare_class_sales.droplevel(level=["fare_class", "brand"])
     assert fare_class_sales.xs("Y5", level="booking_class").to_dict() == pytest.approx(
         {"AL1": 2_955, "AL2": 2_971}, rel=0.02
     )

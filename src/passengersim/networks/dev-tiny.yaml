@@ -1,0 +1,395 @@
+#
+# Tiny network, for developing network optimization algorithms
+#  - Two carriers
+#  - Two fare classes
+#  - Two banks, AL1 uses ORD, AL2 uses ATL
+#  - Based on a stripped-down 3MKT network
+#  - This is uncalibrated and NOT for any real simulation work !!!
+#
+# AlanW, September 2026
+# PassengerSim LLC
+#
+
+scenario: Tiny Dev
+
+simulation_controls:
+  random_seed: 42
+  num_trials: 3
+  num_samples: 300
+  burn_samples: 50
+  sys_k_factor: 0.1
+  mkt_k_factor: 0.2
+  simple_k_factor: 0.4
+  tf_k_factor: 0.1
+  tf_z_factor: 2.0
+  prorate_revenue: true
+  dwm_lite: false
+  max_connect_time: 120
+  demand_multiplier: 2.0
+  manual_paths: false
+
+choice_models:
+  business:
+    kind: pods
+    emult: 1.6
+    path_quality:  [38.30,  0.10]
+    airline_pref_pods:  [-12.29,  0.17]
+    tolerance: 2.0
+    r1: 1.0
+    r2: 0.35
+    r3: 0.50
+  leisure:
+    kind: pods
+    emult: 1.5
+    path_quality:  [2.02, 0.12]
+    airline_pref_pods:  [-1.98, 0.11]
+    tolerance: 5.0
+    r1: 0.70
+    r2: 0.35
+    r3: 0.35
+
+carriers:
+  - name: AL1
+    rm_system: E
+  - name: AL2
+    rm_system: E
+
+classes:
+  - Y0
+  - Y1
+  - Y2
+
+dcps:
+  - 63
+  - 56
+  - 49
+  - 42
+  - 35
+  - 31
+  - 28
+  - 24
+  - 21
+  - 17
+  - 14
+  - 10
+  - 7
+  - 5
+  - 3
+  - 1
+
+booking_curves:
+  - name: '1'
+    curve:
+      63: 0.01
+      56: 0.02
+      49: 0.05
+      42: 0.13
+      35: 0.19
+      31: 0.23
+      28: 0.29
+      24: 0.35
+      21: 0.45
+      17: 0.54
+      14: 0.67
+      10: 0.79
+      7: 0.86
+      5: 0.91
+      3: 0.96
+      1: 1.0
+  - name: '2'
+    curve:
+      63: 0.13
+      56: 0.22
+      49: 0.37
+      42: 0.52
+      35: 0.64
+      31: 0.7
+      28: 0.75
+      24: 0.78
+      21: 0.83
+      17: 0.87
+      14: 0.91
+      10: 0.94
+      7: 0.96
+      5: 0.98
+      3: 0.99
+      1: 1.0
+
+places:
+  ATL:
+    label: Atlanta Hartsfield
+    lat: 33.64
+    lon: -84.43
+    time_zone: America/New_York
+  BOS:
+    label: Boston Logan International Airport
+    lat: 42.3656
+    lon: -71.0098
+    time_zone: America/New_York
+  LAX:
+    label: Los Angeles International Airport
+    lat: 33.9438
+    lon: -118.4091
+    time_zone: America/Los_Angeles
+
+legs:
+  # Bank 1, into the hub
+  - carrier: AL1
+    fltno: 100
+    orig: LAX
+    dest: ATL
+    dep_time: 06:00
+    arr_time: '12:00'
+    capacity: 100
+  - carrier: AL2
+    fltno: 200
+    orig: LAX
+    dest: ATL
+    dep_time: '06:00'
+    arr_time: '13:00'
+    capacity: 100
+
+    # Bank 1 out of the hub
+  - carrier: AL1
+    fltno: 101
+    orig: ATL
+    dest: BOS
+    dep_time: '13:00'
+    arr_time: '17:00'
+    capacity: 100
+  - carrier: AL2
+    fltno: 201
+    orig: ATL
+    dest: BOS
+    dep_time: '14:00'
+    arr_time: '17:00'
+    capacity: 100
+
+  # Bank 2, into the hub
+  - carrier: AL1
+    fltno: 110
+    orig: LAX
+    dest: ATL
+    dep_time: 09:00
+    arr_time: '15:00'
+    capacity: 100
+  - carrier: AL2
+    fltno: 210
+    orig: LAX
+    dest: ATL
+    dep_time: '09:00'
+    arr_time: '15:00'
+    capacity: 100
+
+    # Bank 2 out of the hub
+  - carrier: AL1
+    fltno: 111
+    orig: ATL
+    dest: BOS
+    dep_time: '16:00'
+    arr_time: '20:00'
+    capacity: 100
+  - carrier: AL2
+    fltno: 211
+    orig: ATL
+    dest: BOS
+    dep_time: '16:00'
+    arr_time: '19:00'
+    capacity: 100
+
+demands:
+  - orig: LAX
+    dest: ATL
+    segment: business
+    base_demand: 70.0
+    reference_fare: 250.0
+    choice_model: business
+    curve: 1
+  - orig: LAX
+    dest: ATL
+    segment: leisure
+    base_demand: 90.0
+    reference_fare: 100.0
+    choice_model: leisure
+    curve: 2
+
+  - orig: ATL
+    dest: BOS
+    segment: business
+    base_demand: 120.0
+    reference_fare: 375.0
+    choice_model: business
+    curve: 1
+  - orig: ATL
+    dest: BOS
+    segment: leisure
+    base_demand: 150.0
+    reference_fare: 150.0
+    choice_model: leisure
+    curve: 2
+
+  - orig: LAX
+    dest: BOS
+    segment: business
+    base_demand: 100.0
+    reference_fare: 500.0
+    choice_model: business
+    curve: 1
+  - orig: LAX
+    dest: BOS
+    segment: leisure
+    base_demand: 140.0
+    reference_fare: 200.0
+    choice_model: leisure
+    curve: 2
+
+fares:
+  - carrier: AL1
+    orig: LAX
+    dest: ATL
+    booking_class: Y0
+    price: 500.0
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL1
+    orig: LAX
+    dest: ATL
+    booking_class: Y1
+    price: 400.0
+    advance_purchase: 0
+    restrictions:
+      - R1
+  - carrier: AL1
+    orig: LAX
+    dest: ATL
+    booking_class: Y2
+    price: 300.0
+    advance_purchase: 0
+    restrictions:
+      - R2
+      - R3
+
+  - carrier: AL2
+    orig: LAX
+    dest: ATL
+    booking_class: Y0
+    price: 500.0
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL2
+    orig: LAX
+    dest: ATL
+    booking_class: Y1
+    price: 400.0
+    advance_purchase: 0
+    restrictions:
+      - R2
+  - carrier: AL2
+    orig: LAX
+    dest: ATL
+    booking_class: Y2
+    price: 300.0
+    advance_purchase: 0
+    restrictions:
+      - R2
+      - R3
+
+  - carrier: AL1
+    orig: ATL
+    dest: BOS
+    booking_class: Y0
+    price: 400.0
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL1
+    orig: ATL
+    dest: BOS
+    booking_class: Y1
+    price: 300.0
+    advance_purchase: 0
+    restrictions:
+      - R2
+  - carrier: AL1
+    orig: ATL
+    dest: BOS
+    booking_class: Y2
+    price: 200.0
+    advance_purchase: 0
+    restrictions:
+      - R2
+      - R3
+
+  - carrier: AL2
+    orig: ATL
+    dest: BOS
+    booking_class: Y0
+    price: 400.0
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL2
+    orig: ATL
+    dest: BOS
+    booking_class: Y1
+    price: 300.0
+    advance_purchase: 0
+    restrictions:
+      - R2
+  - carrier: AL2
+    orig: ATL
+    dest: BOS
+    booking_class: Y2
+    price: 200.0
+    advance_purchase: 0
+    restrictions:
+      - R2
+      - R3
+
+  - carrier: AL1
+    orig: LAX
+    dest: BOS
+    booking_class: Y0
+    price: 800.0
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL1
+    orig: LAX
+    dest: BOS
+    booking_class: Y1
+    price: 700.0
+    advance_purchase: 0
+    restrictions:
+      - R2
+  - carrier: AL1
+    orig: LAX
+    dest: BOS
+    booking_class: Y2
+    price: 600.0
+    advance_purchase: 0
+    restrictions:
+      - R2
+      - R3
+
+  - carrier: AL2
+    orig: LAX
+    dest: BOS
+    booking_class: Y0
+    price: 800.0
+    advance_purchase: 0
+    restrictions: []
+  - carrier: AL2
+    orig: LAX
+    dest: BOS
+    booking_class: Y1
+    price: 700.0
+    advance_purchase: 0
+    restrictions:
+      - R2
+  - carrier: AL2
+    orig: LAX
+    dest: BOS
+    booking_class: Y2
+    price: 600.0
+    advance_purchase: 0
+    restrictions:
+      - R2
+      - R3

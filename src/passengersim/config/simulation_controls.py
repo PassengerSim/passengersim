@@ -135,7 +135,18 @@ class ConnectionBuilderSettings(PrettyModel, extra="forbid", validate_assignment
 
 
 class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
-    num_trials: conint(ge=1, le=1000) = 1
+    collect_leg_bid_prices: bool = True
+    """Collect native daily bid-price statistics for every leg, enabled by default.
+
+    Collection excludes burn-in samples and follows core daily-statistics timing,
+    independently of Python tracer callback priorities. No database recording is
+    required. This is an all-leg switch; use LegBidPriceTracer for selected legs.
+    When disabled, no per-leg bid-price accumulator storage is allocated.
+    Results are available as ``summary.leg_bid_price_history``, pooled across
+    retained samples and trials with mean, sample standard deviation, and count.
+    """
+
+    num_trials: conint(ge=1, le=1000) = 3
     """The overall number of trials to run.
 
     Each trial is a complete simulation, including burn-in training time as well
@@ -145,14 +156,14 @@ class SimulationSettings(PrettyModel, extra="allow", validate_assignment=True):
     See [Counting Simulations][counting-simulations] for more details.
     """
 
-    num_samples: conint(ge=1, le=10000) = 600
+    num_samples: conint(ge=1, le=10000) = 350
     """The number of samples to run within each trial.
 
     Each sample represents one "typical" day of travel.
     See [Counting Simulations][counting-simulations] for more details.
     """
 
-    burn_samples: conint(ge=0, le=10000) = 100
+    burn_samples: conint(ge=0, le=10000) = 50
     """The number of samples to burn when starting each trial.
 
     Burned samples are used to populate a stable history of data to support

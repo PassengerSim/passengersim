@@ -42,6 +42,7 @@ from passengersim.progressbar import DummyProgressBar, ProgressBar
 from passengersim.rm.systems import get_registered_rm_system
 from passengersim.summaries import SimulationTables
 from passengersim.summaries.generic import GenericSimulationTables
+from passengersim.summaries.leg_bid_price_history import _merge_moments, _moments_from_rows
 from passengersim.tracers.generic import GenericTracer
 from passengersim.utils.nested_dict import from_nested_dict  # noqa: F401
 from passengersim.utils.si import si_units  # noqa: F401
@@ -117,6 +118,8 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
         self,
         config: Config,
         output_dir: pathlib.Path | None = None,
+        *,
+        connection: sqlite3.Connection | None = None,
     ):
         """
         Initialize a Simulation instance.
@@ -130,13 +133,24 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
             Directory for output files. If None, a temporary directory
             will be created automatically.
 
+        connection : sqlite3.Connection, optional
+            Existing connection shared with the native writer. The caller owns
+            its transaction boundaries and is responsible for closing it.
+
         Notes
         -----
         This initializes the simulation with default parameters including
         DCP lists, choice models, and various data structures for tracking
         simulation results.
         """
+        from passengersim.config.storage import resolve_storage, validate_database_reports
+
+        policy = resolve_storage(config.db, borrowed=connection is not None)
+        validate_database_reports(config, policy)
         revalidate(config)
+        self._storage_policy = policy
+        self._borrowed_connection = connection
+        self._run_started = False
         super().__init__(config, output_dir)
         if config.simulation_controls.write_raw_files:
             try:
@@ -181,6 +195,8 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
         The key is the trial number, and the value is a dictionary with
         carrier names as keys and bid price traces as values."""
 
+        self._leg_bid_price_moments: pd.DataFrame | None = None
+
         self.displacement_traces: dict[int, Any] = {}
         """Displacement cost traces for each carrier.
 
@@ -198,17 +214,9 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
         """
 
         self._initialize(config)
-        if not config.db:
-            self.cnx = database.Database()
-        else:
-            self.cnx = database.Database(
-                engine=config.db.engine,
-                filename=config.db.filename,
-                pragmas=config.db.pragmas,
-                commit_count_delay=config.db.commit_count_delay,
-            )
-        if self.cnx.is_open:
-            self._initialize_db_tables(config)
+        # Allocate on first connection use or uncached run. A cache hit must not
+        # create or overwrite the configured persistent destination.
+        self._database_initialized = False
 
         self.callback_data = CallbackData()
         """Data stored from callbacks.
@@ -219,17 +227,126 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
 
         self._firehose_buffers = {}
 
+    @property
+    def db(self):
+        """The PassengerSim database wrapper, allocated only on first use."""
+        if self.__dict__.get("_db") is None and self.__dict__.get("_database_initialized") is False:
+            self._open_database()
+        return self.__dict__.get("_db")
+
+    @db.setter
+    def db(self, value):
+        self._db = value
+
+    def _open_database(self):
+        """Create a fresh owned run database or attach the caller's connection."""
+        from ._trial_database import TrialDatabaseStore
+
+        if self._borrowed_connection is not None:
+            self.db = database.Database(connection=self._borrowed_connection)
+        elif self._storage_policy.mode == "disabled":
+            self.__dict__.pop("_trial_database_store", None)
+            self.db = database.Database(engine=None)
+        else:
+            store = TrialDatabaseStore(self.config, standalone=True)
+            self._trial_database_store = store
+            store.finalized = True
+            self.db = store.database
+        self._database_initialized = True
+        if self.db.is_open:
+            self._initialize_db_tables(self.config)
+
+    def _prepare_database_run(self, summarizer):
+        """Validate each run and preserve earlier results when this object reruns."""
+        from passengersim.config.storage import resolve_storage, validate_database_reports
+
+        policy = resolve_storage(self.config.db, borrowed=self._borrowed_connection is not None)
+        validate_database_reports(self.config, policy, summarizer)
+        changed = policy != self._storage_policy
+        self._storage_policy = policy
+        if (
+            self.__dict__.get("_db") is None
+            or not self._database_initialized
+            or ((self._run_started or changed) and self._borrowed_connection is None)
+        ):
+            self._open_database()
+        self._run_started = True
+
+    @contextlib.contextmanager
+    def _database_run_scope(self):
+        """Keep owned storage alive and reject close while native code is running."""
+        store = getattr(self, "_trial_database_store", None)
+        if store is not None:
+            if store._running:
+                raise RuntimeError("This simulation is already running")
+            store._running = True
+        try:
+            yield
+        finally:
+            self.db.disconnect_from_simulation_engine()
+            if store is not None:
+                store._running = False
+
+    def _finish_database_result(self, summary, trials):
+        """Attach storage ownership and finish eager queries before discarding data."""
+        summary.config = self.config.model_copy(deep=True)
+        store = getattr(self, "_trial_database_store", None)
+        if store is not None:
+            store.expected = set(trials)
+            store.merged = set(trials)
+            store.finalized = True
+            summary._trial_database_store = store
+        if self._storage_policy.mode != "disabled":
+            summary.run_queries(items=self.config.outputs.reports)
+        if self._storage_policy.mode == "summary_only":
+            self.close()
+        elif self._storage_policy.mode == "disabled":
+            summary.db = None
+        return summary
+
+    @property
+    def database_path(self):
+        """Absolute result path, retained for diagnostics after close."""
+        store = getattr(self, "_trial_database_store", None)
+        if store is not None:
+            return store.consolidated_path
+        db = self.__dict__.get("_db")
+        return db.database_path if db is not None else self._storage_policy.filename
+
+    @property
+    def database_available(self):
+        """Whether this simulation still has an accessible result database."""
+        db = self.__dict__.get("_db")
+        return db is not None and db.connection is not None
+
+    def close(self):
+        """Release this run's database; borrowed connections remain caller-owned."""
+        store = getattr(self, "_trial_database_store", None)
+        if store is not None:
+            store.close()
+        elif self.__dict__.get("_db") is not None:
+            self._db.close()
+        else:
+            # Closing an unused lazy simulation must not create its database.
+            self._database_initialized = True
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
     def _initialize_db_tables(self, config: Config):
-        with self.cnx:
-            database.tables.create_table_leg_defs(self.cnx._connection, self.eng.legs)
-            database.tables.create_table_fare_defs(self.cnx._connection, self.eng.fares)
+        with self.db:
+            database.tables.create_table_leg_defs(self.db.connection, self.eng.legs)
+            database.tables.create_table_fare_defs(self.db.connection, self.eng.fares)
             database.tables.create_table_fare_restriction_defs(
-                self.cnx._connection, self._fare_restriction_mapping.list_all()
+                self.db.connection, self._fare_restriction_mapping.list_all()
             )
-            database.tables.create_table_path_defs(self.cnx._connection, self.eng.paths)
+            database.tables.create_table_path_defs(self.db.connection, self.eng.paths)
             if config.db != ":memory:":
-                self.cnx.save_configs(config)
-            self.cnx._commit_raw()
+                self.db.save_configs(config)
+            self.db._commit_raw()
 
     @property
     def _eng(self) -> SimulationEngine:
@@ -344,8 +461,8 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
 
     @property
     def db_writer(self):
-        self.cnx.connect_to_simulation_engine(self.eng)
-        return self.cnx._db_writer
+        self.db.connect_to_simulation_engine(self.eng)
+        return self.db._db_writer
 
     def _init_sim_and_parms(self, config):
         """
@@ -431,17 +548,14 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
         # that does not set its own specific local value.
         self._apply_global_connect_times(config.simulation_controls.connection_builder)
 
-        # There is a default array of DCPs, we'll override it with the data from the
-        # input file (if available)
-        if len(config.dcps) > 0:
-            self.dcp_list = []
-            for dcp_index, days_prior in enumerate(config.dcps):
-                self.eng.add_dcp(dcp_index, days_prior)
-                self.dcp_list.append(days_prior)
-            # We need to add the last DCP, which is always 0, if not already in the list
-            if self.dcp_list[-1] != 0:
-                self.eng.add_dcp(len(self.dcp_list), 0)
-                self.dcp_list.append(0)
+        # Register the effective schedule even when the input uses the default.
+        # Native daily collection and driver events must share the same horizon.
+        self.dcp_list = list(config.dcps or self.dcp_list)
+        # We need to add the last DCP, which is always 0, if not already in the list.
+        if self.dcp_list[-1] != 0:
+            self.dcp_list.append(0)
+        for dcp_index, days_prior in enumerate(self.dcp_list):
+            self.eng.add_dcp(dcp_index, days_prior)
 
     def _apply_global_connect_times(self, connection_builder) -> None:
         """
@@ -699,6 +813,7 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
                 "rm_system": {"name": carrier_config.rm_system, "options": carrier_config.rm_system_options},
             }
             self.carriers_dict[carrier_name] = carrier
+            carrier.decision_price_rule = carrier_config.decision_price_rule
             carrier.rm_sys = rm_sys
             self.daily_callback(rm_sys)
             frat5_name = carrier_config.frat5
@@ -1085,7 +1200,12 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
         name, build the connections if needed, and then call the vn_initial_mapping
         method to set up the initial mapping for the carriers using virtual nesting.
         """
-        self.cnx.delete_experiment(self.eng.name)
+        # A new run must not reuse pooled or unfinished native observations.
+        enabled = self.config.simulation_controls.collect_leg_bid_prices
+        self.eng.set_parm("collect_leg_bid_prices", enabled)
+        self.eng._take_leg_bid_price_statistics()
+        self._leg_bid_price_moments = _moments_from_rows([]) if enabled else None
+        self.db.delete_experiment(self.eng.name)
         logger.debug("building connections")
         # The min/max connect time settings are applied to the engine globals
         # separately (see _apply_global_connect_times); exclude them here so the
@@ -1095,8 +1215,8 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
         )
         num_paths = self.eng.build_connections(**cnx_builder_kwargs)
         self.eng.compute_hhi()
-        if num_paths and self.cnx.is_open:
-            database.tables.create_table_path_defs(self.cnx._connection, self.eng.paths)
+        if num_paths and self.db.is_open:
+            database.tables.create_table_path_defs(self.db.connection, self.eng.paths)
         logger.debug(f"Connections done, num_paths = {num_paths}")
         self.eng.initialize_bucket_ap_rules()
 
@@ -1136,9 +1256,8 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
             self.eng.choice_set_sampling_probability = prob
             self.eng.choice_set_mkts = self.choice_set_mkts
 
-        # must close all Python SQLite database connections, so that the
-        # C++ simulation engine can open the database without locking issues
-        self.cnx.close()
+        # Python and the native writer share one connection throughout the run.
+        self.db._commit_raw()
 
     def vn_initial_mapping(self, carrier_code):
         """
@@ -1211,12 +1330,11 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
         self.eng.next_departure()
 
         # Commit data to the database
-        if self.cnx:
+        if self.db:
             try:
-                self.cnx.commit()
+                self.db.commit()
             except AttributeError:
                 pass
-        self.db_writer.commit()
 
         # Are we capturing choice-set data?
         if self.choice_set_file is not None:
@@ -1273,9 +1391,12 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
 
     def end_trial(self):
         """End of trial processing."""
+        if self.config.simulation_controls.collect_leg_bid_prices:
+            trial_moments = _moments_from_rows(self.eng._take_leg_bid_price_statistics())
+            self._leg_bid_price_moments = _merge_moments(self._leg_bid_price_moments, trial_moments)
         self.extract_segmentation_by_timeframe()
         self.extract_and_reset_bid_price_traces()
-        self.db_writer.final_write_to_sqlite(self.cnx._connection)
+        self.db_writer.final_write_to_sqlite(self.db.connection)
         self.save_simulation_state()
 
     def extract_and_reset_bid_price_traces(self):
@@ -1470,7 +1591,6 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
     def _run_sim_single_trial(self, trial: int, *, rich_progress: Progress | None = None):
         update_freq = self.update_frequency
         self.db_writer.update_db_write_flags()
-        self.cnx.close()
         n_samples_total = self.eng.num_samples
         n_samples_done = 0
         self.sample_done_callback(n_samples_done, n_samples_total)
@@ -1554,7 +1674,7 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
 
             # Database capture
             if event_type.lower() == "daily":
-                if self.cnx.use_sqlite() and self.eng.save_timeframe_details and recording_day > 0:
+                if self.db.use_sqlite() and self.eng.save_timeframe_details and recording_day > 0:
                     what_had_happened_was.append("write_to_sqlite daily")
                     _internal_log = self.db_writer.write_to_sqlite(
                         recording_day,
@@ -1563,7 +1683,7 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
                         store_displacements=self.eng.config.db.store_displacements,
                     )
             elif event_type.lower() in {"dcp", "done"}:
-                if self.cnx.use_sqlite() and self.eng.save_timeframe_details:
+                if self.db.use_sqlite() and self.eng.save_timeframe_details:
                     what_had_happened_was.append("write_to_sqlite dcp")
                     _internal_log = self.db_writer.write_to_sqlite(
                         recording_day,
@@ -1573,8 +1693,8 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
                     )
                 if event_type.lower() == "done" and "forecast_accuracy" in self.config.outputs.reports:
                     self.eng.capture_forecast_accuracy()
-                if self.cnx.is_open:
-                    self.cnx.save_details(self.db_writer, self.eng, recording_day)
+                # The native batch above already wrote this DCP. Keeping the
+                # Python connection open must not cause a second set of writes.
                 if self.file_writer is not None:
                     self.file_writer.save_details(self.eng, recording_day)
 
@@ -1805,14 +1925,18 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
 
             return cache_run(self, cache_dir=cache_dir, summarizer=summarizer, rich_progress=rich_progress)
 
+        self._prepare_database_run(summarizer)
         start_time = time.time()
-        self.setup_scenario()
-        if single_trial is not None:
-            self._run_sim_single_trial(single_trial, rich_progress=rich_progress)
-        else:
-            self._run_sim(rich_progress=rich_progress)
-        if self.choice_set_file is not None:
-            self.choice_set_file.close()
+        with self._database_run_scope():
+            self.setup_scenario()
+            if single_trial is not None:
+                self._run_sim_single_trial(single_trial, rich_progress=rich_progress)
+            else:
+                self._run_sim(rich_progress=rich_progress)
+            if self.choice_set_file is not None:
+                self.choice_set_file.close()
+            self.db._commit_raw()
+            self.db.disconnect_from_simulation_engine()
         logger.info("Extracting summary results")
         if isinstance(summarizer, GenericSimulationTables):
             summary = summarizer._extract(self)
@@ -1831,6 +1955,11 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
             for cb in getattr(self, cb_group, []):
                 if isinstance(cb, GenericTracer):
                     summary.callback_data[cb.name] = cb.finalize()
+
+        self._finish_database_result(
+            summary,
+            [single_trial] if single_trial is not None else range(self.config.simulation_controls.num_trials),
+        )
 
         # write output files if designated
         if isinstance(summary, GenericSimulationTables):
@@ -1870,39 +1999,44 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
         trial: int,
         summarizer: type[SimulationTablesT] | SimulationTablesT | None = None,
     ) -> SimulationTablesT:
-        self.setup_scenario()
-        self.eng.trial = trial
-
         summarizer = check_summarizer(summarizer)
+        self._prepare_database_run(summarizer)
+        with self._database_run_scope():
+            self.setup_scenario()
+            self.eng.trial = trial
 
-        if not isinstance(summarizer, GenericSimulationTables) and not issubclass(summarizer, GenericSimulationTables):
-            raise TypeError("summarizer must be an instance or subclass of GenericSimulationTables")
+            if not isinstance(summarizer, GenericSimulationTables) and not issubclass(
+                summarizer, GenericSimulationTables
+            ):
+                raise TypeError("summarizer must be an instance or subclass of GenericSimulationTables")
 
-        update_freq = self.update_frequency
-        logger.debug(f"run_sim, num_trials = {self.eng.num_trials}, num_samples = {self.eng.num_samples}")
-        self.db_writer.update_db_write_flags()
-        n_samples_total = self.eng.num_samples
-        n_samples_done = 0
-        self.sample_done_callback(n_samples_done, n_samples_total)
-        if self.eng.config.simulation_controls.show_progress_bar:
-            progress = ProgressBar(total=n_samples_total)
-        else:
-            progress = DummyProgressBar()
-        with progress:
-            self._run_single_trial(
-                trial,
-                n_samples_done,
-                n_samples_total,
-                progress,
-                update_freq,
-            )
+            update_freq = self.update_frequency
+            logger.debug(f"run_sim, num_trials = {self.eng.num_trials}, num_samples = {self.eng.num_samples}")
+            self.db_writer.update_db_write_flags()
+            n_samples_total = self.eng.num_samples
+            n_samples_done = 0
+            self.sample_done_callback(n_samples_done, n_samples_total)
+            if self.eng.config.simulation_controls.show_progress_bar:
+                progress = ProgressBar(total=n_samples_total)
+            else:
+                progress = DummyProgressBar()
+            with progress:
+                self._run_single_trial(
+                    trial,
+                    n_samples_done,
+                    n_samples_total,
+                    progress,
+                    update_freq,
+                )
+            self.db._commit_raw()
+            self.db.disconnect_from_simulation_engine()
         if isinstance(summarizer, GenericSimulationTables):
             summary = summarizer._extract(self)
         elif issubclass(summarizer, GenericSimulationTables):
             summary = summarizer.extract(self)
         else:
             raise TypeError("summarizer must be an instance or subclass of GenericSimulationTables")
-        return summary
+        return self._finish_database_result(summary, [trial])
 
     def backup_db(self, dst: pathlib.Path | str | sqlite3.Connection):
         """Back up this database to another copy.
@@ -1911,7 +2045,7 @@ class Simulation(BaseSimulation, CallbackMixin, Firehose):
         ----------
         dst : Path-like or sqlite3.Connection
         """
-        return self.cnx.backup(dst)
+        return self.db.backup(dst)
 
     def get_choice_parameters(self, choicemodel: str | ChoiceModel):
         """

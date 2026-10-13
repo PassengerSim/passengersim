@@ -16,7 +16,7 @@ def fig_forecasts_and_bid_prices(
 ):
     burn = sim.eng.config.simulation_controls.burn_samples
 
-    bp_df = sim.cnx.dataframe(
+    bp_df = sim.db.dataframe(
         """
         SELECT
           sample,
@@ -31,7 +31,7 @@ def fig_forecasts_and_bid_prices(
         (burn, trial, days_prior, leg_id),
     )
 
-    lg_df = sim.cnx.dataframe(
+    lg_df = sim.db.dataframe(
         """
         SELECT
           sample,

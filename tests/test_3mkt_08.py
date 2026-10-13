@@ -18,6 +18,7 @@ def summary(tmp_path_factory) -> SimulationTables:
     input_file = demo_network("3MKT/08-untrunc-em")
     cfg = Config.from_yaml(input_file)
     cfg.simulation_controls.num_trials = 1
+    cfg.simulation_controls.burn_samples = 100
     cfg.simulation_controls.num_samples = 500
     cfg.outputs.reports.add(("od_fare_class_mix", "BOS", "ORD"))
     tmp_path = tmp_path_factory.mktemp("08-untrunc-em")
@@ -31,10 +32,10 @@ def summary(tmp_path_factory) -> SimulationTables:
 
 def test_3mkt_08_basic(summary, num_regression):
     assert isinstance(summary, SimulationTables)
-    assert isinstance(summary.cnx, Database)
-    # assert summary.cnx.is_open
-    # assert summary.cnx.engine == "sqlite"
-    # assert str(summary.cnx.filename) == ":memory:"
+    assert isinstance(summary.db, Database)
+    # assert summary.db.is_open
+    # assert summary.db.engine == "sqlite"
+    # assert str(summary.db.filename) == ":memory:"
     assert isinstance(summary.sim, Simulation)
     assert summary.sim.eng.carriers[0].name == "AL1"
     num_regression.check(
@@ -121,7 +122,7 @@ def test_3mkt_08_demand_to_come(summary, dataframe_regression):
 @pytest.mark.parametrize("booking_class", ["Y0", "Y4", "Y5"])
 def test_3mkt_08_forecast_traces(summary, leg_id, days_prior, booking_class, dataframe_regression):
     df = leg_forecast_trace(
-        summary.cnx,
+        summary.db,
         leg_id=leg_id,
         booking_class=booking_class,
         days_prior=days_prior,
@@ -138,7 +139,7 @@ def test_3mkt_08_forecast_traces(summary, leg_id, days_prior, booking_class, dat
 @pytest.mark.parametrize("booking_class", ["Y0", "Y4", "Y5"])
 def test_3mkt_08_sales_traces(summary, leg_id, days_prior, booking_class, dataframe_regression):
     df = leg_sales_trace(
-        summary.cnx,
+        summary.db,
         leg_id=leg_id,
         booking_class=booking_class,
         days_prior=days_prior,

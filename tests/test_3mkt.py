@@ -67,9 +67,9 @@ def test_3mkt_db_detail(fast):
     sim = Simulation(config, output_dir=None)
     summary = sim.run(log_reports=False)
     assert summary.demands.shape == (6, 9)
-    fares = sim.cnx.dataframe("SELECT * FROM fare_detail")
+    fares = sim.db.dataframe("SELECT * FROM fare_detail")
     assert fares.shape == (num_samples * n_fares * n_dcps, 9)  # 40800
-    legs = sim.cnx.dataframe("SELECT * FROM leg_detail")
+    legs = sim.db.dataframe("SELECT * FROM leg_detail")
     assert all(
         legs.columns
         == [
@@ -92,7 +92,7 @@ def test_3mkt_db_detail(fast):
         ]
     )
     assert legs.shape == (num_samples * n_dcps * n_legs, 16)  # 3060
-    buckets = sim.cnx.dataframe("SELECT * FROM leg_bucket_detail")
+    buckets = sim.db.dataframe("SELECT * FROM leg_bucket_detail")
     assert all(
         buckets.columns
         == [
@@ -117,5 +117,5 @@ def test_3mkt_db_detail(fast):
         ]
     )
     assert buckets.shape == (num_samples * n_classes * n_dcps * n_legs, 18)  # 30600
-    dmds = sim.cnx.dataframe("SELECT * FROM demand_detail")
+    dmds = sim.db.dataframe("SELECT * FROM demand_detail")
     assert dmds.shape == (num_samples * n_demands * n_dcps, 13)  # 2040

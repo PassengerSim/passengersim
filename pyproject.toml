@@ -47,7 +47,7 @@ dependencies = [
     "dill",
     "docutils",
     "joblib",
-    "lz4",
+    "lz4>=4.3.2",
     "numpy>=2.4,<2.5",
     "ortools",
     "pandas>=2.3.3,<3.0",
@@ -60,6 +60,7 @@ dependencies = [
 
 [project.optional-dependencies]
 test = [
+    "openpyxl>=3.1.5",
     "pytest-regressions ~=2.4",
 ]
 lab = [

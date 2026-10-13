@@ -1,10 +1,11 @@
 import json
 import warnings
+from datetime import UTC, date, datetime, timedelta, timezone
 
 import pytest
 
 from passengersim import demo_network
-from passengersim.config import Carrier, Config, DatabaseConfig, manipulate
+from passengersim.config import Carrier, Config, manipulate
 from passengersim.config.checks import check_config
 
 
@@ -69,6 +70,8 @@ def test_db_serialization(config: Config):
         "fast",
         "filename",
         "pragmas",
+        "result_directory",
+        "result_storage",
         "store_displacements",
         "store_leg_bid_prices",
         "write_items",
@@ -87,21 +90,19 @@ def test_db_serialization(config: Config):
     assert z["db"] is None
 
     # when loading the serialized form, the db attribute should get
-    # loaded as a null database
+    # loaded as None
     cfg0 = Config.model_validate(z)
-    assert isinstance(cfg0.db, DatabaseConfig)
-    assert cfg0.db.filename is None
+    assert cfg0.db is None
     assert not config.find_differences(cfg0)
 
     # test round trip through json, in the serialized form
     # the 'db' key should a None, but when deserialized
-    # the database should end up as a null database
+    # the database should remain None
     j = cfg0.model_dump_json()
     jd = json.loads(j)
     assert jd["db"] is None
     cfg1 = Config.model_validate(jd)
-    assert isinstance(cfg1.db, DatabaseConfig)
-    assert cfg1.db.filename is None
+    assert cfg1.db is None
 
     assert not config.find_differences(cfg1)
 
@@ -295,3 +296,37 @@ def test_class_codes_missing_cabin():
 
     with pytest.raises(ValueError, match="class codes must begin with a cabin code character"):
         _c = Carrier(name="AL1", cabin_ordering=["Y"], rm_system="E", classes=["F0", "F1", "Y2", "Y3", "Y4"])
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    [
+        (date(2020, 3, 1), datetime(2020, 3, 1, tzinfo=UTC)),
+        (datetime(2020, 3, 1, 12, 30), datetime(2020, 3, 1, 12, 30, tzinfo=UTC)),
+        ("2020-03-01T12:30:00-05:00", datetime(2020, 3, 1, 12, 30, tzinfo=timezone(timedelta(hours=-5)))),
+        (
+            datetime(2020, 3, 1, 12, 30, tzinfo=timezone(timedelta(hours=-5))),
+            datetime(2020, 3, 1, 12, 30, tzinfo=timezone(timedelta(hours=-5))),
+        ),
+    ],
+)
+def test_leg_date_preserves_datetime(value: date | str, expected: datetime) -> None:
+    """Plain dates gain midnight UTC; datetimes keep their clock time and offset."""
+    from passengersim.config.legs import Leg
+
+    leg = Leg(carrier="AL1", fltno=1, orig="BOS", dest="LAX", dep_time=0, arr_time=1, capacity=100, date=value)
+    assert leg.date == expected
+    assert leg.date.hour == expected.hour
+    assert leg.date.utcoffset() == expected.utcoffset()
+
+
+def test_simulation_defaults_and_explicit_legacy_counts() -> None:
+    """Default sample counts change only when the caller has omitted them."""
+    from passengersim.config.simulation_controls import SimulationSettings
+
+    defaults = SimulationSettings()
+    assert (defaults.num_trials, defaults.num_samples, defaults.burn_samples) == (3, 350, 50)
+    assert defaults.num_trials * (defaults.num_samples - defaults.burn_samples) == 900
+    explicit = SimulationSettings(num_trials=1, num_samples=600, burn_samples=100)
+    restored = SimulationSettings.model_validate_json(explicit.model_dump_json())
+    assert (restored.num_trials, restored.num_samples, restored.burn_samples) == (1, 600, 100)

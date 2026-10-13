@@ -6,6 +6,7 @@ import json
 import logging
 import multiprocessing
 import pathlib
+import queue
 import threading
 import time
 import traceback
@@ -17,13 +18,13 @@ from datetime import UTC, datetime
 import dill
 import numpy as np  # noqa: F401
 import pandas as pd  # noqa: F401
-from rich.traceback import Traceback as _RichTraceback
 
 from passengersim.callbacks import CallbackMixin
 from passengersim.config import Config
 from passengersim.core import SimulationEngine
 from passengersim.driver._base_sim import BaseSimulation
 from passengersim.driver._singleproc import Simulation, check_summarizer
+from passengersim.driver._trial_database import TrialDatabaseStore, TrialResult, finalize_result, finish_database
 from passengersim.mp_executor import JobExecutor
 from passengersim.rm.systems import export_registered_rm_systems, restore_registered_rm_systems
 from passengersim.summaries import GenericSimulationTables, SimulationTables
@@ -40,10 +41,13 @@ class ThrottledUpdater:
         self.throttle = throttle
         self.last_time = 0
         self.n = 0
+        self.completed = 0
 
-    def __call__(self, *args, **kwargs):
-        self.n += 1
-        if time.time() - self.last_time > self.throttle:
+    def __call__(self, completed, total):
+        # The callback includes an initial zero; count samples, not callbacks.
+        self.n += completed - self.completed
+        self.completed = completed
+        if self.n and time.time() - self.last_time > self.throttle:
             self.flush()
 
     def flush(self):
@@ -55,13 +59,18 @@ class ThrottledUpdater:
 def _subprocess_run_trial(
     trial_id: int,
     cfg_json: str,
-    progress_queue: multiprocessing.Queue,
+    progress_queue: multiprocessing.Queue | None = None,
     output_dir: pathlib.Path | None = None,
     *,
     summarizer=SimulationTables,
     callbacks=None,
     exported_rm_systems=None,
+    database_path: pathlib.Path | None = None,
 ):
+    trial_started = time.perf_counter()
+    sim = None
+    if progress_queue is None:
+        progress_queue = queue.SimpleQueue()
     try:
         if exported_rm_systems:
             restore_registered_rm_systems(exported_rm_systems)
@@ -74,8 +83,10 @@ def _subprocess_run_trial(
         # Writing to database is not a "output" and so is still allowed
         # but we need to make sure that each subprocess has a unique database file
         # because SQLite does not like multiple processes writing to the same database file.
-        if cfg.db is not None and cfg.db.filename is not None and str(cfg.db.filename) != ":memory:":
-            cfg.db.filename = cfg.db.filename.with_suffix(f".trial{trial_id:02}" + cfg.db.filename.suffix)
+        if database_path is not None:
+            cfg.db.filename = database_path
+            cfg.db.result_directory = None
+            cfg.db.result_storage = "persistent"
         output_dir = MaybeTemporaryDirectory(output_dir)
 
         sim = Simulation(cfg, output_dir.joinpath(f"passengersim-trial-{trial_id:02}"))
@@ -88,19 +99,37 @@ def _subprocess_run_trial(
                 sim.daily_callback(cb)
         sim.sample_done_callback = ThrottledUpdater(progress_queue, trial_id, 0.5)
         summary = sim.run(single_trial=trial_id, summarizer=summarizer)
+        simulation_finished = time.perf_counter()
         sim.sample_done_callback.flush()
         progress_queue.put((trial_id, "finalizing", None))
         # Passing a database connection between processes is not allowed,
         # so we need to delete it before returning the summary. But first
         # we will run any queries that were requested as output reports
-        if isinstance(summary, GenericSimulationTables):
+        if isinstance(summary, GenericSimulationTables) and summary.db is not None:
             summary.run_queries(items=cfg.outputs.reports)
+        summary.__dict__.pop("_trial_database_store", None)
         try:
-            summary.cnx = None
+            summary.db = None
         except AttributeError as err:
             print(err)
-        progress_queue.put((trial_id, "done", summary))
-        return summary
+        reports_finished = time.perf_counter()
+        descriptor = None
+        if database_path is not None:
+            descriptor = finish_database(sim.db, trial_id)
+        else:
+            sim.db.close()
+        progress_queue.put((trial_id, "done", None))
+        published = time.perf_counter()
+        return TrialResult(
+            summary,
+            descriptor,
+            {
+                "simulation_and_writes_s": simulation_finished - trial_started,
+                "eager_reports_s": reports_finished - simulation_finished,
+                "worker_finalization_s": published - reports_finished,
+            },
+            published,
+        )
     except Exception as e:
         # Capture the subprocess's full traceback text so it can be preserved
         # when the exception is pickled and re-raised in the parent process.
@@ -123,8 +152,15 @@ def _subprocess_run_trial(
             e._passengersim_subprocess_tb = tb_str
         except Exception:
             pass
-        progress_queue.put((trial_id, "exception", e))
+        progress_queue.put((trial_id, "exception", None))
         return e
+    finally:
+        if sim is not None and sim.db.connection is not None:
+            # Failed trials are never advertised as complete. Roll back pending
+            # work and release handles before the parent can clean up files.
+            sim.db.disconnect_from_simulation_engine()
+            sim.db.connection.rollback()
+            sim.db.close()
 
 
 def _executor_run_trial(
@@ -133,6 +169,7 @@ def _executor_run_trial(
     progress_queue,
     output_dir: pathlib.Path | None,
     dill_kwargs_blob: bytes,
+    database_path: pathlib.Path | None = None,
 ):
     """Worker function for use with ProcessPoolExecutor.
 
@@ -140,7 +177,9 @@ def _executor_run_trial(
     Exceptions are re-raised so the Future captures them.
     """
     kwargs = dill.loads(dill_kwargs_blob)
-    result = _subprocess_run_trial(trial_id, cfg_json, progress_queue, output_dir, **kwargs)
+    result = _subprocess_run_trial(
+        trial_id, cfg_json, progress_queue, output_dir, database_path=database_path, **kwargs
+    )
     if isinstance(result, Exception):
         raise result
     return result
@@ -151,27 +190,141 @@ class MultiSimulation(BaseSimulation, CallbackMixin):
         self,
         config: Config,
         output_dir: pathlib.Path | None = None,
+        *,
+        database_initializer=None,
     ):
+        self._database_initializer = database_initializer
         super().__init__(config, output_dir)
         self.config = config
         self._placeholder_sim = None
 
-    def sequential_run(self, *, summarizer=SimulationTables):
+    def close(self):
+        """Close the current result and every database alias; preserve persistent files."""
+        store = getattr(self, "_trial_database_store", None)
+        if store is not None:
+            store.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
+    @property
+    def db(self):
+        """The shared consolidated database, opened on the consuming thread."""
+        store = getattr(self, "_trial_database_store", None)
+        return store.database if store is not None else None
+
+    @db.setter
+    def db(self, value):
+        # BaseSimulation initializes this attribute before a run has an owner.
+        if value is not None:
+            raise AttributeError("MultiSimulation.db is managed by its result owner")
+
+    @property
+    def database_path(self):
+        """Absolute consolidated result path, without opening its connection."""
+        store = getattr(self, "_trial_database_store", None)
+        return store.consolidated_path if store is not None else None
+
+    @property
+    def database_available(self):
+        """Whether this simulation has retained detail data."""
+        store = getattr(self, "_trial_database_store", None)
+        return bool(store is not None and store.available)
+
+    @property
+    def database_status(self):
+        """Completed, failed, and cancelled trials, plus whole-run completeness."""
+        store = getattr(self, "_trial_database_store", None)
+        return store.status if store is not None else None
+
+    @property
+    def trial_databases(self):
+        """Completed trial descriptors; temporary trials share the consolidated path."""
+        store = getattr(self, "_trial_database_store", None)
+        return dict(store.completed) if store is not None else {}
+
+    def sequential_run(self, *, summarizer=SimulationTables, fail_fast=True):
+        """Run trials sequentially using the same closed-file handoff as workers."""
+        run_start = time.time()
+        summarizer = check_summarizer(summarizer)
+        from passengersim.config.storage import resolve_storage, validate_database_reports
+
+        validate_database_reports(self.config, resolve_storage(self.config.db, orchestrated=True), summarizer)
+        store = self._trial_database_store = TrialDatabaseStore(self.config, initializer=self._database_initializer)
         results = []
-        cfg_json = self.config.model_dump_json()
+        cfg_json = self._dump_config()
         for trial_id in range(self.config.simulation_controls.num_trials):
-            print("starting trial", trial_id)
-            results.append(
-                _subprocess_run_trial(
+            try:
+                value = _subprocess_run_trial(
                     trial_id,
                     cfg_json,
                     output_dir=self.output_dir,
                     summarizer=summarizer,
                     callbacks=self.callback_functions(),
+                    database_path=store.path_for(trial_id),
                 )
-            )
-            print("finished trial", trial_id)
-        return SimulationTables.aggregate(results)
+                if isinstance(value, Exception):
+                    raise value
+                store.accept(trial_id, value)
+                results.append(value.summary)
+            except BaseException as error:
+                store.failed[trial_id] = str(error)
+                if fail_fast:
+                    store.cancelled.update(store.expected - store.merged - store.failed.keys())
+                    store.finalized = True
+                    raise
+        store.finalized = True
+        result = summarizer.aggregate(results)
+        self._finalize_trial_summaries(result, self.config, run_start, store)
+        result._trial_database_store = store
+        return finalize_result(result)
+
+    def _finalize_trial_summaries(self, result, config, run_start, store):
+        """Preserve parent output/report behavior for both trial execution modes."""
+        result._metadata["database.timings"] = store.metrics
+        result.config = config.model_copy(deep=True)
+        result._metadata["time.started"] = datetime.fromtimestamp(run_start, UTC).isoformat()
+        run_finished = time.time()
+        result._metadata["time.runtime"] = run_finished - run_start
+        result._metadata["time.finished"] = datetime.fromtimestamp(run_finished, UTC).isoformat()
+
+        # write output files if designated
+        output_filenames = {}
+        output_filenames["html"] = config.outputs.get_output_filename(
+            "html",
+            timestamp=self._timestamp,
+        )
+        output_filenames["disk"] = config.outputs.get_output_filename(
+            "disk",
+            timestamp=self._timestamp,
+        )
+        if output_filenames["html"]:
+            result._metadata["outputs.html_filename"] = output_filenames["html"]
+        if output_filenames["disk"]:
+            result._metadata["outputs.disk_filename"] = output_filenames["disk"]
+
+        if output_filenames["html"]:
+            try:
+                result.to_html(output_filenames["html"], cfg=config, make_dirs=True, add_timestamp=False)
+            except Exception as err:
+                warnings.warn(f"Error writing HTML file: {err}", stacklevel=2)
+        if output_filenames["disk"]:
+            try:
+                result.to_file(
+                    output_filenames["disk"],
+                    make_dirs=True,
+                    add_timestamp_ext=False,
+                )
+            except Exception as err:
+                warnings.warn(f"Error writing PXSIM file: {err}", stacklevel=2)
+        if filename := config.outputs.get_output_filename("pickle", timestamp=self._timestamp):
+            result._metadata["outputs.pickle_filename"] = result.to_pickle(filename)
+        if filename := config.outputs.get_output_filename("excel", timestamp=self._timestamp):
+            result.to_xlsx(filename)
+        return result
 
     @property
     def _eng(self) -> SimulationEngine:
@@ -235,9 +388,11 @@ class MultiSimulation(BaseSimulation, CallbackMixin):
             A Future that resolves to the aggregated simulation results.
         """
         run_start = time.time()
-        run_start_str = datetime.fromtimestamp(run_start, UTC).isoformat()
 
         summarizer = check_summarizer(summarizer)
+        from passengersim.config.storage import resolve_storage, validate_database_reports
+
+        validate_database_reports(self.config, resolve_storage(self.config.db, orchestrated=True), summarizer)
 
         # if no run_id is provided, the cfg.scenario is used.
         if run_id is None:
@@ -269,20 +424,53 @@ class MultiSimulation(BaseSimulation, CallbackMixin):
         # Use a Manager queue so the proxy object is picklable with standard
         # pickle (required by ProcessPoolExecutor).
         manager = multiprocessing.Manager()
-        progress_queue = manager.Queue()
+        try:
+            progress_queue = manager.Queue()
+            # Reserve storage only after serialization and manager setup succeed;
+            # failures before worker submission must not consume a destination.
+            store = self._trial_database_store = TrialDatabaseStore(self.config, initializer=self._database_initializer)
+        except BaseException:
+            manager.shutdown()
+            raise
+        store._running = True
 
         # Submit all trials to the executor
         trial_futures: dict[int, concurrent.futures.Future] = {}
-        for task_id in task_ids:
-            fut = jobber.executor.submit(
-                _executor_run_trial,
-                task_id,
-                cfg_json,
-                progress_queue,
-                output_dir,
-                dill_kwargs_blob,
-            )
-            trial_futures[task_id] = fut
+        try:
+            for task_id in task_ids:
+                fut = jobber.executor.submit(
+                    _executor_run_trial,
+                    task_id,
+                    cfg_json,
+                    progress_queue,
+                    output_dir,
+                    dill_kwargs_blob,
+                    store.path_for(task_id),
+                )
+                store.track(fut)
+                trial_futures[task_id] = fut
+        except BaseException:
+            store.interrupted = True
+            # Submission itself may fail after earlier workers have started.
+            # Keep their progress queue and files alive until they finish.
+            for future in trial_futures.values():
+                future.cancel()
+            concurrent.futures.wait(trial_futures.values())
+            store.wait()
+            for tid in task_ids:
+                future = trial_futures.get(tid)
+                if future is None or future.cancelled():
+                    store.cancelled.add(tid)
+                    continue
+                try:
+                    value = future.result()
+                    store.accept(tid, value)
+                except BaseException as error:
+                    store.failed[tid] = str(error)
+            store.finalized = True
+            store._running = False
+            manager.shutdown()
+            raise
 
         result_future: concurrent.futures.Future = concurrent.futures.Future()
         config = self.config
@@ -292,141 +480,115 @@ class MultiSimulation(BaseSimulation, CallbackMixin):
             rich_progress = jobber.rich_progress
 
         def _monitor_and_finalize():
+            results = {}
+            first_error = None
+            pending = set(task_ids)
+            task_progress_ids = {}
             try:
-                task_progress_ids = {
-                    task_id: rich_progress.add_task(f"[green]{run_id}Trial {task_id}", total=num_samples)
-                    for task_id in task_ids
-                }
-
-                completed_tasks: set[int] = set()
-                failed = False
-
-                while len(completed_tasks) < len(task_ids) and not failed:
-                    try:
-                        task_id, message, payload = progress_queue.get(timeout=0.25)
-                    except Exception:
-                        # Queue empty or communication error – fall through
-                        # to check whether any futures have resolved.
-                        for tid, f in trial_futures.items():
-                            if tid in completed_tasks or not f.done():
-                                continue
-                            exc = f.exception()
-                            if exc is not None and fail_fast:
-                                for ff in trial_futures.values():
-                                    ff.cancel()
-                                if not result_future.done():
-                                    result_future.set_exception(exc)
-                                failed = True
-                                break
-                            completed_tasks.add(tid)
-                        continue
-
-                    if message == "done":
-                        rich_progress.update(
-                            task_progress_ids[task_id],
-                            completed=num_samples,
-                            description=f"{run_id}Finished {task_id}",
-                            refresh=True,
-                            visible=False,
-                        )
-                        completed_tasks.add(task_id)
-                    elif message == "update":
-                        rich_progress.update(
-                            task_progress_ids[task_id],
-                            advance=payload,
-                            refresh=True,
-                        )
-                    elif message == "finalizing":
-                        rich_progress.update(
-                            task_progress_ids[task_id],
-                            description=f"{run_id}Finalize {task_id}",
-                            refresh=True,
-                        )
-                    elif message == "exception":
-                        # The ``payload`` is the exception raised inside the
-                        # subprocess.  Because tracebacks cannot be pickled,
-                        # ``payload.__traceback__`` is ``None`` here; the
-                        # formatted traceback text was attached in the
-                        # subprocess as ``_passengersim_subprocess_tb`` (and as
-                        # a PEP 678 note).  Prefer printing that captured text
-                        # so the user sees where the failure actually occurred.
-                        sub_tb = getattr(payload, "_passengersim_subprocess_tb", None)
-                        if sub_tb:
-                            rich_progress.console.print(
-                                f"[red]Exception in Trial {task_id} (subprocess traceback)[/red]:\n{sub_tb.rstrip()}"
-                            )
-                        else:
-                            tb = _RichTraceback.from_exception(type(payload), payload, payload.__traceback__)
-                            rich_progress.console.print(f"[red]Exception in Trial {task_id}[/red]:", tb)
-                        completed_tasks.add(task_id)
-                        if fail_fast:
-                            for f in trial_futures.values():
-                                f.cancel()
-                            if not result_future.done():
-                                result_future.set_exception(payload)
-                            failed = True
-                    else:
-                        print(f"Unknown message {message}")
-
-                if failed:
-                    return
-
-                # Aggregate results from the individual futures
-                results: dict[int, object] = {}
                 for task_id in task_ids:
-                    try:
-                        results[task_id] = trial_futures[task_id].result()
-                    except Exception as e:
-                        if fail_fast and not result_future.done():
-                            result_future.set_exception(e)
-                            return
-                        # non-fail-fast: skip failed trials
-
+                    task_progress_ids[task_id] = rich_progress.add_task(
+                        f"[green]{run_id}Trial {task_id}", total=num_samples
+                    )
+                while pending:
+                    if result_future.cancelled():
+                        store.interrupted = True
+                    if result_future.cancelled() or (first_error is not None and fail_fast):
+                        for tid in pending:
+                            trial_futures[tid].cancel()
+                    # Only the monitor merges. Inspect Futures independently of
+                    # queue messages, which may precede actual file publication.
+                    for tid in sorted(pending.copy()):
+                        future = trial_futures[tid]
+                        if not future.done():
+                            continue
+                        pending.remove(tid)
+                        if future.cancelled():
+                            store.cancelled.add(tid)
+                            continue
+                        try:
+                            value = future.result()
+                            store.accept(tid, value)
+                            results[tid] = value.summary
+                            # Futures are authoritative; final queue updates may be unread.
+                            rich_progress.update(
+                                task_progress_ids[tid],
+                                completed=num_samples,
+                                description=f"{run_id}Finished {tid}",
+                            )
+                        except BaseException as error:
+                            store.failed[tid] = str(error)
+                            if first_error is None:
+                                first_error = error
+                            # Worker traceback notes survive Future transport.
+                            sub_tb = getattr(error, "_passengersim_subprocess_tb", None)
+                            rich_progress.console.print(
+                                f"Exception in Trial {tid}: {sub_tb or error}", style="red", markup=False
+                            )
+                        rich_progress.update(task_progress_ids[tid], visible=False, refresh=True)
+                    if pending:
+                        try:
+                            tid, message, payload = progress_queue.get(timeout=0.05)
+                        except queue.Empty:
+                            continue
+                        if tid not in pending:
+                            continue  # Ignore late messages from finalized trials.
+                        if message == "update":
+                            rich_progress.update(task_progress_ids[tid], advance=payload, refresh=True)
+                        elif message == "finalizing":
+                            rich_progress.update(task_progress_ids[tid], description=f"{run_id}Finalize {tid}")
+                store.wait()
+                store.finalized = True
+                if result_future.cancelled():
+                    return
+                if first_error is not None and fail_fast:
+                    result_future.set_exception(first_error)
+                    return
                 result = summarizer.aggregate([v for k, v in sorted(results.items())])
-                result.config = config.model_copy(deep=True)
-                result._metadata["time.started"] = run_start_str
-                run_finished = time.time()
-                result._metadata["time.runtime"] = run_finished - run_start
-                result._metadata["time.finished"] = datetime.fromtimestamp(run_finished, UTC).isoformat()
-
-                # write output files if designated
-                output_filenames = {}
-                output_filenames["html"] = config.outputs.get_output_filename(
-                    "html",
-                    timestamp=self._timestamp,
-                )
-                output_filenames["disk"] = config.outputs.get_output_filename(
-                    "disk",
-                    timestamp=self._timestamp,
-                )
-                if output_filenames["html"]:
-                    result._metadata["outputs.html_filename"] = output_filenames["html"]
-                if output_filenames["disk"]:
-                    result._metadata["outputs.disk_filename"] = output_filenames["disk"]
-
-                if output_filenames["html"]:
-                    try:
-                        result.to_html(output_filenames["html"], cfg=config, make_dirs=True, add_timestamp=False)
-                    except Exception as err:
-                        warnings.warn(f"Error writing HTML file: {err}", stacklevel=2)
-                if output_filenames["disk"]:
-                    try:
-                        result.to_file(output_filenames["disk"], make_dirs=True, add_timestamp_ext=False)
-                    except Exception as err:
-                        warnings.warn(f"Error writing PXSIM file: {err}", stacklevel=2)
-
+                self._finalize_trial_summaries(result, config, run_start, store)
+                # Publish the owner only after monitor-thread output generation;
+                # no retained connection may be opened on this thread.
+                result._trial_database_store = store
                 result_future.set_result(result)
-
-            except Exception as e:
+            except BaseException as error:
+                store.interrupted = True
+                for tid in pending:
+                    trial_futures[tid].cancel()
                 if not result_future.done():
-                    result_future.set_exception(e)
+                    result_future.set_exception(error)
             finally:
+                # Cancellation cannot stop a running worker. Keep its queue and
+                # storage alive until all file users and callbacks finish.
+                concurrent.futures.wait(trial_futures.values())
+                store.wait()
+                # Even a monitor/output failure must preserve successful workers
+                # that were still running when normal collection was interrupted.
+                for tid in sorted(pending):
+                    future = trial_futures[tid]
+                    if future.cancelled():
+                        store.cancelled.add(tid)
+                        continue
+                    try:
+                        value = future.result()
+                        store.accept(tid, value)
+                    except BaseException as error:
+                        store.failed[tid] = str(error)
+                if result_future.cancelled():
+                    store.interrupted = True
+                store.finalized = True
+                store._running = False
                 try:
-                    manager.shutdown()
-                except Exception:
-                    pass
+                    # Clear only this run's tasks, including failed/cancelled trials.
+                    for progress_id in task_progress_ids.values():
+                        rich_progress.remove_task(progress_id)
+                    rich_progress.refresh()
+                finally:
+                    try:
+                        manager.shutdown()
+                    except Exception:
+                        pass
 
         monitor_thread = threading.Thread(target=_monitor_and_finalize, daemon=True)
+        result_future._monitor_thread = monitor_thread
         monitor_thread.start()
 
         return result_future
@@ -457,6 +619,9 @@ class MultiSimulation(BaseSimulation, CallbackMixin):
         cache_dir: pathlib.Path | None = None,
     ):
         summarizer = check_summarizer(summarizer)
+        from passengersim.config.storage import resolve_storage, validate_database_reports
+
+        validate_database_reports(self.config, resolve_storage(self.config.db, orchestrated=True), summarizer)
         # self.log_config()
 
         if cache_dir is not None:
@@ -483,4 +648,11 @@ class MultiSimulation(BaseSimulation, CallbackMixin):
                 # executor=executor,
                 jobber=jobber,
             )
-            return future.result()
+            try:
+                result = future.result()
+                future._monitor_thread.join()
+                return finalize_result(result)
+            finally:
+                # Synchronous completion includes releasing worker queues and
+                # monitor references, not merely publishing the summary.
+                future._monitor_thread.join()

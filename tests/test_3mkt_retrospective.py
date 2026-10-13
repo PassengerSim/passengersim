@@ -41,7 +41,7 @@ def stored_results(retrospect_dir) -> Contrast:
     cfg.db.filename = retrospect.joinpath("simple.sqlite")
     cfg.outputs.base_dir = retrospect_dir / "outputs2"
     summary2 = Simulation(cfg).run()
-    summary2.cnx.close()
+    summary2.db.close()
     summary2.to_file(retrospect.joinpath("simple.pxsim"))
 
     simple = from_file(retrospect.joinpath("simple.pxsim"))
@@ -86,7 +86,7 @@ def test_fig_bookings_by_timeframe(stored_results, dataframe_regression):
 
 
 def test_arbitrary_sql(stored_results, dataframe_regression, retrospect_dir):
-    cnx = sqlite3.connect(retrospect_dir.joinpath("simple.sqlite"))
+    connection = sqlite3.connect(retrospect_dir.joinpath("simple.sqlite"))
 
     query = """
     SELECT
@@ -100,6 +100,6 @@ def test_arbitrary_sql(stored_results, dataframe_regression, retrospect_dir):
       AND sample >= 90
     LIMIT 10
     """
-    df = pd.read_sql_query(query, cnx)
+    df = pd.read_sql_query(query, connection)
     print(df)
     dataframe_regression.check(df)

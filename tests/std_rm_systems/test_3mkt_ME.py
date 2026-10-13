@@ -24,6 +24,7 @@ def config(request, tmp_path_factory) -> pax.Config:
     cfg.carriers.AL1.frat5 = "curve_C"
     cfg.carriers.AL2.rm_system = "E"
     cfg.simulation_controls.num_trials = 1
+    cfg.simulation_controls.burn_samples = 100
     cfg.simulation_controls.num_samples = 250
     cfg.simulation_controls.connection_builder.nonstop_leg_path_id_alignment = False
     cfg.db.filename = tmp_path_factory.mktemp("test-3mkt-CE") / "db.sqlite"

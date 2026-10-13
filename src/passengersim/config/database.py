@@ -12,17 +12,26 @@ class DatabaseConfig(PrettyModel, extra="forbid", validate_assignment=True):
 
     Currently only `sqlite` is fully implemented."""
 
-    filename: pathlib.Path | None = "passengersim-output.sqlite"
-    """Name of file for SQLite output.
+    filename: pathlib.Path | None = None
+    """Exact persistent database destination; None leaves naming to the storage policy.
 
-    When using the sqlite engine, an in-memory database can be created by
-    setting this to ':memory:'.  Note that in-memory databases are not
-    persistent and will be lost when the database connection is closed.  Also,
-    in-memory databases cannot be shared between multiple processes.  When
-    using multiprocessing, all database operations must be performed in the
-    same process that created the database connection. Be sure to run summary
-    queries before closing the database connection, by identifying all database
-    summary tables in the `outputs.reports` configuration option.
+    The legacy value ':memory:' selects real memory storage. To disable recording,
+    set engine=None or set the entire database configuration to None.
+    """
+
+    result_storage: Literal["temporary", "persistent", "memory", "summary_only"] | None = None
+    """Storage and retention policy, shared by all simulation interfaces.
+
+    None selects persistent storage when a filename is supplied, memory for
+    ':memory:', and temporary storage otherwise. Memory is standalone-only.
+    Summary-only computes requested database reports before discarding raw data.
+    """
+
+    result_directory: pathlib.Path | None = None
+    """Parent of unique run directories, never an exact database filename.
+
+    Temporary storage defaults to the OS temporary directory. Persistent storage
+    requires either this directory or an exact filename, but never both.
     """
 
     fast: bool = False

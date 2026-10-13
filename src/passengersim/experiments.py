@@ -265,6 +265,21 @@ class Experiments(CallbackMixin):
         else:
             return pathlib.Path(self.output_dir) / tag / pathlib.Path(filename).name
 
+    def _prepare_output_paths(self, config: Config, tag: str) -> None:
+        """Place configured outputs in the experiment directory in either execution mode."""
+        config.outputs.base_dir = pathlib.Path(self.output_dir or ".") / tag
+        config.outputs.filename_stem = tag
+        # Relative paths already resolve against base_dir. Absolute paths need
+        # their directory removed so different experiments cannot overwrite them.
+        if self.output_dir is not None:
+            for field in ("disk", "pickle", "excel"):
+                filename = getattr(config.outputs, field)
+                if isinstance(filename, pathlib.Path) and filename.is_absolute():
+                    setattr(config.outputs, field, pathlib.Path(filename.name) if self.output_dir else None)
+            filename = config.outputs.html.filename
+            if isinstance(filename, pathlib.Path) and filename.is_absolute():
+                config.outputs.html.filename = pathlib.Path(filename.name) if self.output_dir else None
+
     def existing(self, external: GenericSimulationTables | PathLike | None = None) -> Experiment:
         """Create an experiment that uses existing results, rather than running a simulation.
 
@@ -383,6 +398,9 @@ class Experiments(CallbackMixin):
             # Rejected lazy results will not be returned to a caller who could
             # close them. Release the SQLite handle now, including when an
             # exception traceback or diagnostic tool retains the summary.
+            store = getattr(summary, "_trial_database_store", None)
+            if store is not None:
+                store.close()
             if summary._file_store is not None:
                 summary._file_store.close()
                 summary._file_store = None
@@ -478,6 +496,38 @@ class Experiments(CallbackMixin):
             write_report, base_config=self.base_config, extra=self.extra_reporting
         )
 
+    def _prepare_database_configs(self, experiments):
+        """Validate all fresh experiment destinations before dispatching any run."""
+        from passengersim.config.storage import resolve_storage, validate_database_reports
+
+        prepared = {}
+        destinations = {}
+        for experiment in experiments:
+            if experiment.cached or experiment.external:
+                continue
+            config = experiment.func(self.base_config.model_copy(deep=True))
+            policy = resolve_storage(config.db, orchestrated=True)
+            validate_database_reports(config, policy)
+            if policy.filename is not None:
+                destination = policy.filename.resolve()
+                if destination in destinations:
+                    raise ValueError(
+                        f"Experiments {destinations[destination]!r} and {experiment.tag!r} share "
+                        f"db.filename={destination}; use result_directory or distinct filenames"
+                    )
+                destinations[destination] = experiment.tag
+            elif policy.directory is not None:
+                # Keep experiment labels in the layout without permitting path
+                # traversal or separators in a tag to escape the supplied root.
+                from urllib.parse import quote
+
+                component = quote(experiment.tag, safe="")
+                if component in {".", ".."}:
+                    component = component.replace(".", "%2E")
+                config.db.result_directory = policy.directory / component
+            prepared[experiment.tag] = config
+        return prepared
+
     def _run_experiments_in_sequence(
         self,
         use_existing: UseExistingT | dict[str, UseExistingT] = True,
@@ -559,6 +609,7 @@ class Experiments(CallbackMixin):
         else:
             raise TypeError("tag must be a string or None")
 
+        prepared_configs = self._prepare_database_configs(selected_experiments)
         rich_progress = Progress(
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
@@ -598,6 +649,8 @@ class Experiments(CallbackMixin):
             for e in selected_experiments:
                 top_progress.update(top_task, advance=1, description=f"[bold blue]{e.tag}", refresh=True)
 
+                if isinstance(e.cached, concurrent.futures.Future):
+                    e.cached = e.cached.result()
                 if e.cached:
                     # If a cached SimulationTables result is available, use it and skip the simulation.
                     # No checks are performed on the cached result, so it is the user's responsibility to
@@ -620,16 +673,12 @@ class Experiments(CallbackMixin):
                     continue
 
                 # Create the modified config for this experiment
-                config = e.func(self.base_config.model_copy(deep=True))
+                config = prepared_configs.get(e.tag)
+                if config is None:
+                    config = self._prepare_database_configs([e])[e.tag]
                 config.outputs.html.title = e.title or e.tag
 
-                # Update the paths for the output files
-                if config.outputs.html.filename:
-                    config.outputs.html.filename = self._rename_file(e.tag, config.outputs.html.filename)
-                if config.outputs.pickle:
-                    config.outputs.pickle = self._rename_file(e.tag, config.outputs.pickle)
-                if config.outputs.excel:
-                    config.outputs.excel = self._rename_file(e.tag, config.outputs.excel)
+                self._prepare_output_paths(config, e.tag)
 
                 summary = None
 
@@ -638,7 +687,9 @@ class Experiments(CallbackMixin):
                     try:
                         # Check if the output pickle files are defined and already exist
                         if config.outputs.pickle:
-                            summary = get_default_summarizer().from_pickle(config.outputs.pickle)
+                            summary = get_default_summarizer().from_pickle(
+                                config.outputs.get_output_filename("pickle", make_dirs=False)
+                            )
                         else:
                             raise FileNotFoundError("No output pickle file specified")
                     except FileNotFoundError:
@@ -648,7 +699,7 @@ class Experiments(CallbackMixin):
                         # we also want to check if the pxsim-format disk file exists.
 
                         try:
-                            second_file = config.outputs._get_disk_filename()
+                            second_file = config.outputs.get_output_filename("disk", make_dirs=False)
                             if second_file:
                                 summary = get_default_summarizer().from_file(second_file)
                             else:
@@ -697,11 +748,13 @@ class Experiments(CallbackMixin):
                         summary = sim.run(rich_progress=rich_progress)
                         del sim
                     else:
-                        sim = Simulation(config)
+                        # Use the same per-trial files and ownership as the
+                        # worker path, but execute directly in this process.
+                        sim = MultiSimulation(config)
                         if retain_sims:
                             self._sims[e.tag] = sim
                         self.apply_callback_functions(sim)
-                        summary = sim.run(rich_progress=rich_progress)
+                        summary = sim.sequential_run()
                         del sim
 
                 results[e.tag] = summary
@@ -778,7 +831,6 @@ class Experiments(CallbackMixin):
             A :class:`~passengersim.contrast.Contrast` mapping tags to results,
             or a single result when ``tag`` selects exactly one experiment.
         """
-        jobber = JobExecutor().start()
         results = contrast.Contrast()
         pending_results: dict[str, concurrent.futures.Future] = {}
 
@@ -807,135 +859,135 @@ class Experiments(CallbackMixin):
         else:
             raise TypeError("tag must be a string or None")
 
-        default_use_existing = True
-        if not isinstance(use_existing, dict):
-            default_use_existing = use_existing
-            use_existing = {}
+        prepared_configs = self._prepare_database_configs(selected_experiments)
+        with JobExecutor() as jobber:
+            try:
+                default_use_existing = True
+                if not isinstance(use_existing, dict):
+                    default_use_existing = use_existing
+                    use_existing = {}
 
-        for e in selected_experiments:
-            if e.cached:
-                # If a cached SimulationTables result is available, use it and skip the simulation.
-                # No checks are performed on the cached result, so it is the user's responsibility to
-                # ensure that the cached result is valid and matches the current config and PassengerSim
-                # versions, if applicable.
-                summary = e.cached
-                jobber.rich_progress.console.print(f"Using cached results for experiment {e.tag}")
-                results[e.tag] = summary
-                continue
-            elif e.external:
-                # If an external file is provided, load it and skip the simulation.
-                # This is done without regard for the use_existing parameter, and
-                # the absence of the external file is always an error.
-                if isinstance(e.external, GenericSimulationTables):
-                    summary = e.external
-                else:
-                    summary = get_default_summarizer().from_file(e.external)
-                jobber.rich_progress.console.print(f"Loaded experiment {e.tag} from {e.external}")
-                results[e.tag] = summary
-                continue
-
-            # Create the modified config for this experiment
-            config = e.func(self.base_config.model_copy(deep=True))
-            # Revalidate the config now, which will ensure that all the changes that occur during validation
-            # are captured. For example, the Experiment function might change a carrier to assign a standard
-            # Frat5 curve, but that still needs to be loaded.
-            config = config.model_validate(config)
-            # make the config's title consistent with the experiment title or tag
-            config.outputs.html.title = e.title or e.tag
-
-            # Update the paths for the output files
-            if not self.output_dir:
-                config.outputs.base_dir = pathlib.Path(e.tag)
-            else:
-                config.outputs.base_dir = pathlib.Path(self.output_dir) / e.tag
-            config.outputs.filename_stem = e.tag
-
-            # TODO: FIND ALL THESE AND CHANGE TO config._resolve
-            # if config.outputs.html.filename:
-            #     config.outputs.html.filename = self._rename_file(e.tag, config.outputs.html.filename)
-            # if config.outputs.pickle:
-            #     config.outputs.pickle = self._rename_file(e.tag, config.outputs.pickle)
-            # if config.outputs.excel:
-            #     config.outputs.excel = self._rename_file(e.tag, config.outputs.excel)
-
-            summary = None
-
-            e_use_existing = use_existing.get(e.tag, default_use_existing)
-            if e_use_existing:
-                # At this point either the output pickle file is not defined
-                # (triggering the explicit FileNotFoundError) or does not exist,
-                # which raises the FileNotFoundError organically.  Either way,
-                # we also want to check if the pxsim-format disk file exists.
-
-                try:
-                    disk_file = config.outputs.get_output_filename("disk", make_dirs=False)
-                    if disk_file:
-                        summary = get_default_summarizer().from_file(disk_file)
-                    else:
-                        raise FileNotFoundError("No output disk file specified")
-                except FileNotFoundError as second_error:
-                    if e_use_existing == "raise":
-                        # Neither the output pickle file nor the pxsim-format disk file
-                        # exist, so we need to raise an error.
-                        raise second_error
-                    elif e_use_existing == "ignore":
-                        # The output pxsim-format disk file does not exist, but we have
-                        # been instructed to ignore this.  The matching simulation will
-                        # not be run, and will not be included in the results.
+                for e in selected_experiments:
+                    if e.cached:
+                        # If a cached SimulationTables result is available, use it and skip the simulation.
+                        # No checks are performed on the cached result, so it is the user's responsibility to
+                        # ensure that the cached result is valid and matches the current config and PassengerSim
+                        # versions, if applicable.
+                        summary = e.cached
+                        jobber.rich_progress.console.print(f"Using cached results for experiment {e.tag}")
+                        results[e.tag] = summary
+                        continue
+                    elif e.external:
+                        # If an external file is provided, load it and skip the simulation.
+                        # This is done without regard for the use_existing parameter, and
+                        # the absence of the external file is always an error.
+                        if isinstance(e.external, GenericSimulationTables):
+                            summary = e.external
+                        else:
+                            summary = get_default_summarizer().from_file(e.external)
+                        jobber.rich_progress.console.print(f"Loaded experiment {e.tag} from {e.external}")
+                        results[e.tag] = summary
                         continue
 
-                if summary is not None:
-                    # If we reach this point, we have successfully loaded the
-                    # output from a .pxsim file on disk. But before we celebrate,
-                    # we need to make sure the run we loaded matches the config
-                    # we would otherwise run, and the versions of PassengerSim
-                    # match between the run and the current environment.
-                    msg, summary = self._check_loaded_summary(
-                        summary,
-                        config,
-                        e.tag,
-                        check_versions=check_versions,
-                        check_content=check_content,
-                    )
-                    jobber.rich_progress.console.print(msg)
+                    # Create the modified config for this experiment
+                    config = prepared_configs.get(e.tag)
+                    if config is None:
+                        config = self._prepare_database_configs([e])[e.tag]
+                    # Revalidate the config now, which will ensure that all the changes that occur during validation
+                    # are captured. For example, the Experiment function might change a carrier to assign a standard
+                    # Frat5 curve, but that still needs to be loaded.
+                    config = config.model_validate(config)
+                    # make the config's title consistent with the experiment title or tag
+                    config.outputs.html.title = e.title or e.tag
+
+                    self._prepare_output_paths(config, e.tag)
+
+                    summary = None
+
+                    e_use_existing = use_existing.get(e.tag, default_use_existing)
+                    if e_use_existing:
+                        # At this point either the output pickle file is not defined
+                        # (triggering the explicit FileNotFoundError) or does not exist,
+                        # which raises the FileNotFoundError organically.  Either way,
+                        # we also want to check if the pxsim-format disk file exists.
+
+                        try:
+                            disk_file = config.outputs.get_output_filename("disk", make_dirs=False)
+                            if disk_file:
+                                summary = get_default_summarizer().from_file(disk_file)
+                            else:
+                                raise FileNotFoundError("No output disk file specified")
+                        except FileNotFoundError as second_error:
+                            if e_use_existing == "raise":
+                                # Neither the output pickle file nor the pxsim-format disk file
+                                # exist, so we need to raise an error.
+                                raise second_error
+                            elif e_use_existing == "ignore":
+                                # The output pxsim-format disk file does not exist, but we have
+                                # been instructed to ignore this.  The matching simulation will
+                                # not be run, and will not be included in the results.
+                                continue
+
+                        if summary is not None:
+                            # If we reach this point, we have successfully loaded the
+                            # output from a .pxsim file on disk. But before we celebrate,
+                            # we need to make sure the run we loaded matches the config
+                            # we would otherwise run, and the versions of PassengerSim
+                            # match between the run and the current environment.
+                            msg, summary = self._check_loaded_summary(
+                                summary,
+                                config,
+                                e.tag,
+                                check_versions=check_versions,
+                                check_content=check_content,
+                            )
+                            jobber.rich_progress.console.print(msg)
+                            if summary is None:
+                                if e_use_existing == "raise":
+                                    raise ValueError("existing result does not match requested experiment")
+                                elif e_use_existing == "ignore":
+                                    continue
+
                     if summary is None:
-                        if e_use_existing == "raise":
-                            raise ValueError("existing result does not match requested experiment")
-                        elif e_use_existing == "ignore":
-                            continue
+                        # If we reach this point, we need to run the simulation
+                        sim = MultiSimulation(config)
+                        if retain_sims:
+                            self._sims[e.tag] = sim
+                        self.apply_callback_functions(sim)
+                        summary = sim._run_asynchronously(summarizer=summarizer, jobber=jobber, run_id=e.tag)
+                        del sim
 
-            if summary is None:
-                # If we reach this point, we need to run the simulation
-                sim = MultiSimulation(config)
-                if retain_sims:
-                    self._sims[e.tag] = sim
-                self.apply_callback_functions(sim)
-                summary = sim._run_asynchronously(summarizer=summarizer, jobber=jobber, run_id=e.tag)
-                del sim
+                    pending_results[e.tag] = summary
+                    results[e.tag] = summary
+                    if cache_results:
+                        e.cached = summary
 
-            pending_results[e.tag] = summary
-            results[e.tag] = summary
-            if cache_results:
-                e.cached = summary
+                # convert cached results, which might be Futures, into finalized results
+                results = contrast.Contrast(
+                    {k: (v.result() if isinstance(v, concurrent.futures.Future) else v) for k, v in results.items()}
+                )
 
-        # convert cached results, which might be Futures, into finalized results
-        results = contrast.Contrast(
-            {k: (v.result() if isinstance(v, concurrent.futures.Future) else v) for k, v in results.items()}
-        )
+                # await results
+                for k, v in pending_results.items():
+                    if isinstance(v, concurrent.futures.Future):
+                        results[k] = v.result()
+                    else:
+                        results[k] = v
 
-        # await results
-        for k, v in pending_results.items():
-            if isinstance(v, concurrent.futures.Future):
-                results[k] = v.result()
-            else:
-                results[k] = v
+                if write_report:
+                    self._write_report_after_run(write_report, results)
 
-        if write_report:
-            self._write_report_after_run(write_report, results)
-
-        if tag is not None and len(selected_experiments) == 1:
-            return results[selected_experiments[0].tag]
-        return results
+                if tag is not None and len(selected_experiments) == 1:
+                    return results[selected_experiments[0].tag]
+                return results
+            finally:
+                # Results are published before monitor cleanup. Join every submitted
+                # run even if dispatch, aggregation, or report writing raises.
+                for future in pending_results.values():
+                    monitor = getattr(future, "_monitor_thread", None)
+                    if monitor is not None:
+                        monitor.join()
+                jobber.executor.shutdown(wait=True)
 
     def run(
         self,
@@ -997,7 +1049,7 @@ class Experiments(CallbackMixin):
             or a single result when ``tag`` selects exactly one experiment.
         """
         if single_process:
-            return self._run_experiments_in_sequence(
+            result = self._run_experiments_in_sequence(
                 use_existing=use_existing,
                 tag=tag,
                 check_versions=check_versions,
@@ -1008,7 +1060,7 @@ class Experiments(CallbackMixin):
                 cache_results=cache_results,
             )
         else:
-            return self._run_together(
+            result = self._run_together(
                 use_existing=use_existing,
                 tag=tag,
                 check_versions=check_versions,
@@ -1017,6 +1069,14 @@ class Experiments(CallbackMixin):
                 write_report=write_report,
                 cache_results=cache_results,
             )
+
+        from passengersim.driver._trial_database import finalize_result
+
+        if isinstance(result, GenericSimulationTables):
+            return finalize_result(result)
+        for summary in result.values():
+            finalize_result(summary)
+        return result
 
     @property
     def report_filename(self) -> pathlib.Path:

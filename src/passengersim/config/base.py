@@ -21,9 +21,8 @@ import yaml
 from pydantic import (
     AfterValidator,
     Field,
-    SerializerFunctionWrapHandler,
     ValidationError,
-    field_serializer,
+    ValidationInfo,
     field_validator,
     model_validator,
 )
@@ -589,31 +588,10 @@ class Config(YamlConfig, extra="forbid"):
     documentation.
     """
 
-    db: DatabaseConfig = DatabaseConfig()
+    db: DatabaseConfig | None = DatabaseConfig()
     """
     See [passengersim.config.DatabaseConfig][] for detailed documentation.
     """
-
-    @model_validator(mode="before")
-    @classmethod
-    def _db_is_none(cls, data: Any) -> Any:
-        """Setting the database to none creates a null database."""
-        if isinstance(data, dict):
-            db = data.get("db", None)
-            if db is None:
-                db = DatabaseConfig(filename=None, write_items=set())
-            data["db"] = db
-        return data
-
-    @field_serializer("db", mode="wrap")
-    @classmethod
-    def _db_to_none(cls, v: DatabaseConfig | None, nxt: SerializerFunctionWrapHandler) -> dict | None:
-        """Serialize the database to None if it is a null database."""
-        if v is None:
-            return None
-        if v.filename is None and not v.write_items:
-            return None
-        return nxt(v)
 
     outputs: OutputConfig = OutputConfig()
     """
@@ -959,7 +937,8 @@ class Config(YamlConfig, extra="forbid"):
         usable_samples = controls.num_trials * (controls.num_samples - controls.burn_samples)
         if usable_samples < 750:
             warnings.warn(
-                f"Only {usable_samples} usable samples remain after burn across all trials; "
+                f"Only {usable_samples} usable samples remain after burning "
+                f"{controls.burn_samples} of {controls.num_samples} samples across {controls.num_trials} trials; "
                 "at least 750 usable samples are recommended to ensure meaningful results.",
                 stacklevel=2,
             )
@@ -996,7 +975,7 @@ class Config(YamlConfig, extra="forbid"):
             raise KeyError(f"Unknown standard RM system {std_name}")
 
     @model_validator(mode="after")
-    def _carriers_have_rm_systems(self) -> Self:
+    def _carriers_have_rm_systems(self, info: ValidationInfo) -> Self:
         """Check that all carriers have RM systems that have been defined."""
         for carrier in self.carriers.values():
             assert isinstance(carrier, Carrier)
@@ -1011,6 +990,10 @@ class Config(YamlConfig, extra="forbid"):
             if carrier.rm_system_options is not None and carrier.rm_system_options is not False:
                 if carrier.rm_system_options.get("name", carrier.rm_system) != carrier.rm_system:
                     raise ValueError(f"rm_system {carrier.rm_system} does not match name in rm_system_options")
+            # Results can be inspected without reinstalling the custom RM system
+            # used to produce them. New simulations still require registration.
+            if info.context and info.context.get("pxsim_archive"):
+                continue
             # if the named system is supposed to be a callback-style RM system, check that it's registered
             if carrier.rm_system_options:
                 # it's definitely supposed to be a callback-style RM system
@@ -1219,6 +1202,10 @@ class Config(YamlConfig, extra="forbid"):
     @model_validator(mode="after")
     def _requested_summaries_have_data(self) -> Self:
         """Check that requested summary outputs will have the data needed."""
+        if self.db is None or self.db.engine is None:
+            # Run preflight checks report requirements; allow fields to be edited
+            # in either order before constructing/running a simulation.
+            return self
         if "local_and_flow_yields" in self.outputs.reports:
             if not self.db.write_items & {"pathclass_final", "pathclass"}:
                 raise ValueError(
@@ -1330,7 +1317,7 @@ class Config(YamlConfig, extra="forbid"):
             prefix = proposal
         prefix.mkdir(parents=True)
 
-        if self.db.filename:
+        if self.db is not None and self.db.filename and str(self.db.filename) != ":memory:":
             self.db.filename = prefix.joinpath(self.db.filename)
         if self.outputs.excel:
             self.outputs.excel = prefix.joinpath(self.outputs.excel)
@@ -1365,7 +1352,7 @@ class Config(YamlConfig, extra="forbid"):
         return self
 
     @model_validator(mode="after")
-    def _adjust_times_for_time_zones(self):
+    def _adjust_times_for_time_zones(self, info: ValidationInfo) -> Self:
         """Adjust arrival/departure times to local time from UTC."""
 
         negative_duration_legs = []
@@ -1454,12 +1441,15 @@ class Config(YamlConfig, extra="forbid"):
                     )
                     unreasonable_leg_speeds.append(msg)
 
-        if negative_duration_legs:
+        # Archived results retain historical schedules; new simulation input
+        # still receives the current duration/speed validation.
+        restoring = bool(info.context and info.context.get("pxsim_archive"))
+        if negative_duration_legs and not restoring:
             raise ValueError(
                 "Some legs have non-positive duration, check if you need to set `arr_day` to +1:\n"
                 + "\n".join(negative_duration_legs)
             )
-        if unreasonable_leg_speeds:
+        if unreasonable_leg_speeds and not restoring:
             raise ValueError("Some legs have unreasonable speeds:\n" + "\n".join(unreasonable_leg_speeds))
 
         return self

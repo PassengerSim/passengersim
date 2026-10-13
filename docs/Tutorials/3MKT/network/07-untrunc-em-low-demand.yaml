@@ -1,5 +1,0 @@
-include:
-  - 08-untrunc-em.yaml
-
-simulation_controls:
-  demand_multiplier: 0.5

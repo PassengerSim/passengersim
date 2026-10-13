@@ -29,6 +29,7 @@ class JobExecutor:
             MofNCompleteColumn(),
             TimeRemainingColumn(),
             auto_refresh=False,
+            transient=True,
         )
 
         self._number_of_entries = 0

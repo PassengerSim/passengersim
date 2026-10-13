@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Iterable
+
+from passengersim.utils._database_compat import deprecated_cnx_keyword
 
 from .database import Database
 
 
-def create_table_configs(cnx: Database):
+@deprecated_cnx_keyword()
+def create_table_configs(db: Database | sqlite3.Connection):
     sql = """
     CREATE TABLE IF NOT EXISTS runtime_configs (
         scenario		TEXT PRIMARY KEY,
@@ -14,10 +18,11 @@ def create_table_configs(cnx: Database):
         updated_at	    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
     """
-    cnx.execute(sql)
+    db.execute(sql)
 
 
-def create_table_leg_defs(cnx: Database, legs: Iterable | None = None):
+@deprecated_cnx_keyword()
+def create_table_leg_defs(db: Database | sqlite3.Connection, legs: Iterable | None = None):
     sql = """
     CREATE TABLE IF NOT EXISTS leg_defs
     (
@@ -32,9 +37,9 @@ def create_table_leg_defs(cnx: Database, legs: Iterable | None = None):
         distance FLOAT
     );
     """
-    cnx.execute(sql)
+    db.execute(sql)
     for leg in legs:
-        cnx.execute(
+        db.execute(
             """
             INSERT OR REPLACE INTO leg_defs(
                 leg_id,
@@ -64,7 +69,8 @@ def create_table_leg_defs(cnx: Database, legs: Iterable | None = None):
         )
 
 
-def create_table_fare_restriction_defs(cnx: Database, restrictions: list[str]) -> None:
+@deprecated_cnx_keyword()
+def create_table_fare_restriction_defs(db: Database | sqlite3.Connection, restrictions: list[str]) -> None:
     """
     Create and populate a static database table of fare restrictions.
 
@@ -73,7 +79,7 @@ def create_table_fare_restriction_defs(cnx: Database, restrictions: list[str]) -
 
     Parameters
     ----------
-    cnx : Database
+    db : Database or sqlite3.Connection
     restrictions : list[str]
         The restrictions to store in the database.
     """
@@ -84,9 +90,9 @@ def create_table_fare_restriction_defs(cnx: Database, restrictions: list[str]) -
         restriction TEXT NOT NULL
     );
     """
-    cnx.execute(sql)
+    db.execute(sql)
     for idx, restriction in enumerate(restrictions, start=1):
-        cnx.execute(
+        db.execute(
             """
             INSERT OR REPLACE INTO fare_restriction_defs(
                 restriction_id,
@@ -99,7 +105,8 @@ def create_table_fare_restriction_defs(cnx: Database, restrictions: list[str]) -
         )
 
 
-def create_table_fare_defs(cnx: Database, fares: Iterable | None = None) -> None:
+@deprecated_cnx_keyword()
+def create_table_fare_defs(db: Database | sqlite3.Connection, fares: Iterable | None = None) -> None:
     """
     Create and populate a static database table of fares.
 
@@ -108,7 +115,7 @@ def create_table_fare_defs(cnx: Database, fares: Iterable | None = None) -> None
 
     Parameters
     ----------
-    cnx : Database
+    db : Database or sqlite3.Connection
     fares : Iterable[Fare]
         The fares to store in the database.
     """
@@ -126,16 +133,16 @@ def create_table_fare_defs(cnx: Database, fares: Iterable | None = None) -> None
         category      VARCHAR(20)
     );
     """
-    cnx.execute(sql)
+    db.execute(sql)
     sql2 = """
     CREATE INDEX IF NOT EXISTS fare_defs_idx_2
     ON fare_defs (
         carrier, booking_class
     );
     """
-    cnx.execute(sql2)
+    db.execute(sql2)
     for fare in fares:
-        cnx.execute(
+        db.execute(
             """
             INSERT OR REPLACE INTO fare_defs(
                 fare_id,
@@ -165,7 +172,8 @@ def create_table_fare_defs(cnx: Database, fares: Iterable | None = None) -> None
         )
 
 
-def create_table_path_defs(cnx: Database, paths: Iterable | None = None):
+@deprecated_cnx_keyword()
+def create_table_path_defs(db: Database | sqlite3.Connection, paths: Iterable | None = None):
     sql = """
     CREATE TABLE IF NOT EXISTS path_defs
     (
@@ -179,10 +187,10 @@ def create_table_path_defs(cnx: Database, paths: Iterable | None = None):
         distance FLOAT
     );
     """
-    cnx.execute(sql)
+    db.execute(sql)
     for pth in paths:
         connects = pth.num_legs() > 1
-        cnx.execute(
+        db.execute(
             """
             INSERT OR REPLACE INTO path_defs(
                 path_id,
@@ -210,13 +218,14 @@ def create_table_path_defs(cnx: Database, paths: Iterable | None = None):
         )
 
 
-def create_table_leg_detail(cnx: Database, primary_key: bool = False) -> None:
+@deprecated_cnx_keyword()
+def create_table_leg_detail(db: Database | sqlite3.Connection, primary_key: bool = False) -> None:
     """
     Create the `leg_detail` table in the database.
 
     Parameters
     ----------
-    cnx : Database
+    db : Database or sqlite3.Connection
     primary_key : bool, default False
     """
     sql = """
@@ -248,10 +257,11 @@ def create_table_leg_detail(cnx: Database, primary_key: bool = False) -> None:
         )
     else:
         sql = sql.format(primary_key="")
-    cnx.execute(sql)
+    db.execute(sql)
 
 
-def create_table_leg_bucket_detail(cnx: Database, primary_key: bool = False):
+@deprecated_cnx_keyword()
+def create_table_leg_bucket_detail(db: Database | sqlite3.Connection, primary_key: bool = False):
     sql = """
     CREATE TABLE IF NOT EXISTS leg_bucket_detail
     (
@@ -283,10 +293,11 @@ def create_table_leg_bucket_detail(cnx: Database, primary_key: bool = False):
         )
     else:
         sql = sql.format(primary_key="")
-    cnx.execute(sql)
+    db.execute(sql)
 
 
-def create_table_demand_detail(cnx: Database, primary_key: bool = False):
+@deprecated_cnx_keyword()
+def create_table_demand_detail(db: Database | sqlite3.Connection, primary_key: bool = False):
     sql = """
     CREATE TABLE IF NOT EXISTS demand_detail
     (
@@ -312,10 +323,11 @@ def create_table_demand_detail(cnx: Database, primary_key: bool = False):
         )
     else:
         sql = sql.format(primary_key="")
-    cnx.execute(sql)
+    db.execute(sql)
 
 
-def create_table_fare_detail(cnx: Database, primary_key: bool = False):
+@deprecated_cnx_keyword()
+def create_table_fare_detail(db: Database | sqlite3.Connection, primary_key: bool = False):
     sql = """
     CREATE TABLE IF NOT EXISTS fare_detail
     (
@@ -338,10 +350,11 @@ def create_table_fare_detail(cnx: Database, primary_key: bool = False):
         )
     else:
         sql = sql.format(primary_key="")
-    cnx.execute(sql)
+    db.execute(sql)
 
 
-def create_table_bookings_by_timeframe(cnx: Database, primary_key: bool = False):
+@deprecated_cnx_keyword()
+def create_table_bookings_by_timeframe(db: Database | sqlite3.Connection, primary_key: bool = False):
     sql = """
     CREATE TABLE IF NOT EXISTS bookings_by_timeframe
     (
@@ -361,13 +374,14 @@ def create_table_bookings_by_timeframe(cnx: Database, primary_key: bool = False)
     );
     """
     if primary_key is True:
-        sql = sql.format(primary_key=", PRIMARY KEY(scenario, carrier, booking_class, days_prior)")
+        sql = sql.format(primary_key=", PRIMARY KEY(scenario, trial, carrier, booking_class, days_prior)")
     else:
         sql = sql.format(primary_key="")
-    cnx.execute(sql)
+    db.execute(sql)
 
 
-def create_table_booking_curve(cnx: Database, primary_key: bool = True):
+@deprecated_cnx_keyword()
+def create_table_booking_curve(db: Database | sqlite3.Connection, primary_key: bool = True):
     sql = """
     CREATE TABLE IF NOT EXISTS booking_curve (
         scenario		VARCHAR(20) NOT NULL,
@@ -384,10 +398,11 @@ def create_table_booking_curve(cnx: Database, primary_key: bool = True):
         sql = sql.format(primary_key=", PRIMARY KEY(scenario, carrier, orig, dest, flt_no, days_prior)")
     else:
         sql = sql.format(primary_key="")
-    cnx.execute(sql)
+    db.execute(sql)
 
 
-def create_table_path_class_detail(cnx: Database, primary_key: bool = False):
+@deprecated_cnx_keyword()
+def create_table_path_class_detail(db: Database | sqlite3.Connection, primary_key: bool = False):
     sql = """
     CREATE TABLE IF NOT EXISTS path_class_detail
     (
@@ -416,10 +431,11 @@ def create_table_path_class_detail(cnx: Database, primary_key: bool = False):
         )
     else:
         sql = sql.format(primary_key="")
-    cnx.execute(sql)
+    db.execute(sql)
 
 
-def create_table_edgar(cnx: Database, primary_key: bool = False):
+@deprecated_cnx_keyword()
+def create_table_edgar(db: Database | sqlite3.Connection, primary_key: bool = False):
     """Forecast accuracy data, modeled after UA's EDGAR approach"""
     sql = """
     CREATE TABLE IF NOT EXISTS edgar
@@ -446,10 +462,11 @@ def create_table_edgar(cnx: Database, primary_key: bool = False):
         )
     else:
         sql = sql.format(primary_key="")
-    cnx.execute(sql)
+    db.execute(sql)
 
 
-def create_table_distance(cnx: Database, primary_key: bool = True):
+@deprecated_cnx_keyword()
+def create_table_distance(db: Database | sqlite3.Connection, primary_key: bool = True):
     sql = """
     CREATE TABLE IF NOT EXISTS distance (
         orig			VARCHAR(10) NOT NULL,
@@ -462,10 +479,11 @@ def create_table_distance(cnx: Database, primary_key: bool = True):
         sql = sql.format(primary_key=", PRIMARY KEY(orig, dest)")
     else:
         sql = sql.format(primary_key="")
-    cnx.execute(sql)
+    db.execute(sql)
 
 
-def create_tables(cnx: Database, primary_keys: dict[str, bool] | None = None):
+@deprecated_cnx_keyword()
+def create_tables(db: Database, primary_keys: dict[str, bool] | None = None):
     pk = dict(
         leg=False,
         leg_bucket=False,
@@ -479,14 +497,14 @@ def create_tables(cnx: Database, primary_keys: dict[str, bool] | None = None):
     )
     if primary_keys is not None:
         pk.update(primary_keys)
-    create_table_configs(cnx)
-    create_table_leg_detail(cnx, pk["leg"])
-    create_table_leg_bucket_detail(cnx, pk["leg_bucket"])
-    create_table_demand_detail(cnx, pk["demand"])
-    create_table_fare_detail(cnx, pk["fare"])
-    create_table_bookings_by_timeframe(cnx, pk["bookings"])
-    create_table_booking_curve(cnx, pk["booking_curve"])
-    create_table_path_class_detail(cnx, pk["path_class"])
-    create_table_edgar(cnx, pk["edgar"])
-    create_table_distance(cnx, pk["distance"])
-    cnx._commit_raw()
+    create_table_configs(db)
+    create_table_leg_detail(db, pk["leg"])
+    create_table_leg_bucket_detail(db, pk["leg_bucket"])
+    create_table_demand_detail(db, pk["demand"])
+    create_table_fare_detail(db, pk["fare"])
+    create_table_bookings_by_timeframe(db, pk["bookings"])
+    create_table_booking_curve(db, pk["booking_curve"])
+    create_table_path_class_detail(db, pk["path_class"])
+    create_table_edgar(db, pk["edgar"])
+    create_table_distance(db, pk["distance"])
+    db._commit_raw()

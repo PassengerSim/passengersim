@@ -51,7 +51,9 @@ def test_empty_sim_no_database_summary_tables():
     s = Simulation(c)
     summary = s.run()
     assert isinstance(summary, SimulationTables)
-    assert not summary.cnx.is_open
+    assert summary.db is None
+    assert c.simulation_controls.collect_leg_bid_prices is True
+    assert summary.leg_bid_price_history.empty
 
 
 def test_empty_sim_no_database():
@@ -61,7 +63,7 @@ def test_empty_sim_no_database():
     s = Simulation(c)
     summary = s.run()
     assert isinstance(summary, SimulationTables)
-    assert not summary.cnx.is_open
+    assert summary.db is None
 
 
 def test_automatic_leg_ids():

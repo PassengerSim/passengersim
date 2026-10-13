@@ -26,14 +26,10 @@ class E_NoDetruncation(RmSys):
 
     Notes
     -----
-    This RM system consists of the following actions executed in order:
+    This RM system omits the detruncation action. It consists of the following
+    actions executed in order:
 
-    1. **EM Untruncation of Leg Demands**
-        This step applies the EM algorithm to detruncate observed leg
-        sales into inferred true demand levels.  It runs only once at the
-        beginning of each sample day, and detruncates demand for all timeframes.
-
-    2. **Standard Leg Forecasting**
+    1. **Standard Leg Forecasting**
         This step generates leg-level demand forecasts using a standard
         class-based forecasting algorithm (additive pickup by default). It
         runs full computations to produce leg forecasts for the entire
@@ -42,7 +38,7 @@ class E_NoDetruncation(RmSys):
         array of forecasts to provide the correct forecast values at that
         time.
 
-    3. **EMSR-B Optimization**
+    2. **EMSR-B Optimization**
         Optimizes leg-level seat availability using the Expected Marginal
         Seat Revenue Version B (EMSR-B) algorithm. This step runs on each
         DCP to update the seat availability controls based on the current

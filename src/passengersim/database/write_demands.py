@@ -3,9 +3,11 @@ from __future__ import annotations
 from passengersim_core import SimulationEngine
 
 from passengersim.database import Database
+from passengersim.utils._database_compat import deprecated_cnx_keyword
 
 
-def save_demand_to_database(cnx: Database, sim: SimulationEngine, dcp: int):
+@deprecated_cnx_keyword()
+def save_demand_to_database(db: Database, sim: SimulationEngine, dcp: int):
     """Write simulation demands to the database."""
     data_list = []
     for dmd in sim.demands:
@@ -24,7 +26,7 @@ def save_demand_to_database(cnx: Database, sim: SimulationEngine, dcp: int):
                 dmd.revenue,
             )
         )
-    cursor = cnx.cursor()
+    cursor = db.cursor()
     sql = """
     INSERT INTO demand_detail (
         scenario,       -- 1
@@ -38,5 +40,5 @@ def save_demand_to_database(cnx: Database, sim: SimulationEngine, dcp: int):
         sample_demand,  -- 9
         sold,           -- 10
         revenue         -- 11
-    ) VALUES """ + cnx.sql_placeholders(11)
+    ) VALUES """ + db.sql_placeholders(11)
     cursor.executemany(sql, data_list)

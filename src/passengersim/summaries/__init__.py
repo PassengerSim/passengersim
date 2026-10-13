@@ -28,6 +28,7 @@ from . import (
     displacement_history,
     fare_class_mix,
     forecasts,
+    leg_bid_price_history,
     legbuckets,
     legs,
     local_and_flow_yields,

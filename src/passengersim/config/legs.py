@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 from datetime import UTC, datetime, timedelta
+from datetime import date as datetime_date
 from zoneinfo import ZoneInfo
 
 from pydantic import (
@@ -160,6 +161,8 @@ class Leg(BaseModel, extra="forbid"):
     def _date_from_string(cls, v):
         if isinstance(v, str):
             v = datetime.fromisoformat(v)
+        if isinstance(v, datetime_date) and not isinstance(v, datetime):
+            v = datetime(v.year, v.month, v.day)
         if v.tzinfo is None:
             # when no timezone is specified, assume UTC (not naive)
             v = v.replace(tzinfo=UTC)

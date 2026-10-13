@@ -42,6 +42,9 @@ def summary(config: Config) -> SimulationTables:
 
 @pytest.fixture(scope="module")
 def summary_mp(config: Config) -> SimulationTables:
+    config = config.model_copy(deep=True)
+    # These fixtures compare eager reports, not retained raw databases.
+    config.db.result_storage = "summary_only"
     sim = MultiSimulation(config)
     return sim.run(summarizer=SimulationTables)
 

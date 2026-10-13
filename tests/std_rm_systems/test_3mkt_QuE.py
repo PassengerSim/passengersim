@@ -39,6 +39,7 @@ def config(request) -> pax.Config:
     cfg.frat5_curves["curve_C"].max_cap = max_cap
     cfg.carriers.AL2.rm_system_options = {"name": "E"}
     cfg.simulation_controls.num_trials = 1
+    cfg.simulation_controls.burn_samples = 100
     cfg.simulation_controls.num_samples = 250
     cfg.outputs._write_no_files()
     return cfg

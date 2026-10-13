@@ -6,6 +6,7 @@ import pandas as pd
 
 from passengersim.database import Database
 from passengersim.reporting import report_figure
+from passengersim.utils._database_compat import deprecated_cnx_keyword
 
 from .generic import DatabaseTableItem, GenericSimulationTables
 from .tools import aggregate_by_averaging_dataframe
@@ -16,8 +17,9 @@ if TYPE_CHECKING:
     from passengersim.contrast import Contrast
 
 
+@deprecated_cnx_keyword()
 def detailed_bookings_by_timeframe(
-    cnx: Database,
+    db: Database,
     *,
     scenario: str | None = None,
     burn_samples: int = 100,
@@ -30,7 +32,7 @@ def detailed_bookings_by_timeframe(
 
     Parameters
     ----------
-    cnx : Database
+    db : Database
     scenario : str
     burn_samples : int, default 100
         The bookings will be computed ignoring this many samples from the
@@ -71,7 +73,7 @@ def detailed_bookings_by_timeframe(
     else:
         params = (burn_samples, scenario)
 
-    return cnx.dataframe(qry, params).set_index(["trial", "carrier", "orig", "dest", "booking_class", "days_prior"])
+    return db.dataframe(qry, params).set_index(["trial", "carrier", "orig", "dest", "booking_class", "days_prior"])
 
 
 class SimTabSegmentationDetail(GenericSimulationTables):

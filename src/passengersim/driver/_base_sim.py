@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import pathlib
+import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from typing import TYPE_CHECKING
@@ -65,7 +66,7 @@ class BaseSimulation(ABC):
             Directory for output files. If None, a temporary directory
             will be created automatically.
         """
-        self.cnx = None
+        self.db = None
         self.output_dir = MaybeTemporaryDirectory(output_dir)
 
         # establish a common "timestamp" for this Simulation, which is the date
@@ -73,6 +74,17 @@ class BaseSimulation(ABC):
         # used to potentially tag multiple output files, so having a single
         # common timestamp set here allows us to synchronize output names.
         self._timestamp = timestamp_now()
+
+    @property
+    def cnx(self):
+        """Deprecated alias for the PassengerSim database wrapper."""
+        warnings.warn(".cnx is deprecated; use .db instead.", DeprecationWarning, stacklevel=2)
+        return self.db
+
+    @cnx.setter
+    def cnx(self, value):
+        warnings.warn(".cnx is deprecated; use .db instead.", DeprecationWarning, stacklevel=2)
+        self.db = value
 
     @property
     @abstractmethod

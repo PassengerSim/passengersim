@@ -74,7 +74,7 @@ class Carrier(Named, extra="forbid"):
     continuous price is set via a class-based continuous pricing algorithm,
     which adjusts the price of the continuous priced product based on the
     expected willingness to pay of the customer, as defined by the `frat5`
-    curve. In constrast to the "BP" algorithm, the "CBC" algorithm sets
+    curve. In contrast to the "BP" algorithm, the "CBC" algorithm sets
     the price of the continuous priced product to be equal to the bid price
     plus the expected marginal revenue of the product,
 
@@ -126,10 +126,15 @@ class Carrier(Named, extra="forbid"):
        Example:  If the highest fare, Y0 = $400,
                  then a 1.1 multiplier will allow CP to go up to $440"""
 
-    cp_scale: float = 1.0
+    cp_scale: float = 0.5
     """Continuous pricing modifier scale factor.
-    This is used to scale the fare modifier when using CBC.
-    Scales the fare modifier, which was computed using WTP"""
+
+    This value is the scale multiplier used to compute the "optimal" continuous price.
+    It must be set to exactly match the fare adjustment scale used in the RM system.
+    For example, if the RM system is using a fare adjustment scale of 0.75, then this
+    value must also be set to 0.75. It must match because the continuous pricing algorithm
+    will adjust the bid price in the exact opposite manner of the fare adjustment scale,
+    to set prices back to the original customer scale."""
 
     cp_elasticity: dict | None = None
     """Parameters to estimate customer price elasticity for CP
@@ -137,6 +142,12 @@ class Carrier(Named, extra="forbid"):
          - {'accuracy': 0.8, 'multiplier': 0.5} will guess 80% accurate and multiply
              the Frat5 value for *leisure* by 0.5
          - Other algorithms to come in the future :-) """
+
+    decision_price_rule: str | None = "lowest"
+    """Controls how the value of a Bucket or PathClass is determined.
+       If there are multiple fares in a PathClass, we can use the lowest or
+       we can use a weighted average of sales.  Weighted average can also
+       be used with continuous procing"""
 
     cp_markets: Optional[Literal["all", "local", "connect"]] = "all"
     """Limit the Continuous Pricing to local markets, or conecting markets

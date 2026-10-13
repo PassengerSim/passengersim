@@ -6,8 +6,8 @@ include:
 
 simulation_controls:
   demand_multiplier: 1.0
-  num_trials: 2
-  num_samples: 400
+  num_trials: 3
+  num_samples: 300
   burn_samples: 50
   random_seed: 314
 

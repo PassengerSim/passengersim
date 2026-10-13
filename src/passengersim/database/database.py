@@ -12,6 +12,7 @@ import warnings
 from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
+from types import TracebackType
 from typing import Any, Literal
 
 import pandas as pd
@@ -19,7 +20,7 @@ from passengersim_core import DbWriter
 
 from passengersim.config import Config
 from passengersim.core import SimulationEngine
-from passengersim.utils.tempdir import TemporaryDirectory
+from passengersim.utils._database_compat import deprecated_cnx_keyword
 
 logger = logging.getLogger("passengersim.database")
 
@@ -81,26 +82,22 @@ class Database:
         filename=None,
         pragmas: Iterable[str] = (),
         commit_count_delay: int | None = 250,
+        *,
+        connection: sqlite3.Connection | None = None,
     ):
         if isinstance(engine, str) and engine.endswith(".sqlite") and filename is None:
             filename = engine
             engine = "sqlite"
-        self._connection = None
+        if connection is not None and not isinstance(connection, sqlite3.Connection):
+            raise TypeError("connection must be a sqlite3.Connection")
+        if connection is not None and (engine != "sqlite" or filename is not None):
+            raise ValueError("connection cannot be combined with a filename or non-SQLite engine")
+        self._connection = connection
+        self._owns_connection = connection is None
+        self._db_writer = None
+        self._contexts = []
         self.engine = engine
-        self.filename = filename
-        self._temp_dir = None
-
-        # Reject in-memory databases for now, as it is tricky to manage
-        # them in a multi-process environment, and passing the database handle
-        # from python to C++ is not straightforward.  Instead, we create
-        # a temporary file-based database, and warn the user that this is happening.
-        if str(self.filename) == ":memory:":
-            self._temp_dir = TemporaryDirectory()
-            self.filename = Path(self._temp_dir.name) / "passengersim_temp_db.sqlite"
-            logger.warning(
-                "database filename ':memory:' is not supported, "
-                f"using temporary file-based database at {self.filename}",
-            )
+        self.filename = str(filename) if filename is not None else None
         self.pragmas = pragmas
         self._counter = 0
         self._commit_count_delay = commit_count_delay
@@ -108,49 +105,58 @@ class Database:
             self.commit = self._commit_by_count
         else:
             self.commit = self._commit_raw
-        self.open()
-        self._db_writer = None
+        if connection is None:
+            self.open()
+        else:
+            self._initialize_connection()
 
     def __del__(self):
-        # Windows cannot unlink an open SQLite file. Close the Python
-        # connection before TemporaryDirectory's finalizer runs. Native writers
-        # own their cleanup and must not be called during cyclic collection.
-        # Read __dict__ directly because construction may have failed and
-        # __getattr__ delegates to a connection that might not exist yet.
+        # Cleanup never commits and never closes a caller-owned connection.
         try:
-            connection = self.__dict__.get("_connection")
-            if connection is not None:
-                connection.close()
-            temporary = self.__dict__.get("_temp_dir")
-            if temporary is not None:
-                temporary.cleanup()
+            if self.__dict__.get("_owns_connection", False):
+                connection = self.__dict__.get("_connection")
+                if connection is not None:
+                    connection.close()
         except Exception:
-            # Destructors can run during interpreter shutdown; explicit close
-            # remains the appropriate way to report transaction errors.
             pass
 
+    @property
+    def database_path(self):
+        """Absolute main-database path, or None for memory/disabled connections."""
+        if self.filename is not None:
+            return Path(self.filename).absolute() if self.filename != ":memory:" else None
+        if self._connection is not None:
+            for _, name, path in self._connection.execute("PRAGMA database_list"):
+                if name == "main" and path:
+                    return Path(path).absolute()
+        return None
+
+    @property
+    def connection(self) -> sqlite3.Connection | None:
+        """The Python connection shared with the native writer."""
+        return self._connection
+
     def connect_to_simulation_engine(self, sim: SimulationEngine):
-        # close the regular Python sqlite connection
-        self.close()
-        # open a DbWriter connection
+        """Attach the native writer to this connection without reopening it."""
         if self._db_writer is None:
-            if self.filename:
-                self._db_writer = DbWriter("db", sim.config, sim, str(self.filename))
+            if self._connection is not None:
+                self._db_writer = DbWriter("db", sim.config, sim, self._connection)
             else:
                 self._db_writer = VoidWriter()
 
     def disconnect_from_simulation_engine(self):
+        """Detach the writer while leaving the Python connection open."""
         if self._db_writer:
             self._db_writer.close()
             self._db_writer = None
-        # re-open the regular Python sqlite connection
-        self.open()
 
     def __getattr__(self, item):
         return getattr(self._connection, item)
 
     def open(self, filename: str | None = None):
         """Open the connection if it is not already open."""
+        if not self._owns_connection:
+            raise ConnectionError("a caller-owned connection cannot be reopened by Database")
         if self._connection is not None:
             raise ConnectionError("the connection is already open")
         self.filename = filename or self.filename
@@ -163,24 +169,30 @@ class Database:
                 Path(self.filename).parent.mkdir(exist_ok=True, parents=True)
             logger.info(f"connecting to sqlite database: {self.filename}")
             self._connection = sqlite3.Connection(self.filename)
-            self._connection.create_aggregate("VARIANCE", 1, _VarianceFunc)
-            self._connection.create_aggregate("STDEV", 1, _StdevFunc)
-            for pragma in self.pragmas:
-                self._connection.execute(f"PRAGMA {pragma};")
-            self._connection.execute("BEGIN TRANSACTION;")
-            logger.debug("initializing sqlite tables")
-            from .tables import create_tables
-
-            create_tables(self)
+            self._initialize_connection()
         else:
             raise NotImplementedError(f"unknown engine {self.engine!r}")
 
+    def _initialize_connection(self):
+        """Initialize schema and functions without committing borrowed work."""
+        from .tables import create_tables
+
+        self._connection.create_aggregate("VARIANCE", 1, _VarianceFunc)
+        self._connection.create_aggregate("STDEV", 1, _StdevFunc)
+        for pragma in self.pragmas:
+            self._connection.execute(f"PRAGMA {pragma};")
+        if not self._connection.in_transaction:
+            self._connection.execute("BEGIN TRANSACTION;")
+        create_tables(self)
+
     def close(self):
-        """Flush pending operations and close the connection."""
-        if self._connection:
-            if self._connection.in_transaction:
-                self._connection.execute("COMMIT;")
-            self._connection.close()
+        """Detach the writer; commit and close only a library-owned connection."""
+        self.disconnect_from_simulation_engine()
+        if self._connection is not None:
+            if self._owns_connection:
+                if self._connection.in_transaction:
+                    self._connection.execute("COMMIT;")
+                self._connection.close()
             self._connection = None
 
     def _commit_by_count(self):
@@ -190,39 +202,72 @@ class Database:
             self._counter = 0
 
     def _commit_raw(self):
-        if self._connection:
+        if self._connection and self._owns_connection and not self._contexts:
             if self._connection.in_transaction:
                 self._connection.execute("COMMIT;")
             self._connection.execute("BEGIN TRANSACTION;")
 
     def __enter__(self):
         if not self.is_open:
-            self.disconnect_from_simulation_engine()
-            self.__close_on_exit = True
-        else:
-            self.__close_on_exit = False
-        if self._connection:
-            return self._connection.__enter__()
-        else:
-            return None
+            raise ConnectionError("the database connection is closed")
+        # Savepoints keep contexts nestable and preserve borrowed transactions.
+        if not self._connection.in_transaction:
+            self._connection.execute("BEGIN")
+        name = f"passengersim_context_{len(self._contexts)}"
+        self._connection.execute(f"SAVEPOINT {name}")
+        self._contexts.append(name)
+        return self._connection
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if self._connection:
-            out = self._connection.__exit__(exc_type, exc_val, exc_tb)
-        else:
-            out = None
-        if self.__close_on_exit:
-            self.close()
-        del self.__close_on_exit
-        return out
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> Literal[False]:
+        """Release this scope without hiding an exception from the context body.
+
+        Parameters
+        ----------
+        exc_type : type of BaseException or None
+            Exception type raised by the context body, if any.
+        exc_val : BaseException or None
+            Original exception, which takes precedence over cleanup failures.
+        exc_tb : types.TracebackType or None
+            Original exception traceback.
+
+        Returns
+        -------
+        False
+            Propagate the body's exception, if any.
+
+        Raises
+        ------
+        sqlite3.Error
+            Cleanup fails when there is no original exception to propagate.
+        """
+        name = self._contexts.pop()
+        try:
+            # SQLite may roll back the entire transaction (for example, after
+            # INSERT OR ROLLBACK), removing all nested savepoints at once.
+            if self._connection.in_transaction:
+                if exc_type is not None:
+                    self._connection.execute(f"ROLLBACK TO {name}")
+                self._connection.execute(f"RELEASE {name}")
+            if not self._contexts and self._owns_connection:
+                self._commit_raw()
+        except sqlite3.Error as cleanup_error:
+            if exc_val is None:
+                raise
+            exc_val.add_note(f"Database context cleanup also failed: {cleanup_error}")
+        return False
 
     @property
     def is_open(self) -> bool:
         return self._connection is not None
 
     def use_sqlite(self) -> bool:
-        """Return True if the database engine is SQLite and the filename is not None."""
-        return self.engine == "sqlite" and bool(self.filename)
+        """Return True when this wrapper holds a SQLite connection."""
+        return self.engine == "sqlite" and self._connection is not None
 
     def sql_placeholders(self, n: int):
         """A parenthesis enclosed set of `n` placeholders for the selected engine."""
@@ -367,8 +412,7 @@ class Database:
             );
             """
             self._connection.execute(idx)
-            self._connection.commit()
-            self._connection.execute("BEGIN TRANSACTION;")
+            self._commit_raw()
             any_work = True
 
         if leg_detail and "leg_detail_idx_2" not in self.index_names("leg_detail"):
@@ -378,8 +422,7 @@ class Database:
             ON leg_detail (scenario, trial, sample, days_prior, leg_id);
             """
             self._connection.execute(idx)
-            self._connection.commit()
-            self._connection.execute("BEGIN TRANSACTION;")
+            self._commit_raw()
             any_work = True
 
         if any_work:
@@ -398,14 +441,22 @@ class Database:
             else:
                 print(f"Copied all {total} pages.")
 
-        if not isinstance(dst, sqlite3.Connection):
+        if not self._owns_connection and self._connection.in_transaction:
+            raise ValueError("Commit or roll back the caller-owned connection before backup")
+        owns_destination = not isinstance(dst, sqlite3.Connection)
+        if not owns_destination and dst.in_transaction:
+            raise ValueError("Commit or roll back the destination connection before backup")
+        if owns_destination:
             dst = sqlite3.connect(dst)
-        if self._connection.in_transaction:
-            self._connection.execute("COMMIT;")
-        with dst:
+        try:
+            if self._connection.in_transaction:
+                self._connection.execute("COMMIT;")
             self._connection.backup(dst, pages=10000, progress=_progress if show_progress else None)
-        self._connection.execute("BEGIN TRANSACTION;")
-        dst.close()
+        finally:
+            if self._owns_connection:
+                self._connection.execute("BEGIN TRANSACTION;")
+            if owns_destination:
+                dst.close()
 
 
 def get_database_connection(
@@ -414,6 +465,7 @@ def get_database_connection(
     pragmas: Iterable[str] = (),
     commit_count_delay: int | None = 250,
 ):
+    """Return a PassengerSim Database wrapper, not a raw SQLite connection."""
     return Database(
         engine=engine,
         filename=filename,
@@ -430,22 +482,24 @@ def compute_rrd(sim: SimulationEngine, dep_time: float):
     return days_prior
 
 
-def delete_experiment(cnx: Database, name):
-    with cnx:
+@deprecated_cnx_keyword()
+def delete_experiment(db: Database, name):
+    with db:
         logger.info(f"deleting existing scenario {name!r} from database")
-        cnx.execute(f"DELETE FROM leg_detail WHERE scenario = '{name}' ")
-        cnx.execute(f"DELETE FROM leg_bucket_detail WHERE scenario = '{name}' ")
-        cnx.execute(f"DELETE FROM demand_detail WHERE scenario = '{name}' ")
-        cnx.execute(f"DELETE FROM fare_detail WHERE scenario = '{name}' ")
+        db.execute(f"DELETE FROM leg_detail WHERE scenario = '{name}' ")
+        db.execute(f"DELETE FROM leg_bucket_detail WHERE scenario = '{name}' ")
+        db.execute(f"DELETE FROM demand_detail WHERE scenario = '{name}' ")
+        db.execute(f"DELETE FROM fare_detail WHERE scenario = '{name}' ")
 
 
 n_commit = 0
 
 
-def sql_placeholders(cnx, n: int):
-    if isinstance(cnx, Database):
-        return sql_placeholders(cnx._connection, n)
-    elif isinstance(cnx, sqlite3.Connection):
+@deprecated_cnx_keyword()
+def sql_placeholders(db: Database | sqlite3.Connection, n: int):
+    if isinstance(db, Database):
+        return sql_placeholders(db._connection, n)
+    elif isinstance(db, sqlite3.Connection):
         x = "?"
     else:
         x = "%s"
@@ -453,13 +507,14 @@ def sql_placeholders(cnx, n: int):
 
 
 # TODO - How to model RRD / capture date?
-def save_leg(cnx, sim, leg, dcp) -> string:
+@deprecated_cnx_keyword()
+def save_leg(db: Database | sqlite3.Connection, sim, leg, dcp) -> string:
     _dep_time = datetime.utcfromtimestamp(leg.dep_time).strftime("%Y-%m-%d %H:%M:%S")
     try:
-        cursor = cnx.cursor()
+        cursor = db.cursor()
         sql = f"""INSERT INTO leg_detail
                 (scenario, iteration, trial, sample, days_prior, leg_id, sold, revenue)
-                VALUES ({sql_placeholders(cnx, 8)})"""
+                VALUES ({sql_placeholders(db, 8)})"""
         cursor.execute(
             sql,
             (
@@ -482,17 +537,18 @@ def save_leg(cnx, sim, leg, dcp) -> string:
 leg_bucket_sql = {}
 
 
-def save_leg_bucket_multi(cnx: Database, sim: SimulationEngine, leg, dcp, commit=False) -> string:
+@deprecated_cnx_keyword()
+def save_leg_bucket_multi(db: Database, sim: SimulationEngine, leg, dcp, commit=False) -> string:
     try:
-        cursor = cnx.cursor()
-        cnx_type = type(cnx).__name__
-        if cnx_type not in leg_bucket_sql:
-            sql = leg_bucket_sql[cnx_type] = f"""INSERT INTO leg_bucket_detail
+        cursor = db.cursor()
+        db_type = type(db).__name__
+        if db_type not in leg_bucket_sql:
+            sql = leg_bucket_sql[db_type] = f"""INSERT INTO leg_bucket_detail
                 (scenario, iteration, trial, sample, days_prior, leg_id,
                 bucket_number, name, auth, revenue, sold, detruncated_demand,
-                forecast_mean) VALUES ({sql_placeholders(cnx, 13)})"""
+                forecast_mean) VALUES ({sql_placeholders(db, 13)})"""
         else:
-            sql = leg_bucket_sql.get(cnx_type)
+            sql = leg_bucket_sql.get(db_type)
         data_list = []
         for n, bkt in enumerate(leg.buckets):
             data = (
@@ -514,7 +570,7 @@ def save_leg_bucket_multi(cnx: Database, sim: SimulationEngine, leg, dcp, commit
 
         cursor.executemany(sql, data_list)
         if commit:
-            cnx.commit()
+            db.commit()
         cursor.close()
         return True
     except Exception as err:
@@ -522,7 +578,8 @@ def save_leg_bucket_multi(cnx: Database, sim: SimulationEngine, leg, dcp, commit
         return False
 
 
-def save_demand_multi(cnx: Database, sim: SimulationEngine, dcp) -> string:
+@deprecated_cnx_keyword()
+def save_demand_multi(db: Database, sim: SimulationEngine, dcp) -> string:
     data_list = []
     for dmd in sim.demands:
         data_list.append(
@@ -545,11 +602,11 @@ def save_demand_multi(cnx: Database, sim: SimulationEngine, dcp) -> string:
         #     {dmd.sold}, {dmd.scenario_demand}")
 
     try:
-        cursor = cnx.cursor()
+        cursor = db.cursor()
         sql = f"""INSERT INTO demand_detail
                 (scenario, iteration, trial, sample, days_prior,
                  orig, dest, segment, sample_demand, sold, revenue)
-                VALUES ({sql_placeholders(cnx, 11)})"""
+                VALUES ({sql_placeholders(db, 11)})"""
         cursor.executemany(sql, data_list)
         return True
     except Exception as err:
@@ -557,7 +614,8 @@ def save_demand_multi(cnx: Database, sim: SimulationEngine, dcp) -> string:
         return False
 
 
-def save_fare_multi(cnx: Database, sim: SimulationEngine, dcp) -> string:
+@deprecated_cnx_keyword()
+def save_fare_multi(db: Database, sim: SimulationEngine, dcp) -> string:
     data_list = []
     for fare in sim.fares:
         data_list.append(
@@ -573,11 +631,11 @@ def save_fare_multi(cnx: Database, sim: SimulationEngine, dcp) -> string:
             )
         )
     try:
-        cursor = cnx.cursor()
+        cursor = db.cursor()
         sql = f"""INSERT INTO fare_detail
                 (scenario, iteration, trial, sample, days_prior,
                  sold, sold_business, fare_id)
-                VALUES ({sql_placeholders(cnx, 8)})"""
+                VALUES ({sql_placeholders(db, 8)})"""
         cursor.executemany(sql, data_list)
         return True
     except Exception as err:

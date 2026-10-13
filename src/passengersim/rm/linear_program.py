@@ -9,8 +9,6 @@
 from __future__ import annotations
 
 import random
-import sys
-import warnings
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from statistics import NormalDist
@@ -78,7 +76,8 @@ class LinearProgramming(RmAction):
             elif self.algorithm.lower() == "ssa":
                 s = StochasticSampleSolver(self.carrier, self.debug)
             elif self.algorithm.lower() == "ssblp":
-                s = SSBLP(self.carrier, self.debug)
+                self.frequency = "daily_pre_dep"
+                s = SSBLP(self.carrier, num_samples=self.num_pieces, debug=self.debug)
             else:
                 raise ValueError("Unknown algorithm")
             s.initialize(sim.eng)
@@ -86,7 +85,8 @@ class LinearProgramming(RmAction):
         else:
             self.lp[self.carrier].update(sim.eng)
 
-        self.lp[self.carrier].solve(sim.eng)
+        if sim.eng.last_dcp_index < 15:
+            self.lp[self.carrier].solve(sim.eng)
 
 
 # ##########################################################################################
@@ -106,8 +106,10 @@ class LpBase(ABC):
     def solve(self, sim: SimulationEngine, debug=False):
         pass
 
-    def test_status(self, status):
+    def test_status(self, status, eng, debug=False):
         if status in (pywraplp.Solver.OPTIMAL, pywraplp.Solver.FEASIBLE):
+            if debug:
+                print("***** OPTIMAL *****")
             return True
         elif status == pywraplp.Solver.INFEASIBLE:
             msg = "LP Problem is infeasible"
@@ -119,7 +121,9 @@ class LpBase(ABC):
             msg = "LP Displacement Problem is invalid"
         else:
             msg = "LP Unknown status - this should never happen !!!"
-        warnings.warn(f"{msg}: carrier={self.carrier}, sample={self.sim.sample}", stacklevel=2)
+        if debug:
+            print(f"{msg}: carrier={self.carrier}, sample={eng.sample}, last_dcp={eng.last_dcp_index}")
+        # warnings.warn(f"{msg}: carrier={self.carrier}, sample={eng.sample}", stacklevel=2)
         return False
 
 
@@ -306,7 +310,7 @@ class LpPiecewiseSolver(LpBase):
 
     def solve(self, sim: SimulationEngine, debug=False):
         _result_status = self.solver.Solve()
-        if self.test_status(_result_status):
+        if self.test_status(_result_status, sim):
             # The bid prices are the dual values of the capacity constraints
             for leg in sim.legs:
                 if leg.carrier_name != self.carrier:
@@ -436,7 +440,7 @@ class StochasticSampleSolver(LpBase):
 
     def solve(self, sim: SimulationEngine):
         status = self.solver.Solve()
-        if self.test_status(status):
+        if self.test_status(status, sim):
             for leg in sim.legs.set_filters(carrier=self.carrier):
                 dual = self.constraints[leg.flt_no].dual_value()
                 leg.displacement = max(dual, 0)
@@ -623,7 +627,7 @@ class LpPiecewise2(LpBase):
         """
         status = self.solver.Solve()
 
-        if self.test_status(status):
+        if self.test_status(status, eng):
             for leg in eng.legs:
                 if leg.carrier_name != self.carrier:
                     continue
@@ -653,14 +657,16 @@ class SSBLP(LpBase):
         "debug",
     )
 
-    def __init__(self, _carrier: str, _debug: bool):
+    def __init__(self, _carrier: str, *, num_samples: int = 3, max_dcp_index: int = 16, debug: bool = False):
         self.carrier = _carrier
         self.constraints = {}
-        self.debug = _debug
+        self.debug = debug
         self.solver = None
         self.lp_vars = {}
-        self.num_samples = 5
+        self.num_samples = num_samples
+        self.max_dcp_index = max_dcp_index
         self.objective = None
+        self.classes = set()
 
     def initialize(self, eng: SimulationEngine):
         self.solver = pywraplp.Solver.CreateSolver("GLOP")
@@ -670,205 +676,273 @@ class SSBLP(LpBase):
         tmp = DynamicProgram(eng, self.carrier)
         tmp.initialize()  # This step sets up the PcPtr structures, will refactor later to make this a separate call
 
-        self.debug = True
+        #        if eng.sample == 15 and eng.last_dcp == 10:
+        #            self.debug = True
+        #        else:
+        #            self.debug = False
 
-        # Create LP decision variables
         self.lp_vars = {}
-        sample_vars = defaultdict(list)
         if self.debug:
             print(f"********** Sample = {eng.sample}, setup decision variables **********")
+
+        # Set up the LP
+        revenue_c = self.solver.Constraint(-self.solver.infinity(), 0.0, "revenue")
         for mkt_key, mkt in eng.markets.items():
+            self.create_OA_variables(eng, mkt_key)
+            dmd_info = self.create_decision_variables(eng, mkt_key, mkt, revenue_c)
+            for path in mkt.paths:
+                if path.carrier_name != self.carrier:
+                    continue
+                self.create_nesting_constraints(eng, mkt_key, path)
+
+            self.create_balance_constraints_y(eng, mkt_key, mkt, dmd_info)
+            self.create_balance_constraints_x(eng, mkt_key, mkt, dmd_info)
+            self.create_scale_constraints_y(eng, mkt_key, mkt, dmd_info)
+            self.create_scale_constraints_x(eng, mkt_key, mkt, dmd_info)
+
+        self.create_capacity_constraints(eng)
+
+    def create_decision_variables(self, eng, mkt_key, mkt, revenue_c):
+        # Sum up the demand into various aggregation levels
+        dmd_info = defaultdict(float)
+        my_share = mkt.get_carrier_share(self.carrier)
+        if my_share < 0.01:
+            my_share = 0.0
+
+        for path in mkt.paths:
+            cxr = path.carrier_name
+            if cxr != self.carrier:
+                continue
+            for pc in path.pathclasses:
+                self.classes.add(pc.booking_class)
+                price = pc.optimization_price
+                pc_fcst = pc.forecast
+                for t in range(eng.last_dcp_index, self.max_dcp_index):
+                    y_name = f"y_{pc.identifier}_{t}"
+                    self.lp_vars[y_name] = y = self.solver.NumVar(0.0, self.solver.infinity(), y_name)
+                    self.objective.SetCoefficient(y, 0.0)
+                    revenue_c.SetCoefficient(y, -price)
+                    if self.debug:
+                        print(f"  Create var: {y}")
+
+                    # x variables, one per stochastic sample
+                    num_s = self.num_samples
+                    price_over_s = price / num_s
+                    for s in range(self.num_samples):
+                        x_name = f"x_{mkt_key}_{cxr}_{path.path_id}_{pc.booking_class}_{s}_{t}"
+                        self.lp_vars[x_name] = x = self.solver.NumVar(0.0, self.solver.infinity(), x_name)
+                        self.objective.SetCoefficient(x, price_over_s)
+                        revenue_c.SetCoefficient(x, price_over_s)
+                        if self.debug:
+                            print(f"    Set Obj: {x}, P={price}, |S|={self.num_samples}")
+
+                        # Capture all the demand info.
+                        # For the subscripts, the "i" is implied as we do one market at a time
+                        # "i0" is the Other Airline / No_go option
+                        # Anything that doesn't have "s" in the key is divided by the number of samples
+                        mu = pc_fcst.get_mean_in_timeframe(t)
+                        sigma = pc_fcst.get_stdev_in_timeframe(t)
+                        sample_demand = max(random.normalvariate(mu=mu, sigma=sigma), 0.0)
+                        tot_dmd = sample_demand / my_share
+                        i0_demand = tot_dmd - sample_demand
+                        # D[i,t] = total market demand
+                        dmd_info[t] += tot_dmd / num_s
+                        # D[i0,t] = other airline demand
+                        dmd_info[("i0", t)] += i0_demand / num_s
+                        # D[i0,s,t] = other airline demand, by sample
+                        dmd_info[("i0", s, t)] += i0_demand
+                        # D[i,s,t] = total demand for this sample
+                        dmd_info[(s, t)] += tot_dmd
+                        # D[i,j,k,t] = demand for Path / Class / Sample
+                        dmd_info[(pc.identifier, t)] += sample_demand / num_s
+
+        return dmd_info
+
+    def create_OA_variables(self, eng, mkt_key):
+        if self.debug:
+            pass
+        for t in range(eng.last_dcp_index, self.max_dcp_index):
+            y_name = f"y_OA_{mkt_key}_{t}"
+            self.lp_vars[y_name] = y = self.solver.NumVar(0.0, self.solver.infinity(), y_name)
+            self.objective.SetCoefficient(y, 0.0)
+            if self.debug:
+                print(f"  Create OA var: {y}")
+            for s in range(self.num_samples):
+                x_name = f"x_OA_{mkt_key}_{s}_{t}"
+                self.lp_vars[x_name] = x = self.solver.NumVar(0.0, self.solver.infinity(), x_name)
+                self.objective.SetCoefficient(x, 0.0)
+                if self.debug:
+                    print(f"    Create OA var: {x}")
+
+    def create_nesting_constraints(self, eng, mkt_key, path):
+        # Nesting constraints
+        # Suppose we have Y0, Y1 & Y2, we do this for each sample:
+        #   x_Y2 <= y_Y2
+        #   x_Y2 + x_Y1 <= y_Y2 + y_Y1
+        #   x_Y2 + x_Y1 + x_Y0 <= y_Y2 + y_Y1 + y_Y0
+        # We are already inside the loop over markets & paths
+        cxr = path.carrier_name
+        classes = sorted(self.classes, reverse=True)  # ["Y2", "Y1", "Y0"]
+        for t in range(eng.last_dcp_index, self.max_dcp_index):
+            for s in range(self.num_samples):
+                nest_name = f"Nest-{mkt_key}-{path.path_id}-{t}-{s}"
+                nest_c = self.solver.Constraint(0, self.solver.infinity(), nest_name)
+                if self.debug:
+                    print(nest_name)
+
+                # Now iterate over the classes
+                for ci1 in range(len(classes)):
+                    tmp = ""
+                    for ci2 in range(ci1, len(classes)):
+                        bc = classes[ci2]
+                        x_name = f"x_{mkt_key}_{cxr}_{path.path_id}_{bc}_{s}_{t}"
+                        y_name = f"y_{path.path_id}-{bc}_{t}"
+                        x = self.lp_vars[x_name]
+                        y = self.lp_vars[y_name]
+                        nest_c.SetCoefficient(x, -1.0)
+                        nest_c.SetCoefficient(y, 1.0)
+                        tmp += bc + " "
+                    if self.debug:
+                        print("    constraint for:", tmp)
+
+    def create_balance_constraints_y(self, eng, mkt_key, mkt, dmd_info):
+        for t in range(eng.last_dcp_index, self.max_dcp_index):
+            tf_mkt_dmd = dmd_info[t]
+            balance_name = f"Balance-y-{t}"
+            balance_c_y = self.solver.Constraint(tf_mkt_dmd, tf_mkt_dmd, balance_name)
+            if self.debug:
+                print(f"Balance constraint for {balance_name}:  {mkt_key}, tf={t}, D={tf_mkt_dmd}")
+            y_name_oa = f"y_OA_{mkt_key}_{t}"
+            y_oa = self.lp_vars[y_name_oa]
+            balance_c_y.SetCoefficient(y_oa, 1.0)
+            if self.debug:
+                print(f"    Coeff for {y_name_oa} = 1.0")
             for path in mkt.paths:
                 cxr = path.carrier_name
                 if cxr != self.carrier:
                     continue
                 for pc in path.pathclasses:
-                    price = pc.decision_fare
-                    pc_fcst = pc.forecast
-                    for t in range(eng.last_dcp_index, 16):
-                        y_name = f"y_{pc.identifier}_{t}"
-                        # y_name = f"y_{mkt_key}_{cxr}_{path.path_id}_{pc.booking_class}_{t}"
-                        self.lp_vars[y_name] = y = self.solver.NumVar(0, self.solver.infinity(), y_name)
+                    y_name = f"y_{pc.identifier}_{t}"
+                    y = self.lp_vars[y_name]
+                    balance_c_y.SetCoefficient(y, 1.0)
+                    if self.debug:
+                        print(f"    Coeff for {y_name} = 1.0")
+
+    def create_balance_constraints_x(self, eng, mkt_key, mkt, dmd_info):
+        for s in range(self.num_samples):
+            for t in range(eng.last_dcp_index, self.max_dcp_index):
+                tf_s_mkt_dmd = dmd_info[(s, t)]
+                balance_name = f"Balance-x-{t}"
+                balance_c_x = self.solver.Constraint(tf_s_mkt_dmd, tf_s_mkt_dmd, balance_name)
+                if self.debug:
+                    print(f"Balance constraint for {balance_name}:  {mkt_key}, tf={t}, D={tf_s_mkt_dmd}")
+                x_name_oa = f"x_OA_{mkt_key}_{s}_{t}"
+                x_oa = self.lp_vars[x_name_oa]
+                balance_c_x.SetCoefficient(x_oa, 1.0)
+                if self.debug:
+                    print(f"    Coeff for {x_name_oa} = 1.0")
+                for path in mkt.paths:
+                    cxr = path.carrier_name
+                    if cxr != self.carrier:
+                        continue
+                    for pc in path.pathclasses:
+                        x_name = f"x_{mkt_key}_{cxr}_{path.path_id}_{pc.booking_class}_{s}_{t}"
+                        x = self.lp_vars[x_name]
+                        balance_c_x.SetCoefficient(x, 1.0)
                         if self.debug:
-                            print("  Set Obj:", y, price)
-                        self.objective.SetCoefficient(y, 0.0)
-                        print(y_name)
+                            print(f"    Coeff for {x_name} = 1.0")
 
-                        # x variables, one per stochastic sample
-                        for s in range(self.num_samples):
-                            mu = pc_fcst.get_mean_in_timeframe(s)
-                            sigma = pc_fcst.get_stdev_in_timeframe(s)
-                            sample_demand = max(random.normalvariate(mu=mu, sigma=sigma), 0.0)
-                            x_name = f"x_{mkt_key}_{cxr}_{path.path_id}_{pc.booking_class}_{s}_{t}"
-                            self.lp_vars[x_name] = x = self.solver.NumVar(0, sample_demand, x_name)
-                            sample_vars[s].append(x)
-                            self.objective.SetCoefficient(x, price / self.num_samples)
-                            print(x_name)
+    def create_scale_constraints_y(self, eng, mkt_key, mkt, dmd_info):
+        for t in range(eng.last_dcp_index, self.max_dcp_index):
+            i0_dmd = dmd_info[("i0", t)]
+            scale_name = f"Scale-y-{t}"
+            scale_c_y = self.solver.Constraint(-self.solver.infinity(), 0.0, scale_name)
+            y_name_oa = f"y_OA_{mkt_key}_{t}"
+            y_oa = self.lp_vars[y_name_oa]
+            val = -1.0 / i0_dmd if i0_dmd > 0.01 else 0.0
+            scale_c_y.SetCoefficient(y_oa, val)
+            if self.debug:
+                print(f"Scale constraint for {scale_name}:  {mkt_key}, tf={t}, D={val}")
+            for path in mkt.paths:
+                cxr = path.carrier_name
+                if cxr != self.carrier:
+                    continue
+                for pc in path.pathclasses:
+                    y_name = f"y_{pc.identifier}_{t}"
+                    y = self.lp_vars[y_name]
+                    dmd = dmd_info[(pc.identifier, t)]
+                    val = 1.0 / dmd if dmd > 0.01 else 0.0
+                    scale_c_y.SetCoefficient(y, val)
+                    if self.debug:
+                        print(f"    Coeff for {y_name} = {val}")
 
-                # Nesting constraints
-                # Suppose we have Y0, Y1 & Y2, we do this for each sample:
-                #   x_Y2 <= y_Y2
-                #   x_Y2 + x_Y1 <= y_Y2 + y_Y1
-                #   x_Y2 + x_Y1 + x_Y0 <= y_Y2 + y_Y1 + y_Y0
-                # We are already inside the loop over markets & paths
-                classes = ["Y5", "Y4", "Y3", "Y2", "Y1", "Y0"]
-                for t in range(eng.last_dcp_index, 16):
-                    for s in range(self.num_samples):
-                        nest_name = f"Nest-{mkt_key}-{path.path_id}-{t}-{s}"
-                        nest_c = self.solver.Constraint(0, self.solver.infinity(), nest_name)
-                        print(nest_name)
+    def create_scale_constraints_x(self, eng, mkt_key, mkt, dmd_info):
+        for t in range(eng.last_dcp_index, self.max_dcp_index):
+            i0_dmd = dmd_info[("i0", t)]
+            for s in range(self.num_samples):
+                scale_name = f"Scale-x-{s}-{t}"
+                scale_c_x = self.solver.Constraint(-self.solver.infinity(), 0.0, scale_name)
+                x_name_oa = f"x_OA_{mkt_key}_{s}_{t}"
+                x_oa = self.lp_vars[x_name_oa]
+                val = -1.0 / i0_dmd if i0_dmd > 0.01 else 0.0
+                scale_c_x.SetCoefficient(x_oa, val)
+                if self.debug:
+                    print(f"Scale constraint for {scale_name}:  {mkt_key}, tf={t}, D={val}")
+                for path in mkt.paths:
+                    cxr = path.carrier_name
+                    if cxr != self.carrier:
+                        continue
+                    for pc in path.pathclasses:
+                        dmd = dmd_info[(pc.identifier, t)]
+                        x_name = f"x_{mkt_key}_{cxr}_{path.path_id}_{pc.booking_class}_{s}_{t}"
+                        x = self.lp_vars[x_name]
+                        val = 1.0 / dmd if dmd > 0.01 else 0.0
+                        scale_c_x.SetCoefficient(x, val)
+                        if self.debug:
+                            print(f"    Coeff for {x_name} = {val}")
 
-                        # Now iterate over the classes
-                        for ci1 in range(len(classes)):
-                            tmp = ""
-                            for ci2 in range(ci1, len(classes)):
-                                bc = classes[ci2]
-                                x_name = f"x_{mkt_key}_{cxr}_{path.path_id}_{pc.booking_class}_{s}_{t}"
-                                y_name = f"y_{path.path_id}-{bc}_{t}"
-                                x = self.lp_vars[x_name]
-                                y = self.lp_vars[y_name]
-                                nest_c.SetCoefficient(x, -1.0)
-                                nest_c.SetCoefficient(y, 1.0)
-                                tmp += bc + " "
-                            if self.debug:
-                                print("    constraint for:", tmp)
-
-                if len(self.lp_vars) > 0:
-                    sys.exit(0)
-
-                # for j in range(len(pc_vars)):
-                #     nest_name = f"Nest-{p_id}-{s}-{j}"
-                #     if self.debug:
-                #         print("  Create sample nest constraint:", nest_name)
-                #     nest_c = self.solver.Constraint(0, self.solver.infinity(), nest_name)
-                #     for i in range(j, len(pc_vars)):
-                #         x = sample_vars[s][i]
-                #         y = pc_vars[i]
-                #         if self.debug:
-                #             print("    Coeffs:", x, y)
-                #         nest_c.SetCoefficient(x, -1.0)
-                #         nest_c.SetCoefficient(y, 1.0)
-
-        # Create capacity constraints
+    def create_capacity_constraints(self, eng):
+        if self.debug:
+            print("********** Setup capacity constraints **********")
         if len(self.lp_vars) == 0:
             return
         self.constraints = {}
         for leg in eng.legs.set_filters(carrier=self.carrier):
             rem_cap = leg.capacity - leg.sold
-            ct_name = f"Leg-{leg.flt_no}"
+            ct_name = f"Capacity-{leg.flt_no}"
             if self.debug:
-                print("Capacity constraint", ct_name, rem_cap)
+                print(f"Capacity constraint: {ct_name}, {rem_cap=}")
             ct = self.solver.Constraint(0, rem_cap, ct_name)
             for pc_id in leg.pathclass_identifiers:
-                for t in range(eng.last_dcp_index, 16):
-                    name = f"y_{pc_id}_{t}"
+                for t in range(eng.last_dcp_index, self.max_dcp_index):
+                    y_name = f"y_{pc_id}_{t}"
                     if self.debug:
-                        print("  Adding cap constraint for", name)
-                    ct.SetCoefficient(self.lp_vars[name], 1)
+                        print("  Adding cap constraint for", y_name)
+                    ct.SetCoefficient(self.lp_vars[y_name], 1)
             self.constraints[leg.flt_no] = ct
-        sys.exit(0)
-
-    def initialize2(self, eng: SimulationEngine):
-        self.solver = pywraplp.Solver.CreateSolver("GLOP")
-        self.objective = self.solver.Objective()
-        self.objective.SetMaximization()
-
-        tmp = DynamicProgram(eng, self.carrier)
-        tmp.initialize()  # This step sets up the PcPtr structures, will refactor later to make this a separate call
-
-        # create LP decision variables, which are how many passengers to accept for each path class
-        self.lp_vars = {}
-        if self.debug:
-            print(f"********** Sample = {eng.sample}, setup decision variables **********")
-        for path in eng.paths:  # .set_filters(carrier=self.carrier):
-            if path.carrier_name != self.carrier:
-                continue
-            if self.debug:
-                print("Path:", path)
-
-            p_id = f"{path.carrier_name}_{path.orig}_{path.dest}_{path.path_id}"
-            c_name = f"PathRev-{p_id}"
-            rev_c = self.solver.Constraint(0, self.solver.infinity(), c_name)
-
-            pc_vars = []
-            sample_vars = defaultdict(list)
-            for pc in path.pathclasses:
-                y_name = "y_" + pc.identifier
-                fare = pc.fare_price
-                pc_dmd = pc.fcst_mean
-                self.lp_vars[y_name] = y = self.solver.NumVar(0, pc_dmd, y_name)
-                if self.debug:
-                    print("  Set Obj:", y, fare)
-                self.objective.SetCoefficient(y, 0.0)
-                rev_c.SetCoefficient(y, fare)
-                pc_vars.append(y)
-
-                # Sample variables
-                rev = fare / self.num_samples
-                for s in range(self.num_samples):
-                    sample_demand = max(random.normalvariate(mu=pc_dmd, sigma=pc.fcst_std_dev), 0.0)
-                    x_name = f"x_{s}_{pc.identifier}"
-                    self.lp_vars[x_name] = x = self.solver.NumVar(0, sample_demand, x_name)
-                    sample_vars[s].append(x)
-                    if self.debug:
-                        print("  Set Obj", x, rev, pc_dmd, round(sample_demand, 2))
-                    self.objective.SetCoefficient(x, rev)
-                    if self.debug:
-                        print("  Set Constraint", c_name, x, -1.0 * rev)
-                    rev_c.SetCoefficient(x, -1.0 * rev)
-
-            # Nesting constraints
-            # Suppose we have Y0, Y1 & Y2, we do this for each sample:
-            #   x_Y2 <= y_Y2
-            #   x_Y2 + x_Y1 <= y_Y2 + y_Y1
-            #   x_Y2 + x_Y1 + x_Y0 <= y_Y2 + y_Y1 + y_Y0
-            for s in range(self.num_samples):
-                for j in range(len(pc_vars)):
-                    nest_name = f"SampleNest-{p_id}-{s}-{j}"
-                    if self.debug:
-                        print("  Create sample nest constraint:", nest_name)
-                    nest_c = self.solver.Constraint(0, self.solver.infinity(), nest_name)
-                    for i in range(j, len(pc_vars)):
-                        x = sample_vars[s][i]
-                        y = pc_vars[i]
-                        if self.debug:
-                            print("    Coeffs:", x, y)
-                        nest_c.SetCoefficient(x, -1.0)
-                        nest_c.SetCoefficient(y, 1.0)
-
-        # Create capacity constraints
-        self.constraints = {}
-        for leg in eng.legs.set_filters(carrier=self.carrier):
-            rem_cap = leg.capacity - leg.sold
-            ct_name = f"Leg-{leg.flt_no}"
-            if self.debug:
-                print("Capacity constraint", ct_name, rem_cap)
-            ct = self.solver.Constraint(0, rem_cap, ct_name)
-            for pc_id in leg.pathclass_identifiers:
-                name = "y_" + pc_id
-                if self.debug:
-                    print("  Adding variable", name)
-                ct.SetCoefficient(self.lp_vars[name], 1)
-            self.constraints[leg.flt_no] = ct
+        # sys.exit(0)
 
     def update(self, eng: SimulationEngine):
         self.initialize(eng)
 
     # Solve and write displacement costs (bid prices) back to the engine
     def solve(self, eng: SimulationEngine, debug: bool = False):
-        return
         """
         Solve the LP and write dual values (displacement costs / bid prices)
         back to each leg.
         """
         status = self.solver.Solve()
-        if self.test_status(status):
+        if self.test_status(status, eng, self.debug):
+            if self.debug:
+                print("Objective value =", self.objective.Value())
             for leg in eng.legs.set_filters(carrier=self.carrier):
+                if leg.flt_no not in self.constraints:
+                    continue
                 dual = self.constraints[leg.flt_no].dual_value()
                 leg.displacement = max(dual, 0)
-                if self.set_bp:
-                    leg.bid_price = leg.displacement
-                print(f"Dual for {leg} = {round(dual, 2)}")
-            for k, var in self.lp_vars.items():
-                if k[0] != "x":
-                    print(k, round(var.solution_value(), 2))
+                leg.bid_price = leg.displacement
+                if self.debug:
+                    print(f"Dual for {leg} = {round(dual, 2)}")
+                    for k, var in self.lp_vars.items():
+                        if k[0] != "x":
+                            print(k, round(var.solution_value(), 2))

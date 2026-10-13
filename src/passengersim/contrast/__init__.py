@@ -1313,6 +1313,7 @@ def fig_fare_class_mix(
     raw_df: bool = False,
     also_df: bool = False,
     label_threshold: float = 0.06,
+    group_by: str = "",
 ) -> alt.Chart | pd.DataFrame | tuple[alt.Chart, pd.DataFrame]:
     """Generate a figure contrasting carrier fare class mix for one or more runs.
 
@@ -1342,8 +1343,23 @@ def fig_fare_class_mix(
     """
     df = _assemble(summaries, "fare_class_mix")
     source_order = list(summaries.keys())
+
+    sub_title = ""
+    if group_by in ["", "fare_class"]:
+        group_key = "fare_class"
+    elif group_by == "booking_class":
+        group_key = "booking_class"
+        df = df.groupby(["source", "carrier", "booking_class"], as_index=True).sum("avg_sold").reset_index()
+        sub_title = ", by Booking Class"
+    elif group_by == "brand":
+        group_key = "brand"
+        df = df.groupby(["source", "carrier", "brand"], as_index=True).agg(avg_sold=("avg_sold", "sum")).reset_index()
+        sub_title = ", by Brand"
+    else:
+        raise ValueError("Invalid value for group_by")
+
     if raw_df:
-        df.attrs["title"] = "Carrier Fare Class Mix"
+        df.attrs["title"] = "Carrier Fare Class Mix" + sub_title
         return df
     import altair as alt
 
@@ -1354,10 +1370,10 @@ def fig_fare_class_mix(
     bars = chart.mark_bar().encode(
         x=alt.X("source:N", title="Source", sort=source_order),
         y=alt.Y("avg_sold:Q", title="Seats").stack("zero"),
-        color="booking_class",
+        color=group_key,
         tooltip=[
             "source",
-            "booking_class",
+            group_key,
             alt.Tooltip("avg_sold", format=".2f"),
         ],
     )
@@ -1370,10 +1386,10 @@ def fig_fare_class_mix(
             alt.value(0),
             alt.value(1),
         ),
-        order=alt.Order("booking_class:N", sort="descending"),
+        order=alt.Order(group_key + ":N", sort="descending"),
         tooltip=[
             "source",
-            "booking_class",
+            group_key,
             alt.Tooltip("avg_sold", format=".2f"),
         ],
     )
@@ -1385,11 +1401,11 @@ def fig_fare_class_mix(
         )
         .facet(
             column=alt.Column("carrier:N", title="Carrier"),
-            title="Carrier Fare Class Mix",
+            title="Carrier Fare Class Mix" + sub_title,
         )
     )
     if also_df:
-        df.attrs["title"] = "Carrier Fare Class Mix"
+        df.attrs["title"] = "Carrier Fare Class Mix" + sub_title
         return fig, df
     return fig
 

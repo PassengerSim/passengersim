@@ -13,6 +13,7 @@ def config(tmp_path_factory) -> pax.Config:
     cfg.carriers.AL1.rm_system_options = {"name": "E"}
     cfg.carriers.AL2.rm_system_options = {"name": "E"}
     cfg.simulation_controls.num_trials = 1
+    cfg.simulation_controls.burn_samples = 100
     cfg.db.filename = tmp_path_factory.mktemp("test-3mkt-EE") / "db.sqlite"
     cfg.outputs.base_dir = tmp_path_factory.mktemp("test-3mkt-EE") / "outputs"
     return cfg
